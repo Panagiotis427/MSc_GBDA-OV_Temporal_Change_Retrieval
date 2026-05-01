@@ -164,7 +164,8 @@ def validate_temporal_dataset(
             raise KeyError(f"No embeddings found for location {loc}")
 
         emb_length = len(embedding_lookup[loc])
-        expected = n_obs := len(metadata_df[metadata_df['location'] == loc])
+        n_obs = len(metadata_df[metadata_df['location'] == loc])
+        # expected = n_obs  # Walrus operator for Python 3.8+ compatibility
         if emb_length != n_obs:
             raise ValueError(
                 f"Embeddings for {loc} have length {emb_length}, "
