@@ -1,0 +1,43 @@
+[project]
+name = "project"
+version = "0.1.0"
+requires-python = ">=3.12, <3.13"
+dependencies = [
+  "torch",
+  "torchvision",
+  "triton-rocm>=3.6.0 ; sys_platform == 'linux'",
+  "matplotlib",
+  "docling",
+  "transformers",
+  "sentence-transformers>=5.4.0",
+  "numpy<2",
+  #"onnxruntime_migraphx"
+  "mlflow>=3.11.1",
+  "pytest>=9.0.3",
+  "faiss-cpu>=1.13.2",
+  "gradio>=6.14.0",
+  "coverage>=7.13.5",
+]
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-rocm"},
+]
+torchvision = [
+  { index = "pytorch-rocm"},
+]
+triton-rocm = [
+  { index = "pytorch-rocm"},
+]
+
+
+[[tool.uv.index]]
+name = "pytorch-rocm"
+url = "https://download.pytorch.org/whl/rocm7.2"
+explicit = true
+
+[[tool.uv.index]]
+name = "rocm7.2"
+url = "https://repo.radeon.com/rocm/manylinux/rocm-rel-7.2.1/"
+explicit = true
+
