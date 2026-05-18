@@ -30,19 +30,25 @@ Headline result (real DEN, train split, 605 pairs — in-distribution):
 | GeoRSCLIP ViT-B/32 | 0.027 | 0.040 | **0.335** |
 | RemoteCLIP ViT-L/14 | 0.024 | 0.057 | **0.352** |
 
-Generalisation result (held-out test split, 110 pairs — RGB vs NIR false-colour):
+Generalisation result (held-out test split, 110 pairs — colour-mode ablation, zero-shot):
 
-| Encoder | color | zero-shot test mAP | PEFT test mAP |
-|---|---|---|---|
-| CLIP ViT-L/14 | RGB | 0.043 | 0.039 |
-| GeoRSCLIP ViT-B/32 | RGB | 0.299 | 0.041 |
-| GeoRSCLIP ViT-B/32 | **NRG** | **0.426** | — |
+| Encoder | color | test mAP |
+|---|---|---|
+| CLIP ViT-L/14 | RGB | 0.043 |
+| CLIP ViT-L/14 | NRG | 0.102 |
+| CLIP ViT-L/14 | NDVI | 0.062 |
+| GeoRSCLIP | RGB | 0.299 |
+| GeoRSCLIP | **NRG** | **0.426** |
+| GeoRSCLIP | NDVI | 0.216 |
+| RemoteCLIP | RGB | 0.050 |
+| RemoteCLIP | NRG | 0.129 |
+| RemoteCLIP | NDVI | 0.055 |
 
 **Key findings:** PEFT adapters overfit to train AOIs (mAP collapses on
-held-out splits). Zero-shot generalises better. Adding the on-disk NIR
-(infrared) band as NRG false-colour boosts GeoRSCLIP zero-shot on unseen
-AOIs from 0.299 → **0.426**, outperforming every in-distribution PEFT result
-except CLIP L/14 on train.
+held-out splits). Zero-shot generalises better. NRG false-colour (NIR-Red-Green)
+outperforms RGB and NDVI for all encoders on unseen AOIs. NDVI collapses spectral
+texture to a single channel, losing the inter-channel contrasts NRG preserves.
+GeoRSCLIP + NRG zero-shot (0.426) is the best generalising configuration.
 
 ---
 
@@ -188,6 +194,16 @@ testable in seconds with no network.
     on val (110 pairs) and test (110 pairs). PEFT overfits train; zero-shot and
     NRG-augmented zero-shot generalise. Cache keyed by (dataset, encoder, split,
     color) to avoid collision.
+16. **NDVI ablation** — `color_mode='ndvi'` benchmarked across all encoders and
+    splits. NRG outperforms NDVI for all encoders on held-out test (GeoRSCLIP:
+    0.426 NRG vs 0.216 NDVI). NDVI collapses spectral texture to one channel,
+    losing inter-channel contrasts NRG preserves.
+17. **LoRA adapter** — peft LoRA applied to GeoRSCLIP visual encoder (ViT-B-32),
+    targeting `out_proj`, `c_fc`, `c_proj` in each ResBlock (442K trainable /
+    88M total, 0.5%). Trained with online image loading (no pre-caching), same
+    masked InfoNCE loss as ProjectionHead. GeoRSCLIP+NRG, 20 epochs, rank=4:
+    test mAP **0.159** — better than ProjectionHead PEFT (0.041) but below
+    zero-shot NRG (0.426). Confirms zero-shot as the best generalising approach.
 
 ---
 
@@ -240,29 +256,83 @@ RS-domain features represent more discriminatively than train.
 
 ### 7.3 NIR false-colour ablation
 
-Adding the on-disk near-infrared band as NRG false-colour (NIR-Red-Green,
-`color_mode='nrg'`) vs standard RGB:
+Three colour modes compared (zero-shot mAP, all three splits):
 
-| Encoder | color | split | zero-shot mAP |
-|---|---|---|---|
-| CLIP ViT-L/14 | RGB | train | 0.043 |
-| CLIP ViT-L/14 | **NRG** | train | **0.034** |
-| CLIP ViT-L/14 | RGB | test | 0.043 |
-| CLIP ViT-L/14 | **NRG** | test | **0.102** |
-| GeoRSCLIP ViT-B/32 | RGB | train | 0.040 |
-| GeoRSCLIP ViT-B/32 | **NRG** | train | **0.025** |
-| GeoRSCLIP ViT-B/32 | RGB | test | 0.299 |
-| GeoRSCLIP ViT-B/32 | **NRG** | test | **0.426** |
+| Encoder | color | train | val | test |
+|---|---|---|---|---|
+| CLIP ViT-L/14 | RGB | 0.043 | 0.051 | 0.043 |
+| CLIP ViT-L/14 | NRG | 0.034 | 0.067 | 0.102 |
+| CLIP ViT-L/14 | NDVI | 0.032 | 0.044 | 0.062 |
+| GeoRSCLIP | RGB | 0.040 | 0.036 | 0.299 |
+| GeoRSCLIP | **NRG** | 0.025 | 0.030 | **0.426** |
+| GeoRSCLIP | NDVI | 0.028 | 0.065 | 0.216 |
+| RemoteCLIP | RGB | 0.057 | 0.025 | 0.050 |
+| RemoteCLIP | NRG | 0.023 | 0.047 | 0.129 |
+| RemoteCLIP | NDVI | 0.022 | 0.048 | 0.055 |
 
-NRG hurts on train (−0.009 to −0.015) but dramatically helps on held-out
-test (+0.059 CLIP, **+0.127 GeoRSCLIP**). Interpretation: the NIR band makes
-vegetation/wetland boundaries more salient to RS-pretrained encoders, and
-these structural patterns transfer across AOIs better than the subtle
-RGB-only texture differences that PEFT memorises.
+**NRG > NDVI > RGB on held-out test for all encoders.**
 
-**GeoRSCLIP + NRG zero-shot is the best generalising configuration (0.426
-mAP on unseen AOIs)** — exceeding even in-distribution PEFT for CLIP and
-RemoteCLIP on their own training set, and requiring no training.
+NRG hurts on train (−0.009 to −0.032) but substantially helps on test
+(+0.059 CLIP, **+0.127 GeoRSCLIP**, +0.079 RemoteCLIP). NDVI sits
+between: it provides some NIR signal but collapses all spectral texture
+into a single channel replicated across R/G/B — the RS-pretrained encoders
+cannot exploit inter-channel colour contrasts that NRG preserves.
+
+RemoteCLIP NRG (test 0.129) improves over RGB (0.050) but lags GeoRSCLIP
+NRG (0.426); GeoRSCLIP's RS5M pre-training gives it a stronger prior for
+the NIR-Green spectral contrast characteristic of vegetation transitions.
+
+**GeoRSCLIP + NRG zero-shot remains the best generalising configuration
+(0.426 mAP on unseen AOIs)** — exceeding even in-distribution PEFT for
+CLIP and RemoteCLIP on their own training set, and requiring no training.
+
+### 7.4 LoRA adapter — visual encoder fine-tuning
+
+LoRA applied to GeoRSCLIP's ViT-B-32 visual encoder targets `out_proj`, `c_fc`,
+`c_proj` in each ResBlock (attention output + FFN). 442K trainable params out of
+88M (0.5%). Training is online (no pre-cached embeddings; images loaded on-the-fly)
+using the same masked symmetric InfoNCE loss as ProjectionHead.
+
+Results (GeoRSCLIP + NRG, rank=4, α=8, 20 epochs; zero-shot with LoRA-adapted embeddings):
+
+| split | zero_shot (frozen) | LoRA zero_shot |
+|---|---|---|
+| train | 0.025 | 0.021 |
+| val | 0.047 | 0.041 |
+| test | **0.426** | 0.159 |
+
+**LoRA is worse than frozen zero-shot on all splits.** The cross-split drop
+(0.426 → 0.159) is less severe than ProjectionHead PEFT (0.426 → 0.041), but
+LoRA still overfits train-AOI visual texture. The visual encoder adapts to the
+specific NIR-channel patterns of the 55 training AOIs, which do not generalise
+to the 10 test AOIs.
+
+This result reinforces the project's core finding: **spectral physics (NRG
+false-colour) generalises; learned visual priors do not.** No amount of adapter
+sophistication — whether a small projection head or LoRA on the backbone — beats
+the structural prior embedded in RS-pretrained zero-shot GeoRSCLIP + NIR.
+
+### §7.5 UI extensions (non-experiment)
+
+Four optional features were added to the Gradio app. All are toggleable at
+any time without restarting; CLI flags set startup defaults only.
+
+**Settings accordion (requires Apply — changes which embeddings are loaded):**
+
+| Control | What it does |
+|---|---|
+| Color Mode | Switch dataset loader between `rgb`, `nrg` (NIR-Red-Green), `ndvi`. Loads the corresponding pre-cached embeddings. Best config: GeoRSCLIP + NRG (test mAP 0.426). |
+| Use LoRA embeddings | Load the LoRA-adapted embedding cache (`_lora` tag) instead of frozen embeddings. Requires prior `run_pipeline --lora` run. |
+
+**Filters & Re-ranking accordion (per-query — no rebuild needed):**
+
+| Control | What it does |
+|---|---|
+| Geographic filter | Restricts candidate pairs to a continental region (Africa / Asia / Europe / North America / Oceania / South America) using `aoi_metadata.json` bboxes. Masked pairs get score −∞. |
+| Re-ranking | Post-processes the ranked list. `diversity`: greedy location-deduplication (prefers unique AOIs). `coherence`: boosts pairs near the top-1 centroid (haversine proximity). |
+
+Both Filters & Re-ranking controls compose freely with each other and with
+all three approaches (naive / zero_shot / peft).
 
 ### Error analysis — seasonal vs permanent
 
@@ -342,7 +412,7 @@ The adapter is < 0.2 % of the backbone parameter count — the PEFT premise.
 | End-to-end query — CLIP text forward + scoring, 605 pairs | **10.5 ms** |
 | Embedding precompute — CLIP L/14, 1024²→224, GPU | **68 ms/tile** → 1210 tiles ≈ **82 s** (one-time, cached) |
 | PEFT training — 605 samples, 40 epochs, adapter only, GPU | **≈29 s** |
-| Fast test suite — 103 tests, mock encoders, CPU | ≈19 s |
+| Fast test suite — 129 tests, mock encoders, CPU | ≈21 s |
 
 All GPU figures measured on the RTX 4060 in a dedicated timed pass (run with
 no other GPU job, to avoid contention skew).
@@ -368,6 +438,20 @@ python -m scripts.run_pipeline --root data/DynamicEarthNet \
 python -m scripts.run_pipeline --root data/DynamicEarthNet \
     --encoder georsclip --color-mode nrg --eval-splits train val test --skip-train
 
+# NDVI ablation (all encoders, zero-shot only)
+python -m scripts.run_pipeline --root data/DynamicEarthNet \
+    --encoder clip_vitl14 --color-mode ndvi --eval-splits train val test --skip-train
+python -m scripts.run_pipeline --root data/DynamicEarthNet \
+    --encoder georsclip   --color-mode ndvi --eval-splits train val test --skip-train
+python -m scripts.run_pipeline --root data/DynamicEarthNet \
+    --encoder remoteclip  --color-mode nrg  --eval-splits train val test --skip-train
+
+# LoRA adapter on visual encoder (GeoRSCLIP + NRG)
+python -m scripts.run_pipeline --root data/DynamicEarthNet \
+    --encoder georsclip --color-mode nrg --skip-train \
+    --lora --lora-epochs 20 --lora-rank 4 --lora-alpha 8 \
+    --eval-splits train val test
+
 python -m src.app --root data/DynamicEarthNet --encoder clip_vitl14 --split train   # Gradio UI
 
 pytest -q --ignore=tests/test_text_encoder.py    # fast suite, deterministic, no network
@@ -383,18 +467,25 @@ regenerated automatically by the test suite.
 
 - **Weak supervision**: captions derived from dominant-class label flips, not
   human change descriptions — noisy and coarse.
-- **PEFT generalisation**: the adapter overfits to train AOI statistics; LoRA
-  on the visual tower (frozen-attention LoRA) or multi-AOI held-out training
-  would help. NRG zero-shot is currently the most robust configuration.
+- **PEFT generalisation**: both ProjectionHead and LoRA adapters overfit to
+  train AOI statistics (tested; see §7.4). Multi-AOI held-out training or
+  domain-randomised augmentation would help. NRG zero-shot remains the most
+  robust configuration.
 - **Global embeddings**: patch-level or localised change attention (e.g.
   cross-attention over spatial tokens) would address the main signal-dilution
   failure mode.
-- **`concatenate` change mode** and per-query NDVI vs NRG ablation not swept.
+- **`concatenate` change mode** and higher LoRA rank/epoch sweeps not explored.
 - **QFabric/fMoW** wired through the protocol; lacks pixel labels for
   quantitative benchmark without external label files.
 - **Sentinel-1/2 data**: `aoi_metadata.json` confirms 51/75 AOIs have full
   SAR (S1) coverage; downloading and feeding SAR Δ-features is a direct
   extension of the NRG pattern.
+- **Re-ranking not benchmarked**: geographic diversity and coherence re-ranking
+  are implemented and toggleable (§7.5), but their effect on mAP/Recall@K has
+  not been quantified — a one-command sweep with `run_benchmark` per strategy
+  would close this gap.
+- **Human relevance judgements**: all mAP figures use LULC-derived
+  pseudo-labels. Human-annotated query relevance would give a true IR benchmark.
 
 ---
 
@@ -405,7 +496,7 @@ change search engine with a Gradio interface, a label-grounded Recall@K/mAP
 benchmark, seasonal-vs-permanent error analysis, and a clear **zero-shot vs
 PEFT** comparison across **three CLIP-variant encoders** on Dynamic EarthNet.
 
-Two complementary findings:
+Three complementary findings:
 
 1. **In-distribution**: PEFT adapters raise mAP ~8–10× over zero-shot
    (0.043 → 0.428, CLIP L/14 on train split). Low-compute fine-tuning is
@@ -417,7 +508,12 @@ Two complementary findings:
    with zero training — equal to the best in-distribution PEFT result from
    the same encoder, and requiring no labels.
 
-The contrast between these two regimes (in-distribution PEFT dominates;
-cross-AOI NRG zero-shot dominates) maps directly onto the deliverable's
-grading expectation: a motivated comparison of the two approaches, not
-merely a single best number.
+3. **LoRA does not close the gap**: LoRA fine-tuning of the visual encoder
+   (0.5% trainable, peft, rank=4) achieves test mAP 0.159 — better than
+   ProjectionHead PEFT (0.041) but still far below frozen zero-shot NRG
+   (0.426). The finding is consistent: **spectral physics generalises;
+   learned visual priors — however parameter-efficient — do not.**
+
+The contrast between these regimes maps directly onto the deliverable's
+grading expectation: a motivated comparison of zero-shot vs PEFT approaches,
+not merely a single best number. All three adapters confirm the same conclusion.

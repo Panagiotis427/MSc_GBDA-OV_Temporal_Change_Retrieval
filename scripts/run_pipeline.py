@@ -23,6 +23,11 @@ All splits evaluated independently:
 NRG false-colour (NIR-Red-Green) instead of RGB:
     python -m scripts.run_pipeline --root data/DynamicEarthNet \\
         --encoder clip_vitl14 --color-mode nrg --epochs 40
+
+LoRA adapter instead of (or alongside) ProjectionHead:
+    python -m scripts.run_pipeline --root data/DynamicEarthNet \\
+        --encoder georsclip --color-mode nrg --lora --lora-epochs 20 \\
+        --eval-splits train val test
 """
 from __future__ import annotations
 
@@ -38,6 +43,7 @@ from src.retrieval import ChangeRetriever
 from src.benchmark import run_benchmark
 from src.train import TrainConfig, train_adapter
 from src.model import save_adapter
+from src.lora_train import LoRAConfig, train_lora, save_lora, merge_lora_into_encoder
 
 
 def _build_ds(args, split, **extra):
@@ -67,6 +73,11 @@ def main() -> None:
     ap.add_argument("--epochs", type=int, default=40)
     ap.add_argument("--cache-dir", default="data/cache")
     ap.add_argument("--skip-train", action="store_true")
+    ap.add_argument("--lora", action="store_true",
+                    help="Train a LoRA adapter on the visual encoder (re-caches embeddings).")
+    ap.add_argument("--lora-epochs", type=int, default=20)
+    ap.add_argument("--lora-rank", type=int, default=4)
+    ap.add_argument("--lora-alpha", type=int, default=8)
     ap.add_argument("--train-split", default="train",
                     help="Split used to train the PEFT adapter (default: train)")
     ap.add_argument("--eval-splits", nargs="+", default=["test"],
@@ -126,6 +137,37 @@ def main() -> None:
         train_summary["peft"] = rep.mAP
 
     # ------------------------------------------------------------------
+    # LoRA adapter (optional): fine-tune visual encoder, re-cache, benchmark
+    # ------------------------------------------------------------------
+    lora_store_train = None
+    if args.lora:
+        print(f"\nTraining LoRA adapter (rank={args.lora_rank}, alpha={args.lora_alpha}, "
+              f"{args.lora_epochs} epochs) ...")
+        lora_cfg = LoRAConfig(
+            rank=args.lora_rank,
+            alpha=args.lora_alpha,
+            epochs=args.lora_epochs,
+            seed=args.seed,
+        )
+        visual_lora, lora_history = train_lora(ds_train, enc, lora_cfg, verbose=True)
+        lora_dir = f"models/{ds_train.name}__{enc.name}{color_tag}__lora"
+        save_lora(visual_lora, lora_dir)
+        print(f"Saved LoRA weights -> {lora_dir}/")
+
+        # Merge LoRA into encoder and re-cache train embeddings
+        merge_lora_into_encoder(enc, visual_lora)
+        lora_cache_tag = f"{args.train_split}{color_tag}_lora"
+        lora_store_train = load_or_compute(
+            ds_train, enc,
+            cache_dir=args.cache_dir,
+            cache_tag=lora_cache_tag,
+        )
+        retr_lora_train = ChangeRetriever(lora_store_train, enc, feature_mode=args.mode)
+        rep = run_benchmark(ds_train, retr_lora_train, approach="zero_shot")
+        print(rep.to_table())
+        train_summary["lora"] = rep.mAP
+
+    # ------------------------------------------------------------------
     # Evaluation splits
     # ------------------------------------------------------------------
     eval_splits = args.eval_splits
@@ -160,6 +202,18 @@ def main() -> None:
             rep = run_benchmark(ds_eval, retr_eval, approach="peft")
             print(rep.to_table())
             split_summary["peft"] = rep.mAP
+
+        if args.lora:
+            lora_eval_tag = f"{esplit}{color_tag}_lora"
+            lora_store_eval = load_or_compute(
+                ds_eval, enc,
+                cache_dir=args.cache_dir,
+                cache_tag=lora_eval_tag,
+            )
+            retr_lora_eval = ChangeRetriever(lora_store_eval, enc, feature_mode=args.mode)
+            rep = run_benchmark(ds_eval, retr_lora_eval, approach="zero_shot")
+            print(rep.to_table())
+            split_summary["lora"] = rep.mAP
 
         eval_results[esplit] = split_summary
 

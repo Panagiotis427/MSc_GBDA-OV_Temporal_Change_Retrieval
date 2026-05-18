@@ -1,0 +1,324 @@
+"""
+LoRA fine-tuning of the visual encoder for temporal change retrieval.
+
+Unlike the ProjectionHead adapter (which trains on pre-cached frozen embeddings),
+LoRA modifies the visual encoder's attention weights in-place. This requires
+loading images on-the-fly during training and re-caching embeddings afterwards.
+
+Architecture
+------------
+- LoRA applied to: ``out_proj``, ``c_fc``, ``c_proj`` in each ViT ResBlock
+  (attention output + FFN). QKV ``in_proj_weight`` is skipped because
+  open_clip stores it as a combined parameter, not a sub-module.
+- Trainable params: ~442K for ViT-B-32 (0.5% of visual encoder).
+- Text encoder stays fully frozen throughout.
+- Loss: same masked symmetric InfoNCE used by ProjectionHead trainer.
+- After training: LoRA weights are merged into the base model via
+  ``merge_and_unload()``, then embeddings are re-computed and cached.
+
+CLI
+---
+    python -m src.lora_train --root data/DynamicEarthNet --encoder georsclip \\
+        --split train --color-mode nrg --epochs 20
+
+Use via ``scripts/run_pipeline.py --lora`` for the full cross-split evaluation.
+"""
+from __future__ import annotations
+
+import argparse
+import random
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+import numpy as np
+import torch
+import torch.nn.functional as F
+
+from src.datasets.base import TemporalDataset
+from src.datasets.registry import get_dataset
+from src.encoders import get_encoder
+
+
+# ---------------------------------------------------------------------------
+# Config
+# ---------------------------------------------------------------------------
+
+@dataclass
+class LoRAConfig:
+    rank: int = 4
+    alpha: int = 8
+    dropout: float = 0.1
+    target_modules: List[str] = field(
+        default_factory=lambda: ["out_proj", "c_fc", "c_proj"]
+    )
+    epochs: int = 20
+    lr: float = 1e-4
+    batch_size: int = 8
+    seed: int = 42
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _build_train_pairs(
+    dataset: TemporalDataset,
+) -> Tuple[List[Any], List[str]]:
+    """Return (pairs, captions) lists aligned by index."""
+    pairs = dataset.list_pairs()
+    captions = [
+        getattr(dataset, "text_caption_for_pair", lambda p: "land cover change")(p)
+        for p in pairs
+    ]
+    return pairs, captions
+
+
+def _encode_image_tensor(
+    encoder: Any,
+    image: Any,
+) -> torch.Tensor:
+    """Preprocess a PIL image → [1, C, H, W] tensor on encoder.device."""
+    px = encoder._preprocess(image).unsqueeze(0).to(encoder.device)
+    return px
+
+
+def _visual_forward(visual_lora: Any, px: torch.Tensor) -> torch.Tensor:
+    """Forward through LoRA-wrapped visual encoder → L2-normed [B, D]."""
+    f = visual_lora(px)
+    return F.normalize(f, dim=-1)
+
+
+def _infonce_loss(
+    delta: torch.Tensor,
+    text: torch.Tensor,
+    pos_mask: torch.Tensor,
+    temperature: float = 0.07,
+) -> torch.Tensor:
+    """Masked symmetric InfoNCE (same captions = positives, stable pairs masked)."""
+    logits = (delta @ text.t()) / temperature           # [B, B]
+    logits_t = logits.t()
+    neg_mask = ~pos_mask
+    if neg_mask.any():
+        logits = logits.masked_fill(~(pos_mask | torch.eye(
+            logits.shape[0], dtype=torch.bool, device=logits.device)), -1e9)
+        logits_t = logits_t.masked_fill(~(pos_mask | torch.eye(
+            logits.shape[0], dtype=torch.bool, device=logits.device)), -1e9)
+    targets = torch.arange(delta.shape[0], device=delta.device)
+    loss = (F.cross_entropy(logits, targets) + F.cross_entropy(logits_t, targets)) / 2
+    return loss
+
+
+# ---------------------------------------------------------------------------
+# Main training function
+# ---------------------------------------------------------------------------
+
+def train_lora(
+    dataset: TemporalDataset,
+    encoder: Any,
+    cfg: LoRAConfig = LoRAConfig(),
+    device: Optional[torch.device] = None,
+    verbose: bool = True,
+) -> Tuple[Any, Dict]:
+    """
+    Apply LoRA to ``encoder._model.visual`` and train on ``dataset`` pairs.
+
+    Returns
+    -------
+    visual_lora : peft.PeftModel
+        Trained LoRA-wrapped visual module (NOT yet merged).
+    history : dict
+        Training log with per-epoch loss.
+    """
+    try:
+        from peft import LoraConfig, get_peft_model
+    except ImportError as exc:
+        raise ImportError("peft required: pip install peft") from exc
+
+    torch.manual_seed(cfg.seed)
+    np.random.seed(cfg.seed)
+    random.seed(cfg.seed)
+
+    device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # ---- Apply LoRA to visual encoder ----
+    visual_base = encoder._model.visual
+    lora_cfg = LoraConfig(
+        r=cfg.rank,
+        lora_alpha=cfg.alpha,
+        target_modules=cfg.target_modules,
+        lora_dropout=cfg.dropout,
+        bias="none",
+    )
+    visual_lora = get_peft_model(visual_base, lora_cfg)
+    # peft.get_peft_model already calls mark_only_lora_as_trainable():
+    # base weights → requires_grad=False, LoRA deltas → requires_grad=True.
+    # Only freeze the text side of the CLIP model (visual handled by peft).
+    encoder._model.to(device)
+    for name, p in encoder._model.named_parameters():
+        if not name.startswith("visual."):
+            p.requires_grad = False
+    visual_lora.to(device).train()
+    if verbose:
+        visual_lora.print_trainable_parameters()
+
+    opt = torch.optim.Adam(
+        filter(lambda p: p.requires_grad, visual_lora.parameters()),
+        lr=cfg.lr,
+    )
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=cfg.epochs)
+
+    pairs, captions = _build_train_pairs(dataset)
+    if verbose:
+        print(f"LoRA training: {len(pairs)} pairs, {cfg.epochs} epochs, "
+              f"batch={cfg.batch_size}, rank={cfg.rank}, alpha={cfg.alpha}")
+
+    # Pre-encode captions (text encoder frozen, no grad needed)
+    with torch.no_grad():
+        text_all = torch.from_numpy(
+            encoder.encode_text(captions).astype(np.float32)
+        ).to(device)
+
+    caption_ids = {c: i for i, c in enumerate(sorted(set(captions)))}
+    cid_all = torch.tensor([caption_ids[c] for c in captions], device=device)
+
+    indices = list(range(len(pairs)))
+    history: Dict[str, List[float]] = {"loss": []}
+
+    for epoch in range(cfg.epochs):
+        random.shuffle(indices)
+        epoch_losses: List[float] = []
+
+        for start in range(0, len(indices), cfg.batch_size):
+            batch_idx = indices[start: start + cfg.batch_size]
+            if len(batch_idx) < 2:
+                continue
+
+            px_t1_list, px_t2_list, text_batch, cid_batch = [], [], [], []
+            for i in batch_idx:
+                pair = pairs[i]
+                try:
+                    im1, im2 = dataset.load_pair_images(pair)
+                except Exception:
+                    continue
+                px_t1_list.append(_encode_image_tensor(encoder, im1))
+                px_t2_list.append(_encode_image_tensor(encoder, im2))
+                text_batch.append(text_all[i])
+                cid_batch.append(cid_all[i])
+
+            if len(px_t1_list) < 2:
+                continue
+
+            px_t1 = torch.cat(px_t1_list, dim=0)   # [B, C, H, W]
+            px_t2 = torch.cat(px_t2_list, dim=0)
+            T = torch.stack(text_batch)              # [B, D]
+            cid = torch.stack(cid_batch)
+
+            f1 = _visual_forward(visual_lora, px_t1)
+            f2 = _visual_forward(visual_lora, px_t2)
+            delta = F.normalize(f2 - f1, dim=-1)    # [B, D]
+
+            pos_mask = (cid[:, None] == cid[None, :])
+            loss = _infonce_loss(delta, T, pos_mask)
+
+            opt.zero_grad()
+            loss.backward()
+            opt.step()
+            epoch_losses.append(loss.item())
+
+        mean_loss = float(np.mean(epoch_losses)) if epoch_losses else float("nan")
+        history["loss"].append(mean_loss)
+        sched.step()
+        if verbose and (epoch % 5 == 0 or epoch == cfg.epochs - 1):
+            print(f"  epoch {epoch+1:3d}/{cfg.epochs}  loss={mean_loss:.4f}")
+
+    return visual_lora, history
+
+
+# ---------------------------------------------------------------------------
+# Save / Load
+# ---------------------------------------------------------------------------
+
+def save_lora(visual_lora: Any, path: str | Path) -> None:
+    """Save LoRA adapter weights (not full model — only delta params)."""
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    visual_lora.save_pretrained(str(path))
+
+
+def merge_lora_into_encoder(encoder: Any, visual_lora: Any) -> None:
+    """Merge trained LoRA weights into encoder in-place, unload peft wrapper."""
+    merged = visual_lora.merge_and_unload()
+    encoder._model.visual = merged
+    for p in encoder._model.parameters():
+        p.requires_grad = False
+
+
+def load_lora_into_encoder(encoder: Any, path: str | Path) -> None:
+    """Load a saved LoRA adapter from ``path`` and merge into ``encoder``."""
+    try:
+        from peft import PeftModel
+    except ImportError as exc:
+        raise ImportError("peft required: pip install peft") from exc
+
+    visual_lora = PeftModel.from_pretrained(encoder._model.visual, str(path))
+    merge_lora_into_encoder(encoder, visual_lora)
+
+
+# ---------------------------------------------------------------------------
+# CLI
+# ---------------------------------------------------------------------------
+
+def _main() -> None:
+    ap = argparse.ArgumentParser(description="Train LoRA adapter on visual encoder")
+    ap.add_argument("--root", default="data/DynamicEarthNet")
+    ap.add_argument("--dataset", default="dynamic_earthnet_pp")
+    ap.add_argument("--split", default="train")
+    ap.add_argument("--encoder", default="georsclip",
+                    choices=["clip_vitl14", "georsclip", "remoteclip"])
+    ap.add_argument("--color-mode", default="nrg",
+                    choices=["rgb", "nrg", "ndvi"])
+    ap.add_argument("--rank", type=int, default=4)
+    ap.add_argument("--alpha", type=int, default=8)
+    ap.add_argument("--epochs", type=int, default=20)
+    ap.add_argument("--lr", type=float, default=1e-4)
+    ap.add_argument("--batch-size", type=int, default=8)
+    ap.add_argument("--out", default=None,
+                    help="Output dir for LoRA weights (default: models/<key>__lora/)")
+    ap.add_argument("--cache-dir", default="data/cache")
+    args = ap.parse_args()
+
+    from src.embeddings import load_or_compute
+
+    enc = get_encoder(args.encoder)
+    ds = get_dataset(
+        args.dataset,
+        root=args.root,
+        split=args.split,
+        color_mode=args.color_mode,
+    )
+
+    cfg = LoRAConfig(
+        rank=args.rank,
+        alpha=args.alpha,
+        epochs=args.epochs,
+        lr=args.lr,
+        batch_size=args.batch_size,
+    )
+    visual_lora, history = train_lora(ds, enc, cfg, verbose=True)
+
+    color_tag = f"_{args.color_mode}" if args.color_mode != "rgb" else ""
+    out_dir = args.out or f"models/{ds.name}__{enc.name}{color_tag}__lora"
+    save_lora(visual_lora, out_dir)
+    print(f"LoRA weights saved → {out_dir}")
+
+    print("Merging LoRA into encoder and re-computing embeddings ...")
+    merge_lora_into_encoder(enc, visual_lora)
+    cache_tag = f"{args.split}{color_tag}_lora"
+    store = load_or_compute(ds, enc, cache_dir=args.cache_dir, cache_tag=cache_tag)
+    print(f"Re-cached {len(store.pair_ids)} pairs with LoRA-adapted encoder.")
+    print(f"Cache tag: {cache_tag}")
+    print(f"Final loss: {history['loss'][-1]:.4f}")
+
+
+if __name__ == "__main__":
+    _main()

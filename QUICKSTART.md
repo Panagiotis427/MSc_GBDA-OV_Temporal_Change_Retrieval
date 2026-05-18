@@ -4,6 +4,7 @@ Type a natural-language land-cover change query; get ranked satellite image-pair
 matches with a heatmap and confidence score.
 
 **Just running the app?** Follow sections 1–3.  
+**Hosted demo (no install)?** Push the repo to a HuggingFace Space — `app.py` and `requirements.txt` are ready. See [`docs/EXTENSIONS.md`](docs/EXTENSIONS.md).  
 **Retraining or extending?** See section 4 and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ---
@@ -64,16 +65,24 @@ permanence note (`permanent` / `likely SEASONAL` / `stable`) · ranked table.
 
 ### Launch-time flags
 
-Dataset, Encoder, and Approach are in the **Settings** accordion — change them
-in-app and press **Apply**. Only these need to be set at launch:
+Two accordions hold the controls:
+
+- **Settings** (requires **Apply** to rebuild embeddings): Dataset, Encoder, Approach, Color Mode, LoRA.
+- **Filters & Re-ranking** (takes effect on next **Search**, no Apply): Geographic filter, Re-ranking.
+
+All options can also be set as startup defaults via CLI flags:
 
 | Flag | Default | Notes |
 |---|---|---|
 | `--root` | `data/DynamicEarthNet` | Path to dataset; DEN layout auto-detected. |
 | `--split` | `train` | DEN AOI split: `train` (605 pairs), `val`/`test` (110 each), `all` (825). |
 | `--pairing` | `bimonthly` | How DEN's 24 monthly timesteps pair into (T1, T2). |
-| `--color-mode` | `rgb` | `nrg` = NIR-Red-Green false colour; best zero-shot with GeoRSCLIP. |
 | `--port` | `7860` | Gradio HTTP port. |
+| `--color-mode` | `rgb` | `rgb` / `nrg` (NIR-Red-Green, best zero-shot with GeoRSCLIP) / `ndvi`. Toggle in Settings. |
+| `--lora` / `--no-lora` | off | Load LoRA-adapted embeddings (must be pre-cached by `run_pipeline --lora`). Toggle in Settings. |
+| `--geo-filter` / `--no-geo-filter` | off | Enable geographic region filter at startup. Toggle in Filters & Re-ranking. |
+| `--rerank` / `--no-rerank` | off | Enable post-retrieval re-ranking at startup. Toggle in Filters & Re-ranking. |
+| `--rerank-strategy` | `diversity` | `diversity` = unique AOIs per result; `coherence` = cluster near top-1 location. |
 
 ### Troubleshooting
 
@@ -98,6 +107,12 @@ python -m scripts.run_pipeline --root data/DynamicEarthNet \
 # Best zero-shot generalisation (GeoRSCLIP + NIR, no training):
 python -m scripts.run_pipeline --root data/DynamicEarthNet \
     --encoder georsclip --color-mode nrg --eval-splits train val test --skip-train
+
+# LoRA adapter on visual encoder (add alongside or instead of PEFT):
+python -m scripts.run_pipeline --root data/DynamicEarthNet \
+    --encoder georsclip --color-mode nrg --skip-train \
+    --lora --lora-epochs 20 --lora-rank 4 --lora-alpha 8 \
+    --eval-splits train val test
 ```
 
 Repeat with `--encoder georsclip` / `--encoder remoteclip` for the three-encoder
@@ -115,6 +130,9 @@ python -m src.benchmark  --root data/DynamicEarthNet --encoder clip_vitl14 --app
 
 python -m src.train      --root data/DynamicEarthNet --encoder clip_vitl14
 # Train PEFT adapter only → models/<dataset>__<encoder>__adapter.pt
+
+python -m src.lora_train --root data/DynamicEarthNet --encoder georsclip --color-mode nrg
+# Train LoRA adapter on visual encoder; merges + re-caches embeddings automatically.
 ```
 
 ### Tests

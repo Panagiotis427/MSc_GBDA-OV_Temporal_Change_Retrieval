@@ -121,7 +121,8 @@ def _dynamic_earthnet_factory(**kwargs: Any) -> TemporalDataset:
         from .dynamic_earthnet_pp import DENNpyDataset
         return DENNpyDataset(**kwargs)
     from .dynamic_earthnet import DENDataset
-    kwargs.pop("split", None)  # raster loader has no split arg
+    kwargs.pop("split", None)      # raster loader has no split arg
+    kwargs.pop("color_mode", None) # raster loader has no color_mode (single RGB)
     return DENDataset(**kwargs)
 
 

@@ -102,10 +102,14 @@ derived `PairLabel`s → Recall@K, mAP, plus a seasonal-vs-permanent
 | `src/benchmark.py` | query set + label relevance, Recall@K / mAP / drift |
 | `src/model.py` | `ProjectionHead` adapter, InfoNCE, adapter save/load |
 | `src/train.py` | PEFT training (masked symmetric InfoNCE on weak captions) |
+| `src/lora_train.py` | LoRA fine-tuning of visual encoder via peft; `train_lora`, `merge_lora_into_encoder`, `save_lora` |
+| `src/geo_filter.py` | `GeoFilter` — filter pairs by continental region or lat/lon bbox using `aoi_metadata.json`; toggleable |
+| `src/rerank.py` | `Reranker` — post-retrieval re-ranking: `diversity` (unique AOIs) or `coherence` (cluster near top-1); toggleable |
 | `src/app.py` | Gradio engine + UI (Dataset / Encoder / Approach selectors) |
+| `app.py` | HuggingFace Spaces entry point (uses tiny fixture by default; override via env vars) |
 | `scripts/download_den.py` | fetch + extract DEN subset, build label index |
 | `scripts/make_den_fixture.py` | tiny synthetic DEN tree for fast tests |
-| `scripts/run_pipeline.py` | one-command run with `--train-split` / `--eval-splits` / `--color-mode`; cross-split mAP comparison table |
+| `scripts/run_pipeline.py` | one-command run with `--train-split` / `--eval-splits` / `--color-mode` / `--lora`; cross-split mAP table |
 
 ## Run / install / tests
 

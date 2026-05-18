@@ -1,0 +1,11 @@
+torch
+torchvision
+numpy<2
+gradio>=4.0.0
+open-clip-torch>=2.24.0
+transformers
+pillow>=10.0.0
+pandas
+pyarrow
+opencv-python-headless
+peft>=0.10.0
