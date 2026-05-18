@@ -17,10 +17,20 @@ class TestFrozenTextEncoder:
         """Create a reusable test encoder instance."""
         return FrozenTextEncoder(cache_dir="/tmp/clip-test-cache")
 
-    def test_encoder_initialization(self, encoder):
-        """Test that encoder loads successfully and parameters are frozen."""
-        # Verify model is on CPU (for reproducibility in CI)
-        assert str(encoder.device) == "cpu", f"Expected CPU, got {encoder.device}"
+    def test_encoder_respects_explicit_device(self):
+        """Explicit device must be honored and all params frozen."""
+        import torch
+        enc = FrozenTextEncoder(device=torch.device("cpu"),
+                                cache_dir="/tmp/clip-test-cache")
+        assert str(enc.device) == "cpu", f"Expected cpu, got {enc.device}"
+        assert all(not p.requires_grad for p in enc.model.parameters())
+
+    def test_encoder_default_device_autodetects(self):
+        """Default device = CUDA when available, else CPU (P1 fix)."""
+        import torch
+        expected = "cuda" if torch.cuda.is_available() else "cpu"
+        enc = FrozenTextEncoder(cache_dir="/tmp/clip-test-cache")
+        assert str(enc.device).startswith(expected)
 
     def test_encoder_embed_dim(self, encoder):
         """Test that embed dimension matches CLIP ViT-L/14."""

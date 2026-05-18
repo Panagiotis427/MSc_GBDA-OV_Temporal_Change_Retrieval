@@ -5,10 +5,11 @@ This module loads a pretrained HuggingFace CLIP text model and converts natural 
 change queries (e.g., "new industrial buildings") into embeddings compatible with the image
 element space. The text encoder is frozen - only parameters are learned during training.
 """
+import os
+from src import _cache  # sets HF_HOME before transformers import
 import torch
 from typing import Optional, Tuple, Union
 from transformers import AutoTokenizer, AutoModel
-import os
 
 # CLIP ViT-L/14 multilingual model for good performance on remote sensing terminology
 text_encoder_name = "openai/clip-vit-large-patch14"
@@ -39,9 +40,10 @@ class FrozenTextEncoder:
             cache_dir (str, optional): Directory for caching downloaded models.
         """
         self.model_name = model_name
-        # Force CPU only for reproducibility and low-memory environments
-        self.device = torch.device('cpu')
-        self.cache_dir = cache_dir or os.path.join(os.path.expanduser("~"), ".cache", "clip-text")
+        self.device = device or torch.device(
+            'cuda' if torch.cuda.is_available() else 'cpu'
+        )
+        self.cache_dir = cache_dir or _cache.CLIP_CACHE_DIR
 
         # Load tokenizer and model
         print(f"Loading text encoder: {model_name}")
@@ -95,10 +97,9 @@ class FrozenTextEncoder:
         ).to(self.device)
 
         with torch.no_grad():
-            outputs = self.model.get_text_features(**encoded)
-            embeddings = outputs.last_hidden_state  # Shape: (batch_size, sequence_len, embed_dim)
-            # Pool over the sequence dimension using mean pooling
-            embeddings = embeddings.mean(dim=1)  # Shape: (batch_size, embed_dim)
+            # CLIPModel.get_text_features already returns the projected
+            # text embedding in the shared image-text space: [N, projection_dim].
+            embeddings = self.model.get_text_features(**encoded)
 
         return embeddings
 
