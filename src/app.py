@@ -32,6 +32,7 @@ from src.embeddings import load_or_compute
 from src.encoders import get_encoder
 from src.retrieval import APPROACHES, ChangeRetriever
 from src.heatmap import generate_heatmap
+from src.rerank import RERANK_STRATEGIES
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _SNOW = "snow_and_ice"
@@ -48,6 +49,13 @@ class RunConfig:
     cache_dir: str = str(_PROJECT_ROOT / "data" / "cache")
     feature_mode: str = "difference"
     top_k: int = 5
+    # Spectral / encoder options (require Apply to reload embeddings)
+    color_mode: str = "rgb"         # rgb | nrg | ndvi
+    use_lora: bool = False          # load LoRA-adapted embeddings (must be pre-cached)
+    # Extension toggles (take effect on next Search; no Apply needed)
+    geo_filter: bool = False        # enable geographic region filtering
+    rerank: bool = False            # enable post-retrieval re-ranking
+    rerank_strategy: str = "diversity"  # diversity | coherence
 
 
 @dataclass
@@ -85,20 +93,54 @@ class SemanticChangeSearch:
         if adapter is not None:
             self.retriever.set_adapter(adapter, cfg.feature_mode)
         self._adapter = adapter
+        self._init_extensions(cfg)
         return self
 
     def _build(self, cfg: RunConfig) -> None:
         from src.datasets.registry import build_dataset
+        from src.embeddings import cache_path as _cache_path
         self.dataset = build_dataset(cfg.dataset, root=cfg.root,
-                                     pairing=cfg.pairing, split=cfg.split)
+                                     pairing=cfg.pairing, split=cfg.split,
+                                     color_mode=cfg.color_mode)
         self.encoder = get_encoder(cfg.encoder)
+
+        # Cache tag: match run_pipeline.py convention so pre-computed caches are reused.
+        split_str = cfg.split or "all"
+        color_tag = f"_{cfg.color_mode}" if cfg.color_mode != "rgb" else ""
+        lora_tag = "_lora" if cfg.use_lora else ""
+        cache_tag = f"{split_str}{color_tag}{lora_tag}"
+
+        if cfg.use_lora:
+            lora_cache = _cache_path(cfg.cache_dir, self.dataset.name,
+                                     self.encoder.name, tag=cache_tag)
+            if not lora_cache.exists():
+                raise RuntimeError(
+                    f"LoRA embedding cache not found: {lora_cache.name}\n"
+                    "Train LoRA first:  python -m scripts.run_pipeline --lora ...\n"
+                    "Then re-open the app with 'Use LoRA embeddings' enabled."
+                )
+
         self.store = load_or_compute(self.dataset, self.encoder,
-                                     cache_dir=cfg.cache_dir)
+                                     cache_dir=cfg.cache_dir,
+                                     cache_tag=cache_tag)
         self.retriever = ChangeRetriever(self.store, self.encoder,
                                          feature_mode=cfg.feature_mode)
         self._adapter = self._maybe_load_adapter(cfg)
         if self._adapter is not None:
             self.retriever.set_adapter(self._adapter, cfg.feature_mode)
+        self._init_extensions(cfg)
+
+    def _init_extensions(self, cfg: RunConfig) -> None:
+        """Load geo-filter and reranker if aoi_metadata.json is present."""
+        meta_path = Path(cfg.root) / "aoi_metadata.json"
+        if meta_path.exists():
+            from src.geo_filter import GeoFilter
+            from src.rerank import Reranker
+            self._geo_filter = GeoFilter(meta_path)
+            self._reranker = Reranker(meta_path)
+        else:
+            self._geo_filter = None
+            self._reranker = None
 
     def _maybe_load_adapter(self, cfg: RunConfig):
         path = Path(cfg.cache_dir).parent / "models" / \
@@ -117,14 +159,54 @@ class SemanticChangeSearch:
         return None
 
     # -- query ----------------------------------------------------------
-    def query(self, text: str, approach: str, top_k: int) -> List[ChangeEvent]:
+    def query(
+        self,
+        text: str,
+        approach: str,
+        top_k: int,
+        *,
+        geo_region: str = "All",
+        rerank_strategy: Optional[str] = None,
+    ) -> List[ChangeEvent]:
+        """Retrieve top-K change events matching *text*.
+
+        Parameters
+        ----------
+        text: Natural-language change query.
+        approach: ``"naive"``, ``"zero_shot"``, or ``"peft"``.
+        top_k: Number of results to return.
+        geo_region: If not ``"All"``, restrict pairs to that region
+            (requires ``aoi_metadata.json`` to have been loaded).
+        rerank_strategy: ``"diversity"``, ``"coherence"``, or ``None``
+            (disabled).  Requires ``aoi_metadata.json``.
+        """
         if approach == "peft" and self.retriever.adapter is None:
             raise RuntimeError(
                 "PEFT selected but no adapter found. Train one with "
                 "`python -m src.train` or pick zero_shot.")
         scores = self.retriever.score_all(text, approach=approach)
-        lo, hi = float(scores.min()), float(scores.max())
-        order = np.argsort(-scores)[:top_k]
+
+        # Geographic filter — mask excluded pairs with -inf
+        if geo_region not in ("All", "", None) and self._geo_filter is not None:
+            allowed = {
+                p.location_id
+                for p in self._geo_filter.filter_by_region(self.store.pairs, geo_region)
+            }
+            mask = np.array([p.location_id in allowed for p in self.store.pairs])
+            scores = np.where(mask, scores, -np.inf)
+
+        # Confidence bounds over finite scores only
+        finite = scores[np.isfinite(scores)]
+        lo = float(finite.min()) if len(finite) else 0.0
+        hi = float(finite.max()) if len(finite) else 1.0
+
+        # Re-ranking or default argsort
+        if rerank_strategy is not None and self._reranker is not None:
+            order = self._reranker.rerank(
+                scores, self.store.pairs, top_k, strategy=rerank_strategy
+            )
+        else:
+            order = np.argsort(-scores)[:top_k]
 
         events: List[ChangeEvent] = []
         for rank, i in enumerate(order):
@@ -175,6 +257,8 @@ class SemanticChangeSearch:
         n_locs = len(self.dataset.list_locations())
         per_loc = (n_pairs / n_locs) if n_locs else 0
         adapter = "loaded" if self.retriever.adapter is not None else "none"
+        geo_status = "ready" if self._geo_filter is not None else "N/A (no metadata)"
+        rerank_status = "ready" if self._reranker is not None else "N/A (no metadata)"
         return (
             f"<div class='stats-card'>"
             f"<b>Dataset:</b> <code>{self.cfg.dataset}</code> &nbsp;|&nbsp; "
@@ -185,19 +269,27 @@ class SemanticChangeSearch:
             f"({per_loc:.0f}/location) &nbsp;|&nbsp; "
             f"<b>Encoder:</b> <code>{self.encoder.name}</code> "
             f"({self.encoder.embed_dim}-d) &nbsp;|&nbsp; "
-            f"<b>PEFT adapter:</b> <code>{adapter}</code>"
+            f"<b>PEFT adapter:</b> <code>{adapter}</code> &nbsp;|&nbsp; "
+            f"<b>Geo filter:</b> <code>{geo_status}</code> &nbsp;|&nbsp; "
+            f"<b>Re-ranking:</b> <code>{rerank_status}</code>"
             f"</div>"
         )
 
-    def reload(self, dataset: str, encoder: str, approach: str):
+    def reload(self, dataset: str, encoder: str, approach: str,
+               color_mode: str = "rgb", use_lora: bool = False):
         try:
-            self.cfg = RunConfig(dataset=dataset, encoder=encoder,
-                                 approach=approach, root=self.cfg.root,
-                                 pairing=self.cfg.pairing,
-                                 split=self.cfg.split,
-                                 cache_dir=self.cfg.cache_dir)
+            self.cfg = RunConfig(
+                dataset=dataset, encoder=encoder, approach=approach,
+                root=self.cfg.root, pairing=self.cfg.pairing,
+                split=self.cfg.split, cache_dir=self.cfg.cache_dir,
+                color_mode=color_mode, use_lora=use_lora,
+                geo_filter=self.cfg.geo_filter, rerank=self.cfg.rerank,
+                rerank_strategy=self.cfg.rerank_strategy,
+            )
             self._build(self.cfg)
-            status = (f"Loaded {dataset} + {encoder} | approach={approach} | "
+            lora_note = " + LoRA" if use_lora else ""
+            status = (f"Loaded {dataset} + {encoder}{lora_note} | "
+                      f"color={color_mode} | approach={approach} | "
                       f"{len(self.store)} pairs")
             return status, self.stats_markdown()
         except Exception as exc:
@@ -260,6 +352,17 @@ class SemanticChangeSearch:
 
             stats_md = gr.Markdown(engine.stats_markdown())
 
+            COLOR_MODE_HELP = (
+                "rgb = standard optical (R-G-B)  ·  nrg = NIR-Red-Green false colour "
+                "(best zero-shot with GeoRSCLIP)  ·  ndvi = vegetation index (single channel × 3). "
+                "Changing requires Apply."
+            )
+            LORA_HELP = (
+                "Load LoRA-adapted embeddings pre-cached by run_pipeline --lora. "
+                "Cache must exist for the selected encoder + color mode. "
+                "Changing requires Apply."
+            )
+
             with gr.Accordion("Settings", open=False):
                 with gr.Row():
                     d_dd = gr.Dropdown(list_datasets(), value=engine.cfg.dataset,
@@ -269,13 +372,70 @@ class SemanticChangeSearch:
                     a_dd = gr.Dropdown(list(APPROACHES), value=engine.cfg.approach,
                                        label="Approach", info=APPROACH_HELP)
                 with gr.Row():
+                    color_dd = gr.Dropdown(
+                        ["rgb", "nrg", "ndvi"], value=engine.cfg.color_mode,
+                        label="Color mode", info=COLOR_MODE_HELP,
+                    )
+                    lora_chk = gr.Checkbox(
+                        label="Use LoRA embeddings",
+                        value=engine.cfg.use_lora,
+                        info=LORA_HELP,
+                    )
+                with gr.Row():
                     apply = gr.Button("Apply (rebuild)", variant="secondary")
                     status = gr.Textbox(
                         label="Engine status", interactive=False, scale=4,
                         value=f"{engine.cfg.dataset} + {engine.cfg.encoder} | "
+                              f"color={engine.cfg.color_mode} | "
                               f"{len(engine.store)} pairs | "
                               f"approach={engine.cfg.approach}")
-                apply.click(engine.reload, [d_dd, e_dd, a_dd], [status, stats_md])
+                apply.click(engine.reload,
+                            [d_dd, e_dd, a_dd, color_dd, lora_chk],
+                            [status, stats_md])
+
+            # ---- Filters & Re-ranking (per-query, no Apply needed) ----
+            _geo_available = engine._geo_filter is not None
+            _regions = engine._geo_filter.regions if _geo_available else ["All"]
+            _rerank_available = engine._reranker is not None
+
+            with gr.Accordion("Filters & Re-ranking", open=False):
+                gr.Markdown(
+                    "These options take effect on the **next Search** — no Apply needed."
+                )
+                with gr.Row():
+                    geo_chk = gr.Checkbox(
+                        label="Geographic filter",
+                        value=engine.cfg.geo_filter and _geo_available,
+                        interactive=_geo_available,
+                        info="Restrict results to one continental region."
+                        if _geo_available
+                        else "Requires aoi_metadata.json in --root.",
+                    )
+                    geo_dd = gr.Dropdown(
+                        _regions,
+                        value="All",
+                        label="Region",
+                        interactive=_geo_available,
+                    )
+                with gr.Row():
+                    rerank_chk = gr.Checkbox(
+                        label="Re-rank results",
+                        value=engine.cfg.rerank and _rerank_available,
+                        interactive=_rerank_available,
+                        info="Post-process ranking for spatial quality."
+                        if _rerank_available
+                        else "Requires aoi_metadata.json in --root.",
+                    )
+                    rerank_dd = gr.Dropdown(
+                        list(RERANK_STRATEGIES),
+                        value=engine.cfg.rerank_strategy,
+                        label="Strategy",
+                        interactive=_rerank_available,
+                        info=(
+                            "diversity = prefer unique AOIs per result  ·  "
+                            "coherence = cluster near top-1 location"
+                        ),
+                    )
 
             with gr.Row():
                 q = gr.Textbox(
@@ -310,9 +470,16 @@ class SemanticChangeSearch:
                 cls = "low" if c < 0.4 else ("mid" if c < 0.7 else "")
                 return f"<span class='conf-pill {cls}'>confidence {c:.2f}</span>"
 
-            def handle(text, approach, top_k):
+            def handle(text, approach, top_k,
+                       geo_enabled, geo_region, rerank_enabled, rerank_strategy):
                 try:
-                    evs = engine.query(text, approach, int(top_k))
+                    active_geo = geo_region if geo_enabled else "All"
+                    active_rerank = rerank_strategy if rerank_enabled else None
+                    evs = engine.query(
+                        text, approach, int(top_k),
+                        geo_region=active_geo,
+                        rerank_strategy=active_rerank,
+                    )
                 except Exception as exc:
                     return None, None, None, f"**Error:** {exc}", []
                 if not evs:
@@ -331,7 +498,11 @@ class SemanticChangeSearch:
                 )
                 return top.t1_img, top.t2_img, top.heatmap, md, rows
 
-            go.click(handle, [q, a_dd, k], [t1i, t2i, hmi, summary, table])
+            go.click(
+                handle,
+                [q, a_dd, k, geo_chk, geo_dd, rerank_chk, rerank_dd],
+                [t1i, t2i, hmi, summary, table],
+            )
         return demo
 
 
@@ -352,11 +523,37 @@ def parse_args():
                         "(train = 605 pairs, the corpus the PEFT adapter was fit on)")
     p.add_argument("--cache-dir", default=str(_PROJECT_ROOT / "data" / "cache"))
     p.add_argument("--port", type=int, default=7860)
+    # Spectral / encoder options
+    p.add_argument("--color-mode", default="rgb", choices=["rgb", "nrg", "ndvi"],
+                   help="Image colour mode passed to dataset loader. "
+                        "nrg = NIR-Red-Green (best zero-shot with GeoRSCLIP); "
+                        "ndvi = vegetation index. Change in-app via Settings.")
+    p.add_argument("--lora", action="store_true", default=False,
+                   help="Load LoRA-adapted embeddings (must be pre-cached by run_pipeline --lora). "
+                        "Toggle in-app via Settings.")
+    p.add_argument("--no-lora", dest="lora", action="store_false")
+    # Extension toggles
+    p.add_argument("--geo-filter", action="store_true", default=False,
+                   help="Enable geographic region filter at startup (toggle in-app anytime).")
+    p.add_argument("--no-geo-filter", dest="geo_filter", action="store_false")
+    p.add_argument("--rerank", action="store_true", default=False,
+                   help="Enable post-retrieval re-ranking at startup (toggle in-app anytime).")
+    p.add_argument("--no-rerank", dest="rerank", action="store_false")
+    p.add_argument("--rerank-strategy", default="diversity",
+                   choices=list(RERANK_STRATEGIES),
+                   help="Re-ranking strategy: diversity (default) or coherence.")
     a = p.parse_args()
-    return RunConfig(dataset=a.dataset, encoder=a.encoder, approach=a.approach,
-                     root=a.root, pairing=a.pairing,
-                     split=None if a.split == "all" else a.split,
-                     cache_dir=a.cache_dir), a.port
+    return RunConfig(
+        dataset=a.dataset, encoder=a.encoder, approach=a.approach,
+        root=a.root, pairing=a.pairing,
+        split=None if a.split == "all" else a.split,
+        cache_dir=a.cache_dir,
+        color_mode=a.color_mode,
+        use_lora=a.lora,
+        geo_filter=a.geo_filter,
+        rerank=a.rerank,
+        rerank_strategy=a.rerank_strategy,
+    ), a.port
 
 
 def main():
