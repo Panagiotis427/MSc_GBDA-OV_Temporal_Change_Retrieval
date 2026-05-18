@@ -8,7 +8,7 @@ The CLIP backbone is frozen - only these lightweight adapters are learned.
 """
 import torch
 import torch.nn as nn
-from typing import Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 import math
 
 
@@ -177,6 +177,30 @@ def create_projection_head(
         ... )
     """
     return ProjectionHead(input_dim, output_dim, hidden_dims, dropout_rate)
+
+
+def save_adapter(path: str, adapter: "ProjectionHead", meta: Dict[str, Any]) -> None:
+    """Persist a trained adapter together with the metadata needed to rebuild
+    an identical ``ProjectionHead`` (dims, feature mode, encoder it targets)."""
+    import os
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    torch.save({"state_dict": adapter.state_dict(), "meta": meta}, path)
+
+
+def load_adapter(path: str, map_location="cpu") -> Tuple["ProjectionHead", Dict[str, Any]]:
+    """Reconstruct a ``ProjectionHead`` from a checkpoint written by
+    :func:`save_adapter`. Returns ``(adapter_in_eval_mode, meta)``."""
+    ckpt = torch.load(path, map_location=map_location)
+    meta = ckpt["meta"]
+    adapter = ProjectionHead(
+        input_dim=meta["input_dim"],
+        output_dim=meta["output_dim"],
+        hidden_dims=tuple(meta["hidden_dims"]),
+        dropout_rate=meta.get("dropout_rate", 0.3),
+    )
+    adapter.load_state_dict(ckpt["state_dict"])
+    adapter.eval()
+    return adapter, meta
 
 
 class InfoNCELoss(nn.Module):

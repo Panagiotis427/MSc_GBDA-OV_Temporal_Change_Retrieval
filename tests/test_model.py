@@ -191,22 +191,26 @@ class TestProjectionHead:
         Test that gradients flow correctly through the MLP.
         Essential for backpropagation during training.
         """
+        torch.manual_seed(0)
         model = ProjectionHead(input_dim=768, hidden_dims=(256, 128))
         input_tensor = torch.randn(4, 768, requires_grad=True)
 
+        # A plain sum() loss is degenerate for a LayerNorm-terminated net
+        # (the mean-shift it induces is normalised away), so use a real
+        # MSE-to-target objective like training does.
         output = model(input_tensor)
-        loss = output.sum()
+        target = torch.randn_like(output)
+        loss = torch.nn.functional.mse_loss(output, target)
         loss.backward()
 
-        # All parameters should have non-zero gradients (with high probability)
-        grad_norms = [p.grad.norm().item() for p in model.parameters() if p.grad is not None]
-        zero_grad_count = sum(1 for g in grad_norms if g < 1e-6)
+        # Every Linear weight must receive a non-trivial gradient.
+        for name, p in model.named_parameters():
+            if name.endswith("weight") and p.grad is not None:
+                assert p.grad.norm().item() > 1e-7, f"dead gradient at {name}"
+                assert p.grad.isfinite().all(), f"non-finite gradient at {name}"
 
-        # Allow small tolerance - some weights might legitimately have near-zero gradients
-        assert zero_grad_count <= len(grad_norms) * 0.1, \
-            f"Too many zero gradients: {zero_grad_count}/{len(grad_norms)}"
-
-        assert not torch.isnan(input_tensor.grad).any()
+        assert input_tensor.grad is not None
+        assert torch.isfinite(input_tensor.grad).all()
 
     def test_very_small_hidden_dims(self):
         """

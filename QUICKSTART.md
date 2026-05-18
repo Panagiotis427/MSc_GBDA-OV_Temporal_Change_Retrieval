@@ -1,0 +1,139 @@
+# Quickstart — Semantic Change Search Engine
+
+Type a natural-language land-cover change query; get ranked satellite image-pair
+matches with a heatmap and confidence score.
+
+**Just running the app?** Follow sections 1–3.  
+**Retraining or extending?** See section 4 and [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+---
+
+## 1. Setup (one-time)
+
+**Requirements:** Python 3.12 · ~3 GB disk (model weights) · ~9 GB more for real DEN · GPU optional
+
+```powershell
+cd "D:\Code Projects\GBDA_Lab_Project"
+
+# Activate the project venv (if present):
+D:\Code Projects\.venv\Scripts\Activate.ps1
+# If you get an execution-policy error: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+
+pip install -e .
+```
+
+---
+
+## 2. Option A — 30-second synthetic demo (no download)
+
+```bash
+python -m scripts.make_den_fixture
+# Builds tests/fixtures/den_tiny/: 2 AOIs × 8 months, <1 MB, deterministic.
+
+python -m src.app --root tests/fixtures/den_tiny --split all --encoder clip_vitl14
+# First run downloads CLIP weights (~1.6 GB) into .model_cache/ — one-time.
+# Open http://127.0.0.1:7860
+```
+
+---
+
+## 3. Option B — real Dynamic EarthNet (~7 GB)
+
+```bash
+python -m scripts.download_den --dest data/DynamicEarthNet
+# ~7 GB ZIP via gdown; extracted; idempotent (_done.marker guards re-runs).
+
+python -m src.app --root data/DynamicEarthNet --encoder clip_vitl14
+# Defaults: --split train (55 AOIs, 605 pairs), --approach zero_shot.
+# Switch to --approach peft in the UI for the trained-adapter scoring.
+# Open http://127.0.0.1:7860
+```
+
+---
+
+## App usage
+
+Enter a query, press **Search**. Example queries:
+
+- `agricultural land converted to wetland`
+- `new buildings on former farmland`
+- `forest cleared to bare soil`
+
+Results: T1 / T2 tiles side by side · heatmap on T2 · confidence (0–1) ·
+permanence note (`permanent` / `likely SEASONAL` / `stable`) · ranked table.
+
+### Launch-time flags
+
+Dataset, Encoder, and Approach are in the **Settings** accordion — change them
+in-app and press **Apply**. Only these need to be set at launch:
+
+| Flag | Default | Notes |
+|---|---|---|
+| `--root` | `data/DynamicEarthNet` | Path to dataset; DEN layout auto-detected. |
+| `--split` | `train` | DEN AOI split: `train` (605 pairs), `val`/`test` (110 each), `all` (825). |
+| `--pairing` | `bimonthly` | How DEN's 24 monthly timesteps pair into (T1, T2). |
+| `--color-mode` | `rgb` | `nrg` = NIR-Red-Green false colour; best zero-shot with GeoRSCLIP. |
+| `--port` | `7860` | Gradio HTTP port. |
+
+### Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| Port already in use | Add `--port 7861`; visit `http://127.0.0.1:7861`. |
+| First launch slow | CLIP weights download once (~1.6 GB) into `.model_cache/`. |
+| `peft` errors "no adapter" | Adapter file missing from `models/`; train with `run_pipeline` (section 4) or switch to `zero_shot`. |
+| venv not activating | Run `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once in PowerShell. |
+
+---
+
+## 4. Developer — pipeline, training, tests
+
+### Full pipeline (embed → benchmark → PEFT → cross-split table)
+
+```bash
+# Train on train split, evaluate on all three splits:
+python -m scripts.run_pipeline --root data/DynamicEarthNet \
+    --encoder clip_vitl14 --train-split train --eval-splits train val test --epochs 40
+
+# Best zero-shot generalisation (GeoRSCLIP + NIR, no training):
+python -m scripts.run_pipeline --root data/DynamicEarthNet \
+    --encoder georsclip --color-mode nrg --eval-splits train val test --skip-train
+```
+
+Repeat with `--encoder georsclip` / `--encoder remoteclip` for the three-encoder
+comparison in `REPORT.md §7`.
+
+### Individual stages
+
+```bash
+python -m src.embeddings --root data/DynamicEarthNet --encoder clip_vitl14 \
+    --split train --color-mode rgb
+# Precompute embeddings only. Cache: data/cache/<dataset>__<encoder>__train__pair_embeddings.npz
+
+python -m src.benchmark  --root data/DynamicEarthNet --encoder clip_vitl14 --approach all
+# Recall@K / mAP / seasonal drift on cached embeddings.
+
+python -m src.train      --root data/DynamicEarthNet --encoder clip_vitl14
+# Train PEFT adapter only → models/<dataset>__<encoder>__adapter.pt
+```
+
+### Tests
+
+```bash
+pytest -q --ignore=tests/test_text_encoder.py
+# 103 tests, ~20 s on CPU. Mock encoders; no network; covers full pipeline.
+
+pytest tests/test_text_encoder.py
+# Real CLIP weights; ~45 s. Verifies text-encoder fix end-to-end.
+```
+
+### Adding datasets / encoders
+
+File-additive only — never edit shared pipeline files. See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+### Reference docs
+
+- [`README.md`](README.md) — pipeline diagram, module map.
+- [`REPORT.md`](REPORT.md) — all runs, metrics, timings, error analysis.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — extension contract.
+- [`docs/Common_Resources.md`](docs/Common_Resources.md) — dataset / model links.

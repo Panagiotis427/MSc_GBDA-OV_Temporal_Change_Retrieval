@@ -1,248 +1,123 @@
 """
 Spatial Heatmap Generation for Change Localization.
 
-This module extracts spatial attention maps from CLIP's vision backbone to identify
-which image regions contribute most to the cosine similarity between a change feature
-and a text query. The resulting heatmap is overlaid on T2 images using OpenCV.
+Public API:
+    generate_heatmap(image_t1, image_t2, text, encoder, alpha=0.5)
+    extract_patch_attention(image_t2, image_t1, encoder) -> np.ndarray [grid_h, grid_w]
+    extract_attention_weights(image, text_query, encoder) -> np.ndarray [grid_h, grid_w]
+    resize_heatmap / apply_overlay / generate_grid_heatmap_from_patches  (unchanged)
 
-Key Methods:
-- generate_heatmap(): Extracts patch-level attention and creates blended output
-- extract_attention_weights(): Uses gradient-based saliency from CLIP vision tower
+All vision logic is delegated to ``encoder.compute_patch_text_similarity()``, which must
+return a float32 [grid_h, grid_w] array normalised to [0, 1].
 """
-import torch
-import numpy as np
-from PIL import Image, ImageOps
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Optional, Tuple
+
 import cv2
-from typing import Tuple, Optional
+import numpy as np
+import torch
+from PIL import Image
+
+if TYPE_CHECKING:
+    from .encoders.base import ImageTextEncoder
 
 
 def generate_heatmap(
     image_t1: np.ndarray,
     image_t2: np.ndarray,
-    text_query: str,
-    model: torch.nn.Module,
-    device: torch.device = None,
-    method: str = "gradient"  # "gradient" or "attention"
-) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Generate spatial heatmap showing which regions in T2 image contribute most to
-    the similarity between change features and text query.
+    text: str,
+    encoder: "ImageTextEncoder",
+    alpha: float = 0.5,
+) -> Tuple[np.ndarray, Image.Image]:
+    """Return (raw_heatmap_grid, blended_PIL_image) for image_t2 against *text*.
 
     Args:
-        image_t1: First time-step RGB image (H=384, W=384, 3 channels)
-        image_t2: Second time-step RGB image (same shape)
-        text_query: Natural language description of the change
-        model: Pretrained CLIP vision tower with patch embeddings
-        device: GPU/CPU for inference
-        method: "gradient" - gradient-based saliency, "attention" - attention weights
+        image_t1: H×W×3 uint8 ndarray (used only for patch-diff path — ignored here).
+        image_t2: H×W×3 uint8 ndarray displayed underneath the heatmap.
+        text: Natural-language change query.
+        encoder: Any ``ImageTextEncoder`` implementation.
+        alpha: Heatmap opacity (0 = transparent, 1 = opaque).
 
     Returns:
-        tuple: (heatmap_array, blended_image)
-            - heatmap_array: Normalized attention map (H=12x12 grid, 0-1 range)
-            - blended_image: T2 image with heatmap overlay (RGB PIL format)
+        tuple: (heatmap_grid [grid_h, grid_w] float32 in [0,1],
+                blended PIL.Image.Image)
     """
-    if device is None:
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    pil_t2 = Image.fromarray(image_t2) if isinstance(image_t2, np.ndarray) else image_t2
+    heatmap = encoder.compute_patch_text_similarity(pil_t2, text)   # [grid_h, grid_w]
+    h, w = image_t2.shape[:2] if isinstance(image_t2, np.ndarray) else (image_t2.height, image_t2.width)
+    heatmap_resized = resize_heatmap(heatmap, h, w)
+    img_arr = np.array(image_t2) if not isinstance(image_t2, np.ndarray) else image_t2
+    blended = apply_overlay(img_arr, heatmap_resized, alpha=alpha)
+    return heatmap, blended
 
-    # Ensure images are numpy arrays in [0,1] range with C,H,W shape
-    def preprocess_image(img):
-        img_np = np.array(img)  # HWC uint8 [0-255]
-        img_np = img_np.astype(np.float32) / 255.0  # Normalize to [0,1]
-        img_np = img_np.transpose(2, 0, 1).reshape(3, 384, 384)  # CHW
-        return torch.from_numpy(img_np).unsqueeze(0).to(device)
 
-    image_t1_tensor = preprocess_image(image_t1)
-    image_t2_tensor = preprocess_image(image_t2)
+def extract_patch_attention(
+    image_t2,
+    image_t1,
+    encoder: Optional["ImageTextEncoder"] = None,
+    model=None,
+) -> np.ndarray:
+    """Patch-difference heatmap between T2 and T1.
 
-    with torch.no_grad():
-        if method == "gradient":
-            heatmap = extract_attention_weights(
-                image_t2_tensor, text_query, model=model
-            )
-        elif method == "attention":
-            heatmap = extract_patch_attention(
-                image_t2_tensor, image_t1_tensor, model=model
-            )
-        else:
-            raise ValueError(f"Unknown method: {method}")
+    Supports the new encoder protocol (``encoder`` kwarg) **and** the legacy
+    ``model`` kwarg used by existing tests so they keep passing.
 
-    # Resize 12x12 grid to original image resolution
-    patch_size = 384 // 12  # 32 pixels per patch
-    heatmap_resized = resize_heatmap(heatmap, image_t2.shape[0], image_t2.shape[1])
+    Returns float32 [grid_h, grid_w] in [0, 1].
+    """
+    # --- legacy model path (tests use MockCLIPModel with vision_encoder attr) ---
+    if encoder is None:
+        return _legacy_patch_diff(image_t2, image_t1, model)
 
-    blended_image = apply_overlay(
-        image_t2, heatmap_resized.astype(np.float32), alpha=0.5
-    )
-
-    return heatmap, blended_image
+    # --- encoder protocol path ---
+    pil_t1 = _to_pil(image_t1)
+    pil_t2 = _to_pil(image_t2)
+    sim_t1 = encoder.compute_patch_text_similarity(pil_t1, "")
+    sim_t2 = encoder.compute_patch_text_similarity(pil_t2, "")
+    diff = np.abs(sim_t2.astype(np.float32) - sim_t1.astype(np.float32))
+    lo, hi = diff.min(), diff.max()
+    if hi - lo < 1e-8:
+        return np.zeros_like(diff, dtype=np.float32)
+    return ((diff - lo) / (hi - lo)).astype(np.float32)
 
 
 def extract_attention_weights(
     image: torch.Tensor,
     text_query: str,
-    model: torch.nn.Module = None,
-    target_patch: Optional[int] = None  # Patch index to highlight (None = all)
+    encoder: Optional["ImageTextEncoder"] = None,
+    model=None,
+    target_patch: Optional[int] = None,
 ) -> np.ndarray:
+    """Patch–text similarity heatmap for *image* given *text_query*.
+
+    Supports the new encoder protocol (``encoder`` kwarg) **and** the legacy
+    ``model`` kwarg used by existing tests.
+
+    Returns float32 [grid_h, grid_w] in [0, 1].
     """
-    Extract patch-level attention weights from CLIP vision tower using
-    gradient-based saliency on the image features.
+    # --- encoder protocol path ---
+    if encoder is not None:
+        pil = _to_pil(image)
+        return encoder.compute_patch_text_similarity(pil, text_query)
 
-    This computes how much each 12x12 grid cell in the 384x384 CLIP input
-    contributes to the final pooled image embedding. The gradients flow back
-    through CLIP's vision encoder, highlighting regions that matter for matching
-    with the text query.
-
-    Args:
-        image: Preprocessed RGB image [1, 3, 384, 384]
-        text_query: Text to use as the target embedding
-        model: CLIP model (vision encoder + text encoder)
-        target_patch: Optional specific patch index (0-175) to isolate
-
-    Returns:
-        np.ndarray: Heatmap grid [12, 12] with attention weights per patch
-    """
-    if model is None:
-        from transformers import AutoModel, AutoTokenizer
-        model_name = "openai/clip-vit-large-patch14"
-        print(f"Loading CLIP vision tower: {model_name}")
-        model = AutoModel.from_pretrained(model_name)
-        tokenizer = AutoTokenizer.from_pretrained(model_name)
-    else:
-        # Check if this is a mock model without proper structure (no vision_model/encoders)
-        # Models must have either: vision_model(), vision_encoder+text_encoder, or be raw CLIP
-        if not hasattr(model, 'vision_model') and not hasattr(model, 'vision_encoder'):
-            raise ValueError("Model must have vision_model() method or vision_encoder attribute for patch extraction")
-
-        # Check if this is already a full CLIP model or wrapped with encoders
-        if hasattr(model, 'vision_encoder') and callable(getattr(model, 'vision_encoder')):  # Vision encoder is directly callable (e.g., forward() method)
-            vision_model = model.vision_encoder()
-            text_model = model.text_encoder()
-            tokenizer = None  # Will use the model's internal encoding
-        elif hasattr(model, 'vision_encoder') and not callable(getattr(model, 'vision_encoder')):
-            # vision_encoder is an attribute/instance with a forward() method
-            vision_model = model.vision_encoder.forward  # Get the forward method
-            text_model = model.text_encoder.forward if hasattr(model.text_encoder, 'forward') else model.text_encoder.forward
-            tokenizer = None
-        else:
-            print("Using raw model...")
-            vision_model, text_model, tokenizer = model, model, None
-
-    with torch.no_grad():
-        # Encode image features (patch embeddings) [1, 384, 768]
-        img_features = vision_model(image)
-
-        if target_patch is not None:
-            patch_idx = int(target_patch)
-            if not 0 <= patch_idx < img_features.shape[1]:
-                raise ValueError(f"Patch index {patch_idx} out of range [0, {img_features.shape[1]-1}]")
-            # Isolate single patch
-            single_patch = img_features[:, patch_idx:patch_idx+1]  # [B, 1, C]
-        else:
-            single_patch = img_features  # All patches
-
-        # Encode text query - use model's internal encoding if available (for tests)
-        if tokenizer is not None:
-            input_ids = tokenizer(text_query, return_tensors="pt", max_length=77).input_ids.to('cpu')
-            text_features = text_model(input_ids)[0]  # [1, 77, 768]
-        else:
-            # For mock models that have their own encoding mechanism
-            input_ids = torch.tensor([[1]])  # Dummy input - use model's internal method
-            text_features = text_model(text_query)
-
-        # Cosine similarity between patches and text
-        # Extract batch dimensions: img[P,C], text[T,C]
-        img_norm = single_patch / single_patch.norm(dim=-1, keepdim=True)
-        text_norm = text_features / text_features.norm(dim=-1, keepdim=True)
-        patch_text_sim = torch.matmul(
-            img_norm.squeeze(),  # Removes all leading/trailing 1-dims (B and P if P=1)
-            text_norm.transpose(-2, -1).squeeze()  # Same for text
-        )  # [P=576, T=text_tokens] where P=576 patches for CLIP ViT-L/14
-
-    # Sum across text positions to get overall patch scores
-    if target_patch is not None:
-        return np.array([[[float(torch.sum(patch_text_sim))]]])  # Return single scalar for targeted patch
-    else:
-        patch_scores = torch.sum(patch_text_sim, dim=-1).cpu().numpy()  # [P=576]
-        # Reshape to 24x24 grid (576 patches for CLIP ViT-L/14)
-        return np.clip(patch_scores.reshape(24, 24), a_min=0, a_max=1)  # Normalize to [0,1]
-        return np.clip(patch_grid, 0, 1)  # Normalize to [0,1]
+    # --- legacy model path (MockCLIPModel in tests) ---
+    return _legacy_attention_weights(image, text_query, model, target_patch)
 
 
-def extract_patch_attention(
-    image_t2: torch.Tensor,
-    image_t1: torch.Tensor,
-    model: torch.nn.Module = None
-) -> np.ndarray:
-    """
-    Extract patch-level attention differences between T2 and T1 using CLIP's
-    cross-attention mechanism. Highlights regions where the change is most visually salient.
-
-    Args:
-        image_t2: Preprocessed T2 image [1, 3, 384, 384]
-        image_t1: Preprocessed T1 image [1, 3, 384, 384]
-        model: CLIP model
-
-    Returns:
-        np.ndarray: Grid of attention differences [12, 12]
-    """
-    if model is None:
-        from transformers import AutoModel
-        print("Loading CLIP for difference-based attention...")
-        raw_model = AutoModel.from_pretrained("openai/clip-vit-large-patch14")
-    else:
-        # Check if this is already a full CLIP model or wrapped with encoders
-        if hasattr(model, 'vision_encoder') and callable(getattr(model, 'vision_encoder')):  # Vision encoder is directly callable (e.g., forward() method)
-            vision_model = model.vision_encoder()
-        elif hasattr(model, 'vision_encoder') and not callable(getattr(model, 'vision_encoder')):
-            # vision_encoder is an attribute/instance with a forward() method
-            vision_model = model.vision_encoder.forward  # Get the forward method
-        elif hasattr(model, 'vision_model'):  # Raw CLIP model (has vision_model method)
-            raw_model = model
-            vision_model = model
-        else:
-            raise ValueError("Model must have vision_model() method or vision_encoder attribute")
-
-    with torch.no_grad():
-        # Get patch features [B, 384, 768]
-        feat_t2 = vision_model(image_t2)
-        feat_t1 = vision_model(image_t1)
-
-        # Difference in patch space (normalized L2 diff per patch)
-        norm_f2 = feat_t2 / feat_t2.norm(dim=-1, keepdim=True)
-        norm_f1 = feat_t1 / feat_t1.norm(dim=-1, keepdim=True)
-        patch_diff = torch.abs(norm_f2 - norm_f1).cpu().numpy()  # [B, 384, C]
-
-    # Sum across channels and reshape to grid
-    patch_scores = np.sum(patch_diff[0], axis=1)  # [576 for CLIP ViT-L/14]
-    grid_shape = (24, 24)  # CLIP uses 24x24 patches, not 12x12
-    return np.clip(
-        patch_scores.reshape(grid_shape),
-        a_min=0,
-        a_max=1
-    )
-
+# ---------------------------------------------------------------------------
+# Utility functions (unchanged API, keep tests green)
+# ---------------------------------------------------------------------------
 
 def resize_heatmap(
     heatmap: np.ndarray,
     target_height: int,
-    target_width: int
+    target_width: int,
 ) -> np.ndarray:
-    """
-    Resize CLIP patch grid to full image resolution using bilinear interpolation.
-
-    Args:
-        heatmap: Source grid [24, 24] for CLIP ViT-L/14
-        target_height: Target height in pixels
-        target_width: Target width in pixels
-
-    Returns:
-        np.ndarray: Resized heatmap [H, W] with float values in [0, 1]
-    """
-    # Resize using cv2.INTER_LINEAR for smooth gradients
+    """Bilinear-resize a patch grid to full image resolution."""
     resized = cv2.resize(
         (heatmap * 255).astype(np.uint8),
         (target_width, target_height),
-        interpolation=cv2.INTER_LINEAR
+        interpolation=cv2.INTER_LINEAR,
     ).astype(np.float32) / 255.0
     return np.clip(resized, 0, 1)
 
@@ -251,103 +126,143 @@ def apply_overlay(
     image: np.ndarray,
     heatmap: np.ndarray,
     alpha: float = 0.5,
-    colormap: str = "jet"
+    colormap: str = "jet",
 ) -> Image.Image:
-    """
-    Blend heatmap with T2 image using OpenCV.
-
-    Args:
-        image: T2 RGB image [H, W, 3] in uint8 format
-        heatmap: Normalized attention map [H, W] in float [0,1]
-        alpha: Opacity of heatmap overlay (0.0 = transparent, 1.0 = opaque)
-        colormap: OpenCV colormap name ('jet', 'viridis', etc.)
-
-    Returns:
-        PIL Image: Blended RGB image ready for display
-    """
-    # Apply colormap to heatmap (OpenCV uses uint8)
+    """Alpha-blend colorised heatmap over image."""
     heat_colormap = cv2.applyColorMap(
         (np.clip(heatmap, 0, 1) * 255).astype(np.uint8),
-        getattr(cv2, f'COLORMAP_{colormap.upper()}', cv2.COLORMAP_JET)
+        getattr(cv2, f"COLORMAP_{colormap.upper()}", cv2.COLORMAP_JET),
     )
-
-    # Convert BGR colormap to RGB
     heat_rgb = cv2.cvtColor(heat_colormap, cv2.COLOR_BGR2RGB)
-
-    # Blend with original image using alpha compositing
-    # Ensure both inputs are uint8 for cv2.addWeighted
-    blended = cv2.addWeighted(
-        image.astype(np.uint8), 1 - alpha,
-        heat_rgb, alpha,
-        0, 0
-    )
-
+    blended = cv2.addWeighted(image.astype(np.uint8), 1 - alpha, heat_rgb, alpha, 0)
     return Image.fromarray(blended)
 
 
-def apply_heatmap_only(
-    heatmap: np.ndarray,
-    colormap: str = "jet"
-) -> Image.Image:
-    """
-    Apply a single colormap to a heatmap without blending.
-    Useful for displaying raw attention maps.
-
-    Args:
-        heatmap: Normalized attention map [H, W] in float [0,1]
-        colormap: OpenCV colormap name ('jet', 'viridis', etc.)
-
-    Returns:
-        PIL Image: Colormap-applied heatmap (RGB)
-    """
-    # Apply colormap to heatmap (OpenCV uses uint8)
+def apply_heatmap_only(heatmap: np.ndarray, colormap: str = "jet") -> Image.Image:
     heat_colormap = cv2.applyColorMap(
         (np.clip(heatmap, 0, 1) * 255).astype(np.uint8),
-        getattr(cv2, f'COLORMAP_{colormap.upper()}', cv2.COLORMAP_JET)
+        getattr(cv2, f"COLORMAP_{colormap.upper()}", cv2.COLORMAP_JET),
     )
-
-    # Convert BGR colormap to RGB
-    heat_rgb = cv2.cvtColor(heat_colormap, cv2.COLOR_BGR2RGB)
-
-    return Image.fromarray(heat_rgb)
+    return Image.fromarray(cv2.cvtColor(heat_colormap, cv2.COLOR_BGR2RGB))
 
 
 def generate_grid_heatmap_from_patches(
     patch_scores: np.ndarray,
     grid_shape: Tuple[int, int] = (12, 12),
-    colormap: str = "jet"
+    colormap: str = "jet",
 ) -> Tuple[np.ndarray, np.ndarray]:
-    """
-    Create a visual heatmap directly from a patch score matrix without resizing.
-
-    Useful for debugging or displaying the raw 16x16 grid of CLIP patches.
-
-    Args:
-        patch_scores: Raw scores [P] where P = H*W (e.g., 384)
-        grid_shape: Output shape as (H, W) tuple
-        colormap: OpenCV colormap name
-
-    Returns:
-        tuple: (grid_heatmap_12x12, full_res_heatmap_384x384)
-    """
+    """Reshape flat patch scores to a visual grid + full-res colormap."""
     H, W = grid_shape
-    if len(patch_scores.shape) == 1:
-        patch_grid = patch_scores.reshape(grid_shape).astype(np.float32)
-    else:
-        patch_grid = patch_scores.astype(np.float32)
-
-    # Resize to full resolution
+    patch_grid = (
+        patch_scores.reshape(grid_shape).astype(np.float32)
+        if patch_scores.ndim == 1
+        else patch_scores.astype(np.float32)
+    )
     heatmap_full = cv2.resize(
         (patch_grid * 255).astype(np.uint8),
         (W, H),
-        interpolation=cv2.INTER_CUBIC
+        interpolation=cv2.INTER_CUBIC,
     ).astype(np.float32) / 255.0
-
-    # Apply colormap to full resolution
     heatmap_colormap = cv2.applyColorMap(
         (heatmap_full * 255).astype(np.uint8),
-        getattr(cv2, f"COLORMAP_{colormap.upper()}", cv2.COLORMAP_JET)
+        getattr(cv2, f"COLORMAP_{colormap.upper()}", cv2.COLORMAP_JET),
     )
-
     return patch_grid, heatmap_colormap
 
+
+# ---------------------------------------------------------------------------
+# Legacy helpers (keep tests passing without MockCLIPModel changes)
+# ---------------------------------------------------------------------------
+
+def _to_pil(img) -> Image.Image:
+    if isinstance(img, Image.Image):
+        return img
+    if isinstance(img, np.ndarray):
+        return Image.fromarray(img)
+    # torch.Tensor [1, C, H, W] or [C, H, W]
+    t = img
+    if t.dim() == 4:
+        t = t.squeeze(0)
+    arr = (t.permute(1, 2, 0).cpu().numpy() * 255).clip(0, 255).astype(np.uint8)
+    return Image.fromarray(arr)
+
+
+def _get_legacy_vision_model(model):
+    """Return a callable that maps image tensor → patch features."""
+    if model is None:
+        from transformers import AutoModel
+        raw = AutoModel.from_pretrained("openai/clip-vit-large-patch14")
+        return raw.vision_model
+    if hasattr(model, "vision_encoder"):
+        ve = model.vision_encoder
+        return ve.forward if hasattr(ve, "forward") else ve
+    if hasattr(model, "vision_model"):
+        return model.vision_model
+    raise ValueError("Model has no vision_model / vision_encoder attribute")
+
+
+def _get_legacy_text_model(model):
+    if model is None:
+        return None
+    if hasattr(model, "text_encoder"):
+        te = model.text_encoder
+        return te.forward if hasattr(te, "forward") else te
+    if hasattr(model, "text_model"):
+        return model.text_model
+    return None
+
+
+def _legacy_attention_weights(image, text_query, model, target_patch):
+    vision_fn = _get_legacy_vision_model(model)
+    text_fn = _get_legacy_text_model(model)
+
+    with torch.no_grad():
+        img_feats = vision_fn(image)          # [B, P, C]
+        if target_patch is not None:
+            img_feats = img_feats[:, target_patch:target_patch + 1, :]
+
+        if text_fn is not None:
+            text_feats = text_fn(text_query)  # [1, T, C]
+        else:
+            text_feats = torch.zeros(1, 1, img_feats.shape[-1])
+
+        img_norm = img_feats / (img_feats.norm(dim=-1, keepdim=True) + 1e-8)
+        txt_norm = text_feats / (text_feats.norm(dim=-1, keepdim=True) + 1e-8)
+        sims = torch.matmul(img_norm.squeeze(0), txt_norm.squeeze(0).t())  # [P, T]
+
+    if target_patch is not None:
+        return np.array([[[float(sims.sum())]]])
+
+    patch_scores = sims.sum(dim=-1).cpu().numpy()   # [P]
+    n = patch_scores.shape[0]
+    side = int(round(n ** 0.5))
+    if side * side != n:
+        side = int(n ** 0.5)
+    lo, hi = patch_scores.min(), patch_scores.max()
+    if hi - lo < 1e-8:
+        return np.zeros((side, side), dtype=np.float32)
+    normed = ((patch_scores - lo) / (hi - lo)).astype(np.float32)
+    return np.clip(normed.reshape(side, side), 0, 1)
+
+
+def _legacy_patch_diff(image_t2, image_t1, model):
+    vision_fn = _get_legacy_vision_model(model)
+
+    with torch.no_grad():
+        f2 = vision_fn(image_t2)   # [B, P, C]
+        f1 = vision_fn(image_t1)
+
+        n2 = f2 / (f2.norm(dim=-1, keepdim=True) + 1e-8)
+        n1 = f1 / (f1.norm(dim=-1, keepdim=True) + 1e-8)
+        diff = torch.abs(n2 - n1).cpu().numpy()   # [B, P, C]
+
+    patch_scores = diff[0].sum(axis=-1)   # [P]
+    n = patch_scores.shape[0]
+    side = int(round(n ** 0.5))
+    if side * side != n:
+        side = int(n ** 0.5)
+    lo, hi = patch_scores.min(), patch_scores.max()
+    if hi - lo < 1e-8:
+        return np.zeros((side, side), dtype=np.float32)
+    normed = ((patch_scores - lo) / (hi - lo)).astype(np.float32)
+    return np.clip(normed.reshape(side, side), 0, 1)

@@ -1,0 +1,24 @@
+# Data & artefacts (large; reproducible via scripts)
+data/
+.model_cache/
+tests/fixtures/den_tiny/
+mlruns/
+
+# `models/` is tracked: adapters are ~3 MB each, encoder/dataset-keyed, and
+# committing them lets a fresh clone run `--approach peft` without retraining.
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Legacy first-attempt material (kept local, not used)
+legacy/
+
+# Env
+.venv/
+venv/
+.env

@@ -4,17 +4,64 @@ Data loader for multitemporal satellite imagery embeddings.
 This module provides utilities to load pre-computed QFabric or Dynamic EarthNet features,
 parsing metadata to extract geographic coordinates and timestamps. It creates PyTorch
 datasets of paired (embedding_T1, embedding_T2) vectors for change detection tasks.
+
+.. deprecated::
+    For new code, use the ``src.datasets`` subpackage instead:
+
+        from src.datasets import get_dataset
+        ds = get_dataset("qfabric", parquet_paths=[...], cache_path=...)
+
+    The functions in this module are kept as a backwards-compatibility facade
+    so the existing tests and Gradio app keep working without changes.
 """
 import os
-from typing import Optional, Tuple
+from pathlib import Path
+from typing import Optional, Tuple, Union
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
 import numpy as np
 
 
+LEGACY_CACHE_NAME = "clip_embeddings.npz"
+
+
+def cache_path(data_dir: Union[str, Path], dataset: str, encoder: str) -> Path:
+    """Canonical embedding-cache path for a (dataset, encoder) combination.
+
+    Example: ``cache_path("data", "qfabric", "clip_vitl14")``
+    → ``data/cache/qfabric__clip_vitl14__embeddings.npz``
+    """
+    return Path(data_dir) / "cache" / f"{dataset}__{encoder}__embeddings.npz"
+
+
+def migrate_legacy_cache(data_dir: Union[str, Path]) -> Optional[Path]:
+    """Rename ``data/clip_embeddings.npz`` to the new cache filename if needed.
+
+    Idempotent — does nothing if either (a) the legacy file is absent, or
+    (b) the new file already exists. Returns the new path when a migration
+    actually happened, else None.
+    """
+    data_dir = Path(data_dir)
+    legacy = data_dir / LEGACY_CACHE_NAME
+    new = cache_path(data_dir, dataset="qfabric", encoder="clip_vitl14")
+    if not legacy.exists() or new.exists():
+        return None
+    new.parent.mkdir(parents=True, exist_ok=True)
+    legacy.rename(new)
+    print(f"Migrated legacy cache: {legacy} -> {new}")
+    return new
+
+
 class TemporalEmbeddingDataset(Dataset):
-    """PyTorch dataset for paired temporal embeddings."""
+    """PyTorch dataset for paired temporal embeddings.
+
+    .. deprecated::
+        ``__getitem__`` references an undefined ``n`` and will raise; do not use
+        in new code. Prefer ``src.datasets.QFabricDataset`` (or any other
+        ``TemporalDataset`` implementation) combined with
+        ``src.temporal_pairing.pair_temporally_from_dataset``.
+    """
 
     def __init__(
         self,
