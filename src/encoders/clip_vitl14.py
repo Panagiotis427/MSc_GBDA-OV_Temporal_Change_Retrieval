@@ -113,7 +113,8 @@ class CLIPViTL14Encoder:
                 max_length=77,
                 return_tensors="pt",
             ).to(self.device)
-            text_features = self._clip_model.get_text_features(**text_inputs)
+            text_out = self._clip_model.text_model(**text_inputs)
+            text_features = self._clip_model.text_projection(text_out.pooler_output)
             text_features = F.normalize(text_features, dim=-1)
 
             sims = (projected @ text_features.t()).squeeze(0).squeeze(-1)

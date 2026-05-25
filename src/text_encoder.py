@@ -97,9 +97,8 @@ class FrozenTextEncoder:
         ).to(self.device)
 
         with torch.no_grad():
-            # CLIPModel.get_text_features already returns the projected
-            # text embedding in the shared image-text space: [N, projection_dim].
-            embeddings = self.model.get_text_features(**encoded)
+            text_out = self.model.text_model(**encoded)
+            embeddings = self.model.text_projection(text_out.pooler_output)
 
         return embeddings
 
