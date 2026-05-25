@@ -82,7 +82,8 @@ class CLIPViTL14Encoder:
             for i in range(0, len(images), batch_size):
                 batch = images[i : i + batch_size]
                 pixel_values = self._processor(images=batch, return_tensors="pt").pixel_values.to(self.device)
-                feats = self._clip_model.get_image_features(pixel_values=pixel_values)
+                vision_out = self._clip_model.vision_model(pixel_values=pixel_values)
+                feats = self._clip_model.visual_projection(vision_out.pooler_output)
                 feats = F.normalize(feats, dim=-1)
                 embs.append(feats.cpu().numpy())
         return np.concatenate(embs, axis=0)
