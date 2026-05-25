@@ -312,7 +312,28 @@ false-colour) generalises; learned visual priors do not.** No amount of adapter
 sophistication — whether a small projection head or LoRA on the backbone — beats
 the structural prior embedded in RS-pretrained zero-shot GeoRSCLIP + NIR.
 
-### §7.5 UI extensions (non-experiment)
+### §7.5 Re-ranking quantification (GeoRSCLIP + NRG, zero_shot, test split)
+
+Post-retrieval re-ranking was evaluated on the held-out test split (110 pairs,
+3 queries with positives) using the best-generalising configuration
+(GeoRSCLIP + NRG zero-shot, mAP 0.426).
+
+| Strategy | R@1 | R@3 | R@5 | R@10 | mAP |
+|---|---|---|---|---|---|
+| baseline (no rerank) | 0.133 | **0.333** | **0.400** | **0.467** | **0.426** |
+| diversity | 0.133 | 0.267 | 0.267 | 0.267 | 0.344 |
+| coherence | 0.133 | 0.200 | 0.267 | 0.467 | 0.345 |
+
+**Both re-ranking strategies reduce retrieval quality.** Diversity deduplicates
+locations, pushing relevant pairs from the same AOI out of the top window.
+Coherence clusters geographically near the top-1 result, but relevant pairs
+are globally distributed (not spatially clustered). Neither strategy was
+designed to optimise semantic relevance — they trade mAP for UX properties:
+result variety (diversity) and spatial coherence (coherence). The gap
+(−0.082 mAP) is the cost of prioritising display ergonomics over ranking
+fidelity.
+
+### §7.6 UI extensions (non-experiment)
 
 Four optional features were added to the Gradio app. All are toggleable at
 any time without restarting; CLI flags set startup defaults only.
@@ -480,10 +501,9 @@ regenerated automatically by the test suite.
 - **Sentinel-1/2 data**: `aoi_metadata.json` confirms 51/75 AOIs have full
   SAR (S1) coverage; downloading and feeding SAR Δ-features is a direct
   extension of the NRG pattern.
-- **Re-ranking not benchmarked**: geographic diversity and coherence re-ranking
-  are implemented and toggleable (§7.5), but their effect on mAP/Recall@K has
-  not been quantified — a one-command sweep with `run_benchmark` per strategy
-  would close this gap.
+- **Re-ranking trades mAP for UX**: diversity and coherence re-ranking are
+  quantified in §7.5. Both reduce mAP (−0.082) vs baseline; they optimise
+  display variety, not retrieval quality.
 - **Human relevance judgements**: all mAP figures use LULC-derived
   pseudo-labels. Human-annotated query relevance would give a true IR benchmark.
 

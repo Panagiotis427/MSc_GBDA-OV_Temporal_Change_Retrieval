@@ -126,7 +126,12 @@ class SemanticChangeSearch:
         split_str = cfg.split or "all"
         color_tag = f"_{cfg.color_mode}" if cfg.color_mode != "rgb" else ""
         lora_tag = "_lora" if cfg.use_lora else ""
-        cache_tag = f"{split_str}{color_tag}{lora_tag}"
+        # Match embeddings CLI convention: test+rgb (no lora) has no tag suffix
+        cache_tag = (
+            f"{split_str}{color_tag}{lora_tag}"
+            if split_str != "test" or color_tag or lora_tag
+            else ""
+        )
 
         if cfg.use_lora:
             lora_cache = _cache_path(cfg.cache_dir, self.dataset.name,
