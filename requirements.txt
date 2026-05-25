@@ -9,3 +9,4 @@ pandas
 pyarrow
 opencv-python-headless
 peft>=0.10.0
+rasterio
