@@ -75,6 +75,24 @@ class ChangeEvent:
 
 
 class SemanticChangeSearch:
+    _CSS = """
+        .top-card {border: 1px solid var(--border-color-primary, #d0d0d0);
+                   border-radius: 12px; padding: 14px 18px;
+                   background: var(--background-fill-secondary, #fafafa);}
+        .conf-pill {display:inline-block; padding:4px 12px; border-radius:999px;
+                    background:#2e7d32; color:white; font-weight:600;}
+        .conf-pill.mid {background:#f9a825;}
+        .conf-pill.low {background:#c62828;}
+        .stats-card {border:1px solid var(--border-color-primary,#d0d0d0);
+                     border-left:4px solid #1565c0;
+                     border-radius:10px; padding:10px 14px;
+                     background:var(--background-fill-secondary,#f5f9ff);
+                     font-size:0.95em; line-height:1.7;}
+        .stats-card code {background:rgba(21,101,192,0.08); padding:1px 6px;
+                          border-radius:4px; font-weight:600;}
+        .stats-err {border-left-color:#c62828; background:#fff4f4;}
+        """
+
     def __init__(self, cfg: RunConfig):
         self.cfg = cfg
         self._build(cfg)
@@ -328,26 +346,7 @@ class SemanticChangeSearch:
         QUERY_HELP = ("Natural language. Use specific land-cover transitions "
                       "(verbs and class names) for best results.")
 
-        css = """
-        .top-card {border: 1px solid var(--border-color-primary, #d0d0d0);
-                   border-radius: 12px; padding: 14px 18px;
-                   background: var(--background-fill-secondary, #fafafa);}
-        .conf-pill {display:inline-block; padding:4px 12px; border-radius:999px;
-                    background:#2e7d32; color:white; font-weight:600;}
-        .conf-pill.mid {background:#f9a825;}
-        .conf-pill.low {background:#c62828;}
-        .stats-card {border:1px solid var(--border-color-primary,#d0d0d0);
-                     border-left:4px solid #1565c0;
-                     border-radius:10px; padding:10px 14px;
-                     background:var(--background-fill-secondary,#f5f9ff);
-                     font-size:0.95em; line-height:1.7;}
-        .stats-card code {background:rgba(21,101,192,0.08); padding:1px 6px;
-                          border-radius:4px; font-weight:600;}
-        .stats-err {border-left-color:#c62828; background:#fff4f4;}
-        """
-
-        with gr.Blocks(title="Semantic Change Search Engine", css=css,
-                       theme=gr.themes.Soft()) as demo:
+        with gr.Blocks(title="Semantic Change Search Engine") as demo:
             gr.Markdown(INTRO)
 
             stats_md = gr.Markdown(engine.stats_markdown())
@@ -557,12 +556,14 @@ def parse_args():
 
 
 def main():
+    import gradio as gr
     cfg, port = parse_args()
     print(f"Starting engine: dataset={cfg.dataset} encoder={cfg.encoder} "
           f"approach={cfg.approach}")
     engine = SemanticChangeSearch(cfg)
     demo = engine.build_interface()
-    demo.launch(server_name="0.0.0.0", server_port=port, show_error=True)
+    demo.launch(server_name="0.0.0.0", server_port=port, show_error=True,
+                theme=gr.themes.Soft(), css=SemanticChangeSearch._CSS)
 
 
 if __name__ == "__main__":
