@@ -190,7 +190,7 @@ def save_adapter(path: str, adapter: "ProjectionHead", meta: Dict[str, Any]) -> 
 def load_adapter(path: str, map_location="cpu") -> Tuple["ProjectionHead", Dict[str, Any]]:
     """Reconstruct a ``ProjectionHead`` from a checkpoint written by
     :func:`save_adapter`. Returns ``(adapter_in_eval_mode, meta)``."""
-    ckpt = torch.load(path, map_location=map_location)
+    ckpt = torch.load(path, map_location=map_location, weights_only=False)
     meta = ckpt["meta"]
     adapter = ProjectionHead(
         input_dim=meta["input_dim"],

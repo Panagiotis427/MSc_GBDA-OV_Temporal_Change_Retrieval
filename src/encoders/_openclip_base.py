@@ -21,7 +21,7 @@ from PIL import Image
 def _load_state_dict_flexible(model, ckpt_path: str) -> None:
     """Tolerant load: handles ``{'state_dict': ...}`` wrappers, ``module.``
     prefixes, and partial matches (strict=False)."""
-    ckpt = torch.load(ckpt_path, map_location="cpu")
+    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     sd = ckpt.get("state_dict", ckpt) if isinstance(ckpt, dict) else ckpt
     sd = {(k[7:] if k.startswith("module.") else k): v for k, v in sd.items()}
     missing, unexpected = model.load_state_dict(sd, strict=False)
