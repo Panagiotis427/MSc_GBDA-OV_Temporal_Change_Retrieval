@@ -106,7 +106,7 @@ derived `PairLabel`s → Recall@K, mAP, plus a seasonal-vs-permanent
 | `src/datasets/` | `TemporalDataset` protocol, `DENDataset` (raster), `DENNpyDataset` (DynNet `.npy` + `color_mode` rgb/nrg/ndvi via NIR infrared frames), `QFabricDataset`, layout-detecting registry + opts adapters |
 | `src/queries/` | Per-dataset query sets (`den.py`); registry resolved by `dataset.name` |
 | `src/encoders/` | `ImageTextEncoder` protocol; `clip_vitl14` (768-d), `georsclip` (512-d), `remoteclip` (768-d) |
-| `src/text_encoder.py` | frozen CLIP text tower (`get_text_features`, device-aware) |
+| `src/text_encoder.py` | frozen CLIP text tower (`text_model` + `text_projection`, device-aware) |
 | `src/features.py` | `compute_change_feature` (difference / concatenate) |
 | `src/embeddings.py` | per-pair `f_T1,f_T2` compute + npz cache (`PairEmbeddingStore`); `cache_tag` arg keys cache by split+color to prevent cross-split collision |
 | `src/retrieval.py` | `ChangeRetriever` — naive / zero_shot / peft scoring |

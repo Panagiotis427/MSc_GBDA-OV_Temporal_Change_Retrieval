@@ -81,8 +81,10 @@ class SemanticChangeSearch:
                    background: var(--background-fill-secondary, #fafafa);}
         .conf-pill {display:inline-block; padding:4px 12px; border-radius:999px;
                     background:#2e7d32; color:white; font-weight:600;}
-        .conf-pill.mid {background:#f9a825;}
+        .conf-pill.mid {background:#f9a825; color:#222;}
         .conf-pill.low {background:#c62828;}
+        #search-btn { min-height: 3.5rem !important; font-size: 1.1rem !important;
+                      letter-spacing: 0.03em; }
         .stats-card {border:1px solid var(--border-color-primary,#d0d0d0);
                      border-left:4px solid #1565c0;
                      border-radius:10px; padding:10px 14px;
@@ -325,56 +327,83 @@ class SemanticChangeSearch:
         from src.datasets.registry import list_datasets
         from src.encoders import list_encoders
 
-        INTRO = (
-            "# Semantic Change Search Engine\n"
-            "Type a natural-language description of a land-cover change "
-            "(e.g. *'new buildings on former farmland'*). The system ranks "
-            "every bi-temporal `(T1, T2)` image pair in the dataset by how "
-            "well the change between the two timesteps matches the query, "
-            "and returns the matched tiles plus a heatmap on T2."
-        )
-
         APPROACH_HELP = (
-            "naive = cos(text, T2)  ·  zero_shot = cos(text, T2) − cos(text, T1) "
-            "(Δ-similarity, no training)  ·  peft = cos(text, adapter(Δf)) "
-            "(trained ProjectionHead, best quality)"
+            "Naive = cos(text, After) — image retrieval baseline.  "
+            "Zero-shot = cos(text, After) − cos(text, Before) — no training needed.  "
+            "PEFT adapter = cos(text, adapter(Δf)) — trained projection head, best quality."
         )
         ENCODER_HELP = (
-            "clip_vitl14 (general, 768-d)  ·  georsclip (RS-pretrained ViT-B/32, 512-d)  "
+            "clip_vitl14 (general purpose, 768-d)  ·  georsclip (RS-pretrained ViT-B/32, 512-d)  "
             "·  remoteclip (RS-pretrained ViT-L/14, 768-d). Weights download on first use."
         )
         DATASET_HELP = (
-            "Pair corpus to search over. Pulled live from the dataset registry; "
-            "switching rebuilds (or loads cached) embeddings."
+            "Pair corpus to search over. Switching rebuilds (or loads cached) embeddings — "
+            "press Apply Settings afterwards."
         )
         TOPK_HELP = "How many ranked change events to return."
-        QUERY_HELP = ("Natural language. Use specific land-cover transitions "
-                      "(verbs and class names) for best results.")
+        QUERY_HELP = ("Describe the land-cover change you are looking for. "
+                      "Specific transitions (e.g. 'forest cleared to bare soil') work best.")
+        COLOR_MODE_HELP = (
+            "rgb = standard optical (R-G-B)  ·  nrg = NIR-Red-Green false colour "
+            "(best zero-shot with GeoRSCLIP)  ·  ndvi = vegetation index (single channel × 3). "
+            "Changing requires Apply Settings."
+        )
+        LORA_HELP = (
+            "Load LoRA-adapted embeddings pre-cached by run_pipeline --lora. "
+            "Cache must exist for the selected encoder + color mode. "
+            "Changing requires Apply Settings."
+        )
 
         with gr.Blocks(title="Semantic Change Search Engine") as demo:
-            gr.Markdown(INTRO)
-
-            stats_md = gr.Markdown(engine.stats_markdown())
-
-            COLOR_MODE_HELP = (
-                "rgb = standard optical (R-G-B)  ·  nrg = NIR-Red-Green false colour "
-                "(best zero-shot with GeoRSCLIP)  ·  ndvi = vegetation index (single channel × 3). "
-                "Changing requires Apply."
-            )
-            LORA_HELP = (
-                "Load LoRA-adapted embeddings pre-cached by run_pipeline --lora. "
-                "Cache must exist for the selected encoder + color mode. "
-                "Changing requires Apply."
+            gr.Markdown(
+                "# Semantic Change Search Engine\n"
+                "Describe a land-cover change in plain language — "
+                "the engine finds the satellite image pairs where it happened."
             )
 
+            # ---- Query first — most important ----
+            with gr.Row():
+                q = gr.Textbox(
+                    label="Change query", scale=5,
+                    value="new buildings on former farmland",
+                    placeholder="e.g. agricultural land converted to wetland",
+                    info=QUERY_HELP,
+                )
+                a_dd = gr.Dropdown(
+                    choices=[
+                        ("Naive (baseline)", "naive"),
+                        ("Zero-shot (no training)", "zero_shot"),
+                        ("PEFT adapter (trained)", "peft"),
+                    ],
+                    value=engine.cfg.approach,
+                    label="Approach",
+                    info=APPROACH_HELP,
+                    scale=2,
+                )
+                k = gr.Slider(1, 10, value=engine.cfg.top_k, step=1,
+                              label="Top-K", info=TOPK_HELP, scale=1)
+                go = gr.Button("Search", variant="primary", size="lg",
+                               elem_id="search-btn")
+
+            gr.Examples(
+                examples=[
+                    ["new buildings on former farmland"],
+                    ["forest cleared to bare soil"],
+                    ["agricultural land converted to wetland"],
+                    ["seasonal snow melting away"],
+                ],
+                inputs=[q],
+                label="Example queries — click to fill",
+            )
+
+            # ---- Settings (power-user, collapsed) ----
             with gr.Accordion("Settings", open=False):
+                stats_md = gr.Markdown(engine.stats_markdown())
                 with gr.Row():
                     d_dd = gr.Dropdown(list_datasets(), value=engine.cfg.dataset,
                                        label="Dataset", info=DATASET_HELP)
                     e_dd = gr.Dropdown(list_encoders(), value=engine.cfg.encoder,
                                        label="Encoder", info=ENCODER_HELP)
-                    a_dd = gr.Dropdown(list(APPROACHES), value=engine.cfg.approach,
-                                       label="Approach", info=APPROACH_HELP)
                 with gr.Row():
                     color_dd = gr.Dropdown(
                         ["rgb", "nrg", "ndvi"], value=engine.cfg.color_mode,
@@ -386,7 +415,7 @@ class SemanticChangeSearch:
                         info=LORA_HELP,
                     )
                 with gr.Row():
-                    apply = gr.Button("Apply (rebuild)", variant="secondary")
+                    apply = gr.Button("Apply Settings", variant="secondary")
                     status = gr.Textbox(
                         label="Engine status", interactive=False, scale=4,
                         value=f"{engine.cfg.dataset} + {engine.cfg.encoder} | "
@@ -397,14 +426,15 @@ class SemanticChangeSearch:
                             [d_dd, e_dd, a_dd, color_dd, lora_chk],
                             [status, stats_md])
 
-            # ---- Filters & Re-ranking (per-query, no Apply needed) ----
+            # ---- Filters & Re-ranking (per-query, no Apply Settings needed) ----
             _geo_available = engine._geo_filter is not None
             _regions = engine._geo_filter.regions if _geo_available else ["All"]
             _rerank_available = engine._reranker is not None
 
             with gr.Accordion("Filters & Re-ranking", open=False):
                 gr.Markdown(
-                    "These options take effect on the **next Search** — no Apply needed."
+                    "These options take effect on the **next Search** — "
+                    "no Apply Settings needed."
                 )
                 with gr.Row():
                     geo_chk = gr.Checkbox(
@@ -441,32 +471,20 @@ class SemanticChangeSearch:
                         ),
                     )
 
-            with gr.Row():
-                q = gr.Textbox(
-                    label="Change query", scale=5,
-                    value="new buildings on former farmland",
-                    placeholder="e.g. agricultural land converted to wetland",
-                    info=QUERY_HELP,
-                )
-                k = gr.Slider(1, 10, value=engine.cfg.top_k, step=1,
-                              label="Top-K", info=TOPK_HELP)
-                go = gr.Button("Search", variant="primary", size="lg")
-
+            # ---- Results ----
             gr.Markdown("## Top match")
             with gr.Group(elem_classes="top-card"):
                 with gr.Row():
-                    t1i = gr.Image(label="T1 (earlier)", height=300,
-                                   interactive=False)
-                    t2i = gr.Image(label="T2 (later)", height=300,
-                                   interactive=False)
-                    hmi = gr.Image(label="Change heatmap on T2", height=300,
+                    t1i = gr.Image(label="Before", height=300, interactive=False)
+                    t2i = gr.Image(label="After", height=300, interactive=False)
+                    hmi = gr.Image(label="Change heatmap (After)", height=300,
                                    interactive=False)
                 summary = gr.Markdown("*Press Search to retrieve.*")
 
-            with gr.Accordion("All ranked change events", open=True):
+            with gr.Accordion("Results table", open=True):
                 table = gr.Dataframe(
-                    headers=["rank", "location", "T1", "T2", "score",
-                             "confidence", "caption", "note"],
+                    headers=["rank", "location", "Before", "After", "score",
+                             "confidence", "caption", "land cover change"],
                     interactive=False, wrap=True,
                 )
 
@@ -496,13 +514,18 @@ class SemanticChangeSearch:
                     f"### {top.caption}\n"
                     f"{_pill(top.confidence)} &nbsp; "
                     f"**Location** `{top.location}` &nbsp; "
-                    f"**T1 -> T2** `{top.t1_key}` -> `{top.t2_key}` &nbsp; "
+                    f"**Before → After** `{top.t1_key}` → `{top.t2_key}` &nbsp; "
                     f"**Score** `{top.score:.4f}`\n\n"
                     f"_Reasoning:_ {top.seasonal_note}."
                 )
                 return top.t1_img, top.t2_img, top.heatmap, md, rows
 
             go.click(
+                handle,
+                [q, a_dd, k, geo_chk, geo_dd, rerank_chk, rerank_dd],
+                [t1i, t2i, hmi, summary, table],
+            )
+            q.submit(
                 handle,
                 [q, a_dd, k, geo_chk, geo_dd, rerank_chk, rerank_dd],
                 [t1i, t2i, hmi, summary, table],
@@ -568,7 +591,7 @@ def main():
     engine = SemanticChangeSearch(cfg)
     demo = engine.build_interface()
     demo.launch(server_name="0.0.0.0", server_port=port, show_error=True,
-                theme=gr.themes.Soft(), css=SemanticChangeSearch._CSS)
+                theme=gr.themes.Ocean(), css=SemanticChangeSearch._CSS)
 
 
 if __name__ == "__main__":

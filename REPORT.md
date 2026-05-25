@@ -312,7 +312,7 @@ false-colour) generalises; learned visual priors do not.** No amount of adapter
 sophistication — whether a small projection head or LoRA on the backbone — beats
 the structural prior embedded in RS-pretrained zero-shot GeoRSCLIP + NIR.
 
-### §7.5 Re-ranking quantification (GeoRSCLIP + NRG, zero_shot, test split)
+### 7.5 Re-ranking quantification (GeoRSCLIP + NRG, zero_shot, test split)
 
 Post-retrieval re-ranking was evaluated on the held-out test split (110 pairs,
 3 queries with positives) using the best-generalising configuration
@@ -333,7 +333,7 @@ result variety (diversity) and spatial coherence (coherence). The gap
 (−0.082 mAP) is the cost of prioritising display ergonomics over ranking
 fidelity.
 
-### §7.6 UI extensions (non-experiment)
+### 7.6 UI extensions (non-experiment)
 
 Four optional features were added to the Gradio app. All are toggleable at
 any time without restarting; CLI flags set startup defaults only.
