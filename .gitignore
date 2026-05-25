@@ -24,3 +24,6 @@ venv/
 
 # Launch logs
 *.log
+
+# Model adapters excluded from HF Space branch (binaries too large without LFS)
+models/
