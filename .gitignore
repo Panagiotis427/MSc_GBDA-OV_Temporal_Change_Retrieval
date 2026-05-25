@@ -22,3 +22,6 @@ legacy/
 .venv/
 venv/
 .env
+
+# Launch logs
+*.log
