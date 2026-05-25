@@ -1,3 +1,14 @@
+---
+title: Semantic Change Search Engine
+emoji: satellite
+colorFrom: blue
+colorTo: green
+sdk: gradio
+sdk_version: "6.14.0"
+app_file: app.py
+pinned: false
+---
+
 # Open-Vocabulary Temporal Change Retrieval (GBDA Case 11)
 
 A *Semantic Change Search Engine*: given a natural-language query

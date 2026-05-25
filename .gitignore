@@ -1,7 +1,6 @@
 # Data & artefacts (large; reproducible via scripts)
 data/
 .model_cache/
-tests/fixtures/den_tiny/
 mlruns/
 
 # `models/` is tracked: adapters are ~3 MB each, encoder/dataset-keyed, and
