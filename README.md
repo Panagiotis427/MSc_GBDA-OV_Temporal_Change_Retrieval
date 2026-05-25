@@ -1,6 +1,6 @@
 ---
 title: Semantic Change Search Engine
-emoji: satellite
+emoji: 🛰️
 colorFrom: blue
 colorTo: green
 sdk: gradio
