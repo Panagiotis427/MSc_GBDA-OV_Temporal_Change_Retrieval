@@ -1,5 +1,5 @@
 ---
-title: Semantic Change Search Engine
+title: Open Vocabulary Temporal Change Retrieval
 emoji: 🛰️
 colorFrom: blue
 colorTo: green
