@@ -31,6 +31,13 @@ where = ["."]
 include = ["src*"]
 namespaces = true
 
+[tool.pytest.ini_options]
+# scripts/ is a regular package used by tests/conftest.py but deliberately
+# excluded from the installed library. Add repo root to sys.path so the
+# test suite can import both `src.*` and `scripts.*` regardless of whether
+# the package is pip-installed.
+pythonpath = ["."]
+
 [tool.uv.sources]
 torch = [
   { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" },
