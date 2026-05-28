@@ -29,7 +29,7 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["src*"]
-namespaces = false
+namespaces = true
 
 [tool.uv.sources]
 torch = [
