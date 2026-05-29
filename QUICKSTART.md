@@ -139,7 +139,7 @@ python -m src.lora_train --root data/DynamicEarthNet --encoder georsclip --color
 
 ```bash
 pytest -q --ignore=tests/test_text_encoder.py
-# 103 tests, ~20 s on CPU. Mock encoders; no network; covers full pipeline.
+# 129 tests, ~20 s on CPU. Mock encoders; no network; covers full pipeline.
 
 pytest tests/test_text_encoder.py
 # Real CLIP weights; ~45 s. Verifies text-encoder fix end-to-end.

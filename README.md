@@ -88,6 +88,8 @@ Three scoring **approaches** (the supervisor-requested comparison):
 | `zero_shot` | cos(t, f_T2) − cos(t, f_T1)  (Δ-similarity) | none |
 | `peft`      | cos(t, g(Δf)), g = trained ProjectionHead   | ~0.5–0.7 M params (adapter only; backbones frozen) |
 
+*Per-encoder results for all three approaches — in-distribution and cross-split — are in [`REPORT.md`](REPORT.md) §7.*
+
 **Key decoupling:** `f_T1, f_T2` are cached per `(dataset, encoder, split, color_mode)` so all
 three approaches and any number of queries reuse the same one-time encode
 pass. Adding a dataset = implementing the `TemporalDataset` protocol +

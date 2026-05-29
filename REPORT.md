@@ -154,7 +154,7 @@ testable in seconds with no network.
 4. **CLIP text sanity** — post-fix `encode_text` returns `[N, 768]`,
    L2-normalised, on CUDA; forest image correctly prefers "forest" over
    "city". Confirms the P1 fix.
-5. **Fast test suite (mock encoders, fixture, no network)** — **103 passed**.
+5. **Fast test suite (mock encoders, fixture, no network)** — **129 passed**.
    Covers embeddings cache + round-trip, retrieval (naive/zero_shot/peft),
    benchmark metrics (exact Recall@1/AP on engineered transitions), PEFT
    training (loss decreases, save/load, PEFT ≥ zero-shot), encoder
