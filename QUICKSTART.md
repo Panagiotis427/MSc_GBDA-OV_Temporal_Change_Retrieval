@@ -11,14 +11,14 @@ matches with a heatmap and confidence score.
 
 ## 1. Setup (one-time)
 
-**Requirements:** Python 3.12 · ~3 GB disk (model weights) · ~9 GB more for real DEN · GPU optional
+**Requirements:** Python 3.12+ · ~3 GB disk (model weights) · ~9 GB more for real DEN · GPU optional
 
-```powershell
-cd "D:\Code Projects\GBDA_Lab_Project"
+```bash
+git clone <repo-url> && cd MSc_GBDA-OV_Temporal_Change_Retrieval
 
-# Activate the project venv (if present):
-D:\Code Projects\.venv\Scripts\Activate.ps1
-# If you get an execution-policy error: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+python -m venv .venv
+source .venv/bin/activate          # Windows (PowerShell): .venv\Scripts\Activate.ps1
+                                   #   if blocked once: Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 pip install -e .
 ```

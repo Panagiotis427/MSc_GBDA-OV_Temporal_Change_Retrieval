@@ -25,6 +25,21 @@ dataset-agnostic (QFabric / fMoW slot in via the registry).
 > **Just want to run the app?** See [`QUICKSTART.md`](QUICKSTART.md) —
 > install, then a 30-second synthetic demo or the real dataset.
 
+## Demo
+
+![Gradio UI — semantic change search engine](assets/app_screenshot.png)
+
+*Enter a free-text change query, pick a dataset / encoder / scoring approach, and get
+ranked before→after pairs with a change heatmap on T2.* To (re)generate the screenshot
+locally (it lands in `assets/app_screenshot.png`):
+
+```bash
+pip install -e .
+python -m scripts.make_den_fixture
+python -m src.app --root tests/fixtures/den_tiny --split all --encoder clip_vitl14   # http://127.0.0.1:7860
+# then save a screenshot of the browser tab to assets/app_screenshot.png
+```
+
 ## Pipeline
 
 End-to-end flow for one user query, with the module responsible at each
