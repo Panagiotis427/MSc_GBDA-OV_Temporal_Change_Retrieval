@@ -53,7 +53,9 @@ class CLIPViTL14Encoder:
         self._clip_model.eval()
         for p in self._clip_model.parameters():
             p.requires_grad = False
-        self._processor: CLIPProcessor = CLIPProcessor.from_pretrained(model_name, cache_dir=self.cache_dir)
+        self._processor: CLIPProcessor = CLIPProcessor.from_pretrained(
+            model_name, cache_dir=self.cache_dir, use_fast=True
+        )
 
     def encode_text(
         self,
