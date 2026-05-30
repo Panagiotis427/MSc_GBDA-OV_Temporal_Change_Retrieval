@@ -354,7 +354,8 @@ class SemanticChangeSearch:
             "Changing requires Apply Settings."
         )
 
-        with gr.Blocks(title="Semantic Change Search Engine") as demo:
+        with gr.Blocks(title="Semantic Change Search Engine",
+                       analytics_enabled=False) as demo:
             gr.Markdown(
                 "# Semantic Change Search Engine\n"
                 "Describe a land-cover change in plain language — "
@@ -385,16 +386,19 @@ class SemanticChangeSearch:
                 go = gr.Button("Search", variant="primary", size="lg",
                                elem_id="search-btn")
 
-            gr.Examples(
-                examples=[
-                    ["new buildings on former farmland"],
-                    ["forest cleared to bare soil"],
-                    ["agricultural land converted to wetland"],
-                    ["seasonal snow melting away"],
-                ],
-                inputs=[q],
-                label="Example queries — click to fill",
-            )
+            # NOTE: gr.Examples (Dataset component) triggers a frontend render loop in
+            # gradio 6.14 when combined with the full component tree — page sticks on
+            # "Loading..." and Firefox flags "slowing down". Plain fill-buttons give the
+            # same click-to-fill UX without the Dataset component.
+            gr.Markdown("Example queries — click to fill")
+            with gr.Row():
+                for _ex in [
+                    "new buildings on former farmland",
+                    "forest cleared to bare soil",
+                    "agricultural land converted to wetland",
+                    "seasonal snow melting away",
+                ]:
+                    gr.Button(_ex, size="sm").click(lambda v=_ex: v, None, q)
 
             # ---- Settings (power-user, collapsed) ----
             with gr.Accordion("Settings", open=False):
@@ -590,8 +594,13 @@ def main():
           f"approach={cfg.approach}")
     engine = SemanticChangeSearch(cfg)
     demo = engine.build_interface()
+    # Local system fonts only — no remote Google-font fetch (blocks render on slow net).
+    theme = gr.themes.Ocean(
+        font=["system-ui", "-apple-system", "Segoe UI", "Arial", "sans-serif"],
+        font_mono=["Consolas", "Monaco", "monospace"],
+    )
     demo.launch(server_name="0.0.0.0", server_port=port, show_error=True,
-                theme=gr.themes.Ocean(), css=SemanticChangeSearch._CSS)
+                theme=theme, css=SemanticChangeSearch._CSS)
 
 
 if __name__ == "__main__":
