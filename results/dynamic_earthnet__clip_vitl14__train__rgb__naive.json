@@ -1,0 +1,123 @@
+{
+  "approach": "naive",
+  "color_mode": "rgb",
+  "dataset": "dynamic_earthnet",
+  "encoder": "clip_vitl14",
+  "k_values": [
+    1,
+    3,
+    5,
+    10
+  ],
+  "lora": false,
+  "macro": {
+    "mAP": 0.03070097944911419,
+    "recall_at_k": {
+      "1": 0.0,
+      "10": 0.010526315789473684,
+      "3": 0.0,
+      "5": 0.0
+    },
+    "seasonal_drift_at_k": {
+      "1": 0.0,
+      "10": 0.0,
+      "3": 0.0,
+      "5": 0.0
+    }
+  },
+  "n_pairs": 605,
+  "per_query": [
+    {
+      "ap": 0.01108285823107481,
+      "category": "permanent",
+      "n_relevant": 5,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "new water body or flooding"
+    },
+    {
+      "ap": 0.005810546305328974,
+      "category": "permanent",
+      "n_relevant": 3,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "bare soil or land cleared"
+    },
+    {
+      "ap": 0.031726066890310885,
+      "category": "permanent",
+      "n_relevant": 14,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "agricultural land converted to wetland or marsh"
+    },
+    {
+      "ap": 0.03242362850427881,
+      "category": "permanent",
+      "n_relevant": 14,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "wetland drained and turned into farmland"
+    },
+    {
+      "ap": 0.07246179731457747,
+      "category": "permanent",
+      "n_relevant": 19,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.05263157894736842,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "land turning into wetland"
+    }
+  ],
+  "schema_version": 1,
+  "split": "train"
+}

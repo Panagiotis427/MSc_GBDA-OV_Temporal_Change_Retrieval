@@ -36,6 +36,20 @@ def cache_path(cache_dir: str | Path, dataset_name: str, encoder_name: str,
     return Path(cache_dir) / f"{dataset_name}__{encoder_name}{suffix}__pair_embeddings.npz"
 
 
+def cache_tag_for(split: str, color_mode: str = "rgb", lora: bool = False) -> str:
+    """Canonical embedding-cache tag: ``<split>[_<color>][_lora]``.
+
+    Single source of truth for the cache-tag string, matching the layout the
+    committed caches were written with by ``scripts.run_pipeline`` (rgb adds no
+    colour suffix; lora appends ``_lora``). Importers: ``run_pipeline``, the
+    ``embeddings`` CLI, ``app``, ``export_results``. Keeping this in one place
+    avoids the historical ``test``+``rgb``->empty-tag drift.
+    """
+    color_tag = f"_{color_mode}" if color_mode != "rgb" else ""
+    lora_tag = "_lora" if lora else ""
+    return f"{split}{color_tag}{lora_tag}"
+
+
 @dataclass
 class PairEmbeddingStore:
     """Ordered pair list + aligned ``f_T1`` / ``f_T2`` matrices."""
@@ -180,8 +194,7 @@ def main() -> None:
         color_mode=color_mode,
     )
     enc = get_encoder(args.encoder)
-    color_tag = f"_{color_mode}" if color_mode != "rgb" else ""
-    cache_tag = f"{args.split}{color_tag}" if args.split != "test" or color_tag else ""
+    cache_tag = cache_tag_for(args.split, color_mode)
     store = load_or_compute(
         ds, enc, cache_dir=args.cache_dir, force=args.force,
         batch_size=args.batch_size, cache_tag=cache_tag,

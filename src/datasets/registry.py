@@ -97,7 +97,15 @@ def _qfabric_opts(*, root=None, pairing=None, split=None, **extra) -> Dict[str, 
     """QFabric needs ``parquet_paths`` or a precomputed embedding store. By
     default, treat ``root`` as a directory holding ``*.parquet`` shards; any
     explicit kwarg in ``extra`` (``parquet_paths``, ``cache_path``,
-    ``embedding_lookup`` ...) wins."""
+    ``embedding_lookup`` ...) wins.
+
+    Generic pipeline options the QFabric loader doesn't accept are dropped:
+    ``color_mode`` (parquet is RGB-only), ``pairing``/``split`` (fixed-5 axis,
+    no splits). Defaults to ``images_only`` so the project encoder does the
+    encoding via ``load_or_compute`` (same path as DEN), not the legacy
+    CLIP-in-loader path.
+    """
+    extra.pop("color_mode", None)  # QFabric parquet is RGB-only
     out: Dict[str, Any] = dict(extra)
     if root and "parquet_paths" not in out and not any(
         k in out for k in ("embedding_lookup", "cache_path")
@@ -107,6 +115,7 @@ def _qfabric_opts(*, root=None, pairing=None, split=None, **extra) -> Dict[str, 
         shards = sorted(glob.glob(os.path.join(root, "*.parquet")))
         if shards:
             out["parquet_paths"] = shards
+            out.setdefault("images_only", True)
     return out
 
 

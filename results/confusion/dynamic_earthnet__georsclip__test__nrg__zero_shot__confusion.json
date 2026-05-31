@@ -1,0 +1,101 @@
+{
+  "approach": "zero_shot",
+  "conf_k": 10,
+  "dataset": "dynamic_earthnet",
+  "encoder": "georsclip",
+  "labels": [
+    "stable",
+    "agriculture->wetlands",
+    "wetlands->agriculture"
+  ],
+  "matrix": [
+    [
+      6,
+      3,
+      1
+    ],
+    [
+      6,
+      3,
+      1
+    ],
+    [
+      7,
+      3,
+      0
+    ]
+  ],
+  "per_query": [
+    {
+      "category": "permanent",
+      "fp_seasonal": 0,
+      "fp_transitions": {
+        "stable": 6,
+        "wetlands->agriculture": 1
+      },
+      "n_relevant": 5,
+      "precision_at_k": {
+        "1": 1.0,
+        "10": 0.3,
+        "3": 1.0,
+        "5": 0.6
+      },
+      "recall_at_k": {
+        "1": 0.2,
+        "10": 0.6,
+        "3": 0.6,
+        "5": 0.6
+      },
+      "text": "agricultural land converted to wetland or marsh"
+    },
+    {
+      "category": "permanent",
+      "fp_seasonal": 0,
+      "fp_transitions": {
+        "agriculture->wetlands": 3,
+        "stable": 6
+      },
+      "n_relevant": 5,
+      "precision_at_k": {
+        "1": 0.0,
+        "10": 0.1,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.2,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "wetland drained and turned into farmland"
+    },
+    {
+      "category": "permanent",
+      "fp_seasonal": 0,
+      "fp_transitions": {
+        "stable": 7
+      },
+      "n_relevant": 5,
+      "precision_at_k": {
+        "1": 1.0,
+        "10": 0.3,
+        "3": 0.6666666666666666,
+        "5": 0.6
+      },
+      "recall_at_k": {
+        "1": 0.2,
+        "10": 0.6,
+        "3": 0.4,
+        "5": 0.6
+      },
+      "text": "land turning into wetland"
+    }
+  ],
+  "query_texts": [
+    "agricultural land converted to wetland or marsh",
+    "wetland drained and turned into farmland",
+    "land turning into wetland"
+  ],
+  "split": "test"
+}

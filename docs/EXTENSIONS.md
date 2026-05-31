@@ -57,12 +57,26 @@ Replace template captions (`"agriculture replaced by impervious surface"`) with 
 - **How:** For each `PairLabel`, prompt LLM with class names + change fraction; cache results; pass to `train.py` via `text_caption_for_pair()` override.
 - **Effort:** ~2 days.
 
-### QFabric full pipeline
-Run full benchmark on QFabric (450k change polygons, 6 change types, 9 change status classes, 504 locations).
+### QFabric — second dataset (structurally wired; labels pending)
+Demonstrates the dataset-agnostic abstraction on a second dataset with a
+different temporal axis (fixed-5 timepoints vs DEN's monthly series).
 
-- **Why:** Tests dataset-agnosticism claim. Different change taxonomy and annotation style from DEN.
-- **How:** Download full QFabric via HuggingFace `EVER-Z/QFabric_mt_images_1024`; `QFabricDataset` + `src/queries/qfabric.py` already stub-present; flesh out `get_pair_label` and query set.
-- **Effort:** ~3 days (data download + query set design + benchmark run).
+- **Done:** `scripts/download_qfabric.py` pulls an image subset from HuggingFace
+  `EVER-Z/QFabric_mt_images_1024`; `QFabricDataset(images_only=True)` reads the
+  parquet images and runs through the **same** path as DEN
+  (`load_or_compute` → `ChangeRetriever` → Gradio app) with any project encoder.
+  `_qfabric_opts` drops generic kwargs (`color_mode`/`pairing`/`split`) the
+  loader doesn't accept. Verified end-to-end: `--dataset qfabric` zero-shot
+  retrieval returns ranked pairs.
+- **Deferred (decision):** the `EVER-Z` parquet is **images-only — no change/
+  status labels**, so `get_pair_label` returns `None` and there is no
+  label-grounded QFabric benchmark (no mAP) and no `src/queries/qfabric.py` yet.
+  To add quantitative QFabric results, supply a label source — TEOChatlas
+  (`jirvin16/TEOChatlas`), Granular AI GeoJSON polygons, or a manual `labels.csv`
+  sidecar keyed by location — then implement `get_pair_label` + a query set
+  mirroring `src/queries/den.py`.
+- **Run:** `python -m scripts.download_qfabric --dest data/QFabric --n-shards 8`
+  then `python -m src.app --dataset qfabric --root data/QFabric --approach zero_shot`.
 
 ### fMoW-Sentinel pipeline
 Multi-temporal Sentinel-2 imagery, 63 land-use categories, worldwide coverage.

@@ -73,6 +73,10 @@ def _transition(src=None, dst=None) -> Callable[[PairLabel], bool]:
 # ``run_benchmark`` via ``dataset.name``.
 
 
+# Bump when the serialized JSON layout (``to_dict``) changes incompatibly.
+SCHEMA_VERSION = 1
+
+
 @dataclass
 class QueryResult:
     text: str
@@ -81,6 +85,30 @@ class QueryResult:
     recall_at_k: Dict[int, float]
     ap: float
     seasonal_drift_at_k: Dict[int, float]  # frac of non-relevant top-K that are seasonal
+
+    def to_dict(self) -> Dict:
+        # K stored as *string* keys for JSON stability.
+        return {
+            "text": self.text,
+            "category": self.category,
+            "n_relevant": int(self.n_relevant),
+            "recall_at_k": {str(k): float(v) for k, v in self.recall_at_k.items()},
+            "ap": float(self.ap),
+            "seasonal_drift_at_k": {str(k): float(v)
+                                    for k, v in self.seasonal_drift_at_k.items()},
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict) -> "QueryResult":
+        return cls(
+            text=d["text"],
+            category=d["category"],
+            n_relevant=int(d["n_relevant"]),
+            recall_at_k={int(k): float(v) for k, v in d["recall_at_k"].items()},
+            ap=float(d["ap"]),
+            seasonal_drift_at_k={int(k): float(v)
+                                 for k, v in d["seasonal_drift_at_k"].items()},
+        )
 
 
 @dataclass
@@ -102,6 +130,56 @@ class BenchmarkReport:
     @property
     def mAP(self) -> float:
         return float(np.mean([q.ap for q in self.per_query])) if self.per_query else 0.0
+
+    @property
+    def _ks(self) -> List[int]:
+        return sorted(self.per_query[0].recall_at_k) if self.per_query else []
+
+    def macro_seasonal_drift(self) -> Dict[int, float]:
+        """Mean seasonal-drift@K over *permanent* queries (mirrors ``to_table``).
+
+        0.0 for every K when there are no permanent queries (or no snow class).
+        """
+        perm = [q for q in self.per_query if q.category == "permanent"]
+        if not perm:
+            return {k: 0.0 for k in self._ks}
+        return {k: float(np.mean([q.seasonal_drift_at_k[k] for q in perm]))
+                for k in self._ks}
+
+    def to_dict(self, *, color_mode: str = "rgb", split: Optional[str] = None,
+                lora: bool = False) -> Dict:
+        ks = self._ks
+        mr = self.macro_recall
+        sd = self.macro_seasonal_drift()
+        return {
+            "schema_version": SCHEMA_VERSION,
+            "dataset": self.dataset,
+            "encoder": self.encoder,
+            "approach": self.approach,
+            "split": split,
+            "color_mode": color_mode,
+            "lora": bool(lora),
+            "n_pairs": int(self.n_pairs),
+            "k_values": [int(k) for k in ks],
+            "macro": {
+                "mAP": self.mAP,
+                "recall_at_k": {str(k): mr[k] for k in ks},
+                "seasonal_drift_at_k": {str(k): sd[k] for k in ks},
+            },
+            "per_query": [q.to_dict() for q in self.per_query],
+        }
+
+    @classmethod
+    def from_dict(cls, d: Dict) -> "BenchmarkReport":
+        """Reconstruct the core report. Top-level ``split``/``color_mode``/``lora``
+        metadata stays in the source dict (read directly by ``results_io``)."""
+        return cls(
+            approach=d["approach"],
+            encoder=d["encoder"],
+            dataset=d["dataset"],
+            n_pairs=int(d["n_pairs"]),
+            per_query=[QueryResult.from_dict(q) for q in d["per_query"]],
+        )
 
     def to_table(self) -> str:
         ks = sorted(self.per_query[0].recall_at_k) if self.per_query else []

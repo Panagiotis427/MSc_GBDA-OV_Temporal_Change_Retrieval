@@ -26,7 +26,7 @@ Headline result (real DEN, train split, 605 pairs — in-distribution):
 
 | Encoder | naive mAP | zero-shot mAP | **PEFT mAP** |
 |---|---|---|---|
-| CLIP ViT-L/14 | 0.031 | 0.043 | **0.428** |
+| CLIP ViT-L/14 | 0.031 | 0.043 | **0.420** |
 | GeoRSCLIP ViT-B/32 | 0.027 | 0.040 | **0.335** |
 | RemoteCLIP ViT-L/14 | 0.024 | 0.057 | **0.352** |
 
@@ -167,7 +167,7 @@ testable in seconds with no network.
    the test split is class-imbalanced toward agri/wetland; CLIP cannot resolve
    subtle agri↔wetland flips zero-shot.
 8. **Real DEN, train split (CLIP, 605 pairs)** — full pipeline incl. PEFT:
-   naive 0.031, zero-shot 0.043, **PEFT 0.428** mAP. Embeddings + adapter
+   naive 0.031, zero-shot 0.043, **PEFT 0.420** mAP. Embeddings + adapter
    cached.
 9. **Headless app smoke (real CLIP, train split)** — engine builds from cache;
    `zero_shot` top result a weak stable pair (consistent with §7), `peft` top
@@ -215,7 +215,7 @@ testable in seconds with no network.
 
 | Encoder | naive | zero-shot | PEFT | PEFT R@10 |
 |---|---|---|---|---|
-| CLIP ViT-L/14 (768-d) | 0.031 | 0.043 | **0.428** | 0.36 |
+| CLIP ViT-L/14 (768-d) | 0.031 | 0.043 | **0.420** | 0.36 |
 | GeoRSCLIP ViT-B/32 (512-d) | 0.027 | 0.040 | **0.335** | 0.26 |
 | RemoteCLIP ViT-L/14 (768-d) | 0.024 | 0.057 | **0.352** | 0.30 |
 
@@ -227,9 +227,17 @@ testable in seconds with no network.
   mAP ~8–10×. Central deliverable comparison — confirms the brief's premise.
 - **RS pretraining helps zero-shot; capacity wins PEFT.** RemoteCLIP has the
   best zero-shot (0.057 vs CLIP 0.043, GeoRSCLIP 0.040). Under PEFT the
-  larger general backbone wins: CLIP ViT-L/14 0.428 > RemoteCLIP 0.352 >
+  larger general backbone wins: CLIP ViT-L/14 0.420 > RemoteCLIP 0.352 >
   GeoRSCLIP 0.335. Backbone capacity (L/14, 768-d) outweighs domain
   pretraining once an adapter is learned.
+
+![mAP by encoder x approach, train split](assets/figures/map_bars__train__rgb.png)
+
+Qualitative zero-shot vs PEFT (top-3 retrievals per query, [T1 | T2], green =
+relevant): the adapter sharpens scores but the gain is concentrated on the
+classes its weak captions cover.
+
+![Zero-shot vs PEFT, CLIP, train](assets/figures/zeroshot_vs_peft__clip_vitl14__train.png)
 
 ### 7.2 Cross-split generalisation (adapter trained on train, eval on val/test)
 
@@ -239,7 +247,7 @@ mAP per split (RGB, `difference`):
 |---|---|---|---|---|
 | CLIP ViT-L/14 | naive | 0.031 | 0.053 | 0.046 |
 | CLIP ViT-L/14 | zero-shot | 0.043 | 0.051 | 0.043 |
-| CLIP ViT-L/14 | **PEFT** | **0.428** | **0.042** | **0.039** |
+| CLIP ViT-L/14 | **PEFT** | **0.420** | **0.042** | **0.040** |
 | GeoRSCLIP ViT-B/32 | naive | 0.027 | 0.030 | 0.061 |
 | GeoRSCLIP ViT-B/32 | zero-shot | 0.040 | 0.036 | 0.299 |
 | GeoRSCLIP ViT-B/32 | **PEFT** | **0.335** | **0.087** | **0.041** |
@@ -253,6 +261,10 @@ change semantics. On unseen val and test AOIs, PEFT is equal to or worse than
 zero-shot. GeoRSCLIP zero-shot on the test split achieves 0.299 mAP without
 any training — suggesting the test AOIs contain land-cover transitions that
 RS-domain features represent more discriminatively than train.
+
+The train spike then val/test collapse is the signature of the overfit:
+
+![Cross-split mAP, CLIP](assets/figures/cross_split__clip_vitl14__rgb.png)
 
 ### 7.3 NIR false-colour ablation
 
@@ -271,6 +283,8 @@ Three colour modes compared (zero-shot mAP, all three splits):
 | RemoteCLIP | NDVI | 0.022 | 0.048 | 0.055 |
 
 **NRG > NDVI > RGB on held-out test for all encoders.**
+
+![Colour-mode ablation, zero-shot, test](assets/figures/color_ablation__zero_shot__test.png)
 
 NRG hurts on train (−0.009 to −0.032) but substantially helps on test
 (+0.059 CLIP, **+0.127 GeoRSCLIP**, +0.079 RemoteCLIP). NDVI sits
@@ -311,6 +325,8 @@ This result reinforces the project's core finding: **spectral physics (NRG
 false-colour) generalises; learned visual priors do not.** No amount of adapter
 sophistication — whether a small projection head or LoRA on the backbone — beats
 the structural prior embedded in RS-pretrained zero-shot GeoRSCLIP + NIR.
+
+![GeoRSCLIP NRG: frozen zero-shot vs LoRA across splits](assets/figures/cross_split__georsclip__nrg.png)
 
 ### 7.5 Re-ranking quantification (GeoRSCLIP + NRG, zero_shot, test split)
 
@@ -368,6 +384,30 @@ benchmark would count it as drift if mis-retrieved. The dominant real error is
 not seasonal confusion but **low recall from class imbalance and weak
 label-derived captions** (many near-stable bimonthly pairs; agri↔wetland
 visually subtle).
+
+The per-query confusion analysis (`src/error_analysis.py`) makes this concrete:
+it bins each query's top-K retrievals by their *actual* label transition. On the
+best test configuration (GeoRSCLIP + NRG), the wetland queries' top-10 are
+dominated by **`stable`** pairs (6–7 of 10), not by seasonal or wrong-transition
+confusion — i.e. the failure mode is surfacing no-change pairs, consistent with
+the class-imbalance reading above.
+
+![Confusion: GeoRSCLIP NRG zero-shot, test](assets/figures/confusion__georsclip__test__zero_shot.png)
+
+Seasonal-drift@K curves (flat at 0 on train, as expected) and the per-encoder
+confusion matrices for CLIP train (zero-shot vs PEFT) are in `assets/figures/`.
+
+**Reproducing the figures (from cached embeddings — no GPU training):**
+
+```
+python -m scripts.export_results --color-modes rgb nrg ndvi \
+    --approaches naive zero_shot peft --lora --confusion --results-dir results
+python -m scripts.make_figures --results-dir results --out-dir assets/figures
+python -m scripts.make_comparison_figure --encoder clip_vitl14 --split train
+```
+
+`export_results` writes one JSON per run + `macro_summary.csv` (machine-readable,
+re-plottable); `make_figures` renders the bar/curve/heatmap/confusion PNGs.
 
 ---
 
@@ -496,8 +536,14 @@ regenerated automatically by the test suite.
   cross-attention over spatial tokens) would address the main signal-dilution
   failure mode.
 - **`concatenate` change mode** and higher LoRA rank/epoch sweeps not explored.
-- **QFabric/fMoW** wired through the protocol; lacks pixel labels for
-  quantitative benchmark without external label files.
+- **QFabric** is now wired end-to-end as a second dataset: an image subset
+  (`EVER-Z/QFabric_mt_images_1024`) loads through the same encoder/retrieval
+  path and serves qualitative zero-shot retrieval in the app, demonstrating the
+  dataset-agnostic design across a different temporal axis (fixed-5 timepoints).
+  The published parquet is **images-only**, so a label-grounded QFabric
+  benchmark (mAP) awaits an external label source (TEOChatlas / Granular AI
+  GeoJSON / manual sidecar) plus a `get_pair_label` + query-set implementation.
+  **fMoW** remains wired only at the protocol level.
 - **Sentinel-1/2 data**: `aoi_metadata.json` confirms 51/75 AOIs have full
   SAR (S1) coverage; downloading and feeding SAR Δ-features is a direct
   extension of the NRG pattern.
@@ -519,7 +565,7 @@ PEFT** comparison across **three CLIP-variant encoders** on Dynamic EarthNet.
 Three complementary findings:
 
 1. **In-distribution**: PEFT adapters raise mAP ~8–10× over zero-shot
-   (0.043 → 0.428, CLIP L/14 on train split). Low-compute fine-tuning is
+   (0.043 → 0.420, CLIP L/14 on train split). Low-compute fine-tuning is
    decisive for subtle agri/wetland change on familiar AOIs.
 
 2. **Out-of-distribution**: PEFT collapses on unseen AOIs; zero-shot with the

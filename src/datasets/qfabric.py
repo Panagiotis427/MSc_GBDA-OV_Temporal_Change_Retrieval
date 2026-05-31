@@ -45,6 +45,7 @@ class QFabricDataset:
         cache_path: Optional[str] = None,
         device: Optional[Any] = None,
         *,
+        images_only: bool = False,
         embedding_lookup: Optional[Dict[str, np.ndarray]] = None,
         image_lookup: Optional[Dict[str, List[Image.Image]]] = None,
         metadata_df: Optional[pd.DataFrame] = None,
@@ -53,6 +54,20 @@ class QFabricDataset:
             self._embedding_lookup = embedding_lookup
             self._image_lookup = image_lookup or {}
             self._metadata_df = metadata_df
+        elif images_only:
+            # Project pipeline path: read PIL images from the parquet shards
+            # *without* any CLIP encoding. ``embeddings.load_or_compute`` then
+            # encodes them with the selected project encoder (clip_vitl14 /
+            # georsclip / remoteclip), matching the DEN code path exactly.
+            if parquet_paths is None:
+                raise ValueError("QFabricDataset(images_only=True) needs parquet_paths.")
+            self._image_lookup, self._metadata_df = self._read_parquet_images(parquet_paths)
+            # zero-width arrays carry only the per-location timepoint count that
+            # ``list_pairs`` needs; the real vectors come from the project encoder.
+            self._embedding_lookup = {
+                loc: np.zeros((len(imgs), 0), dtype=np.float32)
+                for loc, imgs in self._image_lookup.items()
+            }
         else:
             if parquet_paths is None:
                 raise ValueError(
@@ -68,6 +83,38 @@ class QFabricDataset:
 
         self._enrich_metadata()
         self._pairs_cache: Optional[List[PairKey]] = None
+
+    @staticmethod
+    def _read_parquet_images(
+        parquet_paths: Union[str, List[str]],
+    ) -> Tuple[Dict[str, List[Image.Image]], pd.DataFrame]:
+        """Decode the 5 per-row images from each shard into a location->images
+        lookup + a metadata frame. No model, no encoding (fast PNG decompress)."""
+        import io
+        import os
+
+        from ..data_loader import parse_date_from_filename
+
+        if isinstance(parquet_paths, str):
+            parquet_paths = [parquet_paths]
+        image_lookup: Dict[str, List[Image.Image]] = {}
+        rows: List[Dict[str, Any]] = []
+        for pp in parquet_paths:
+            shard = os.path.splitext(os.path.basename(pp))[0]
+            df = pd.read_parquet(pp)
+            img_cols = [c for c in df.columns
+                        if c.endswith("_image") and not c.endswith("_name")]
+            name_cols = [c for c in df.columns if c.endswith("_image_name")]
+            for ri, row in df.iterrows():
+                loc = f"{shard}_r{int(ri):04d}"
+                imgs: List[Image.Image] = []
+                for ti, (ic, nc) in enumerate(zip(img_cols, name_cols)):
+                    imgs.append(Image.open(io.BytesIO(row[ic]["bytes"])).convert("RGB"))
+                    rows.append({"location": loc,
+                                 "timestamp": parse_date_from_filename(row[nc]),
+                                 "timepoint_idx": ti})
+                image_lookup[loc] = imgs
+        return image_lookup, pd.DataFrame(rows)
 
     @staticmethod
     def _build_from_parquet(

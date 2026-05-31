@@ -119,21 +119,16 @@ class SemanticChangeSearch:
     def _build(self, cfg: RunConfig) -> None:
         from src.datasets.registry import build_dataset
         from src.embeddings import cache_path as _cache_path
+        from src.embeddings import cache_tag_for
         self.dataset = build_dataset(cfg.dataset, root=cfg.root,
                                      pairing=cfg.pairing, split=cfg.split,
                                      color_mode=cfg.color_mode)
         self.encoder = get_encoder(cfg.encoder)
 
-        # Cache tag: match run_pipeline.py convention so pre-computed caches are reused.
+        # Canonical cache tag (single source of truth in src.embeddings) so the
+        # pre-computed run_pipeline caches are reused. split=None ("all") -> "all".
         split_str = cfg.split or "all"
-        color_tag = f"_{cfg.color_mode}" if cfg.color_mode != "rgb" else ""
-        lora_tag = "_lora" if cfg.use_lora else ""
-        # Match embeddings CLI convention: test+rgb (no lora) has no tag suffix
-        cache_tag = (
-            f"{split_str}{color_tag}{lora_tag}"
-            if split_str != "test" or color_tag or lora_tag
-            else ""
-        )
+        cache_tag = cache_tag_for(split_str, cfg.color_mode, cfg.use_lora)
 
         if cfg.use_lora:
             lora_cache = _cache_path(cfg.cache_dir, self.dataset.name,

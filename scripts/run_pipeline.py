@@ -37,10 +37,11 @@ import numpy as np
 import torch
 
 from src.datasets.registry import build_dataset
-from src.embeddings import load_or_compute
+from src.embeddings import cache_tag_for, load_or_compute
 from src.encoders import get_encoder
 from src.retrieval import ChangeRetriever
 from src.benchmark import run_benchmark
+from src.results_io import append_macro_csv, load_all, result_path, write_report
 from src.train import TrainConfig, train_adapter
 from src.model import save_adapter
 from src.lora_train import LoRAConfig, train_lora, save_lora, merge_lora_into_encoder
@@ -83,6 +84,9 @@ def main() -> None:
     ap.add_argument("--eval-splits", nargs="+", default=["test"],
                     help="Splits to evaluate on (default: test). Pass 'all' for all splits.")
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--results-dir", default=None,
+                    help="If set, also dump each benchmark to "
+                         "results/<...>.json + a macro_summary.csv (re-plottable).")
     args = ap.parse_args()
 
     torch.manual_seed(args.seed)
@@ -91,6 +95,20 @@ def main() -> None:
     enc = get_encoder(args.encoder)
     color_tag = f"_{args.color_mode}" if args.color_mode != "rgb" else ""
 
+    written: list = []
+
+    def _emit(report, *, esplit, lora=False):
+        """Print the table and, when --results-dir is set, persist JSON + collect
+        the record for the macro CSV. Returns the report's mAP."""
+        print(report.to_table())
+        if args.results_dir:
+            p = result_path(args.results_dir, args.dataset, enc.name, esplit,
+                            color=args.color_mode, approach=report.approach, lora=lora)
+            write_report(report, p, color_mode=args.color_mode, split=esplit, lora=lora)
+            written.append(report.to_dict(color_mode=args.color_mode,
+                                          split=esplit, lora=lora))
+        return report.mAP
+
     # ------------------------------------------------------------------
     # Training split: compute embeddings + train adapter
     # ------------------------------------------------------------------
@@ -98,7 +116,7 @@ def main() -> None:
     store_train = load_or_compute(
         ds_train, enc,
         cache_dir=args.cache_dir,
-        cache_tag=f"{args.train_split}{color_tag}",
+        cache_tag=cache_tag_for(args.train_split, args.color_mode),
     )
 
     retr_train = ChangeRetriever(store_train, enc, feature_mode=args.mode)
@@ -108,8 +126,7 @@ def main() -> None:
     train_summary: dict[str, float] = {}
     for appr in ("naive", "zero_shot"):
         rep = run_benchmark(ds_train, retr_train, approach=appr)
-        print(rep.to_table())
-        train_summary[appr] = rep.mAP
+        train_summary[appr] = _emit(rep, esplit=args.train_split)
 
     adapter = None
     if not args.skip_train:
@@ -133,8 +150,7 @@ def main() -> None:
         print(f"Saved adapter -> {adapter_path}")
         retr_train.set_adapter(adapter, feature_mode=args.mode)
         rep = run_benchmark(ds_train, retr_train, approach="peft")
-        print(rep.to_table())
-        train_summary["peft"] = rep.mAP
+        train_summary["peft"] = _emit(rep, esplit=args.train_split)
 
     # ------------------------------------------------------------------
     # LoRA adapter (optional): fine-tune visual encoder, re-cache, benchmark
@@ -156,7 +172,7 @@ def main() -> None:
 
         # Merge LoRA into encoder and re-cache train embeddings
         merge_lora_into_encoder(enc, visual_lora)
-        lora_cache_tag = f"{args.train_split}{color_tag}_lora"
+        lora_cache_tag = cache_tag_for(args.train_split, args.color_mode, lora=True)
         lora_store_train = load_or_compute(
             ds_train, enc,
             cache_dir=args.cache_dir,
@@ -164,8 +180,7 @@ def main() -> None:
         )
         retr_lora_train = ChangeRetriever(lora_store_train, enc, feature_mode=args.mode)
         rep = run_benchmark(ds_train, retr_lora_train, approach="zero_shot")
-        print(rep.to_table())
-        train_summary["lora"] = rep.mAP
+        train_summary["lora"] = _emit(rep, esplit=args.train_split, lora=True)
 
     # ------------------------------------------------------------------
     # Evaluation splits
@@ -187,24 +202,22 @@ def main() -> None:
         store_eval = load_or_compute(
             ds_eval, enc,
             cache_dir=args.cache_dir,
-            cache_tag=f"{esplit}{color_tag}",
+            cache_tag=cache_tag_for(esplit, args.color_mode),
         )
         retr_eval = ChangeRetriever(store_eval, enc, feature_mode=args.mode)
 
         split_summary: dict[str, float] = {}
         for appr in ("naive", "zero_shot"):
             rep = run_benchmark(ds_eval, retr_eval, approach=appr)
-            print(rep.to_table())
-            split_summary[appr] = rep.mAP
+            split_summary[appr] = _emit(rep, esplit=esplit)
 
         if adapter is not None:
             retr_eval.set_adapter(adapter, feature_mode=args.mode)
             rep = run_benchmark(ds_eval, retr_eval, approach="peft")
-            print(rep.to_table())
-            split_summary["peft"] = rep.mAP
+            split_summary["peft"] = _emit(rep, esplit=esplit)
 
         if args.lora:
-            lora_eval_tag = f"{esplit}{color_tag}_lora"
+            lora_eval_tag = cache_tag_for(esplit, args.color_mode, lora=True)
             lora_store_eval = load_or_compute(
                 ds_eval, enc,
                 cache_dir=args.cache_dir,
@@ -212,8 +225,7 @@ def main() -> None:
             )
             retr_lora_eval = ChangeRetriever(lora_store_eval, enc, feature_mode=args.mode)
             rep = run_benchmark(ds_eval, retr_lora_eval, approach="zero_shot")
-            print(rep.to_table())
-            split_summary["lora"] = rep.mAP
+            split_summary["lora"] = _emit(rep, esplit=esplit, lora=True)
 
         eval_results[esplit] = split_summary
 
@@ -234,6 +246,14 @@ def main() -> None:
         )
         print(row)
     print("===================================================")
+
+    if args.results_dir and written:
+        # Rebuild macro CSV from all results on disk so a subset run does not
+        # clobber the full aggregate.
+        all_recs = load_all(args.results_dir)
+        csv_path = append_macro_csv(all_recs, f"{args.results_dir}/macro_summary.csv")
+        print(f"\nWrote {len(written)} JSON result(s) this run -> {args.results_dir}/  "
+              f"+ macro CSV ({len(all_recs)} rows) -> {csv_path}")
 
 
 if __name__ == "__main__":

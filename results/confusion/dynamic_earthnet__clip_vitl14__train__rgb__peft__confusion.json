@@ -1,0 +1,187 @@
+{
+  "approach": "peft",
+  "conf_k": 10,
+  "dataset": "dynamic_earthnet",
+  "encoder": "clip_vitl14",
+  "labels": [
+    "stable",
+    "wetlands->agriculture",
+    "wetlands->water",
+    "agriculture->wetlands",
+    "water->wetlands",
+    "impervious_surface->wetlands",
+    "wetlands->soil",
+    "soil->wetlands"
+  ],
+  "matrix": [
+    [
+      4,
+      0,
+      4,
+      0,
+      1,
+      1,
+      0,
+      0
+    ],
+    [
+      10,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      5,
+      0,
+      5,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      7,
+      0,
+      3,
+      0,
+      0,
+      0,
+      0
+    ],
+    [
+      0,
+      1,
+      4,
+      0,
+      1,
+      1,
+      2,
+      1
+    ]
+  ],
+  "per_query": [
+    {
+      "category": "permanent",
+      "fp_seasonal": 0,
+      "fp_transitions": {
+        "impervious_surface->wetlands": 1,
+        "stable": 4,
+        "water->wetlands": 1
+      },
+      "n_relevant": 5,
+      "precision_at_k": {
+        "1": 0.0,
+        "10": 0.4,
+        "3": 0.0,
+        "5": 0.2
+      },
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.8,
+        "3": 0.0,
+        "5": 0.2
+      },
+      "text": "new water body or flooding"
+    },
+    {
+      "category": "permanent",
+      "fp_seasonal": 0,
+      "fp_transitions": {
+        "stable": 10
+      },
+      "n_relevant": 3,
+      "precision_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "bare soil or land cleared"
+    },
+    {
+      "category": "permanent",
+      "fp_seasonal": 0,
+      "fp_transitions": {
+        "wetlands->agriculture": 5
+      },
+      "n_relevant": 14,
+      "precision_at_k": {
+        "1": 1.0,
+        "10": 0.5,
+        "3": 0.6666666666666666,
+        "5": 0.6
+      },
+      "recall_at_k": {
+        "1": 0.07142857142857142,
+        "10": 0.35714285714285715,
+        "3": 0.14285714285714285,
+        "5": 0.21428571428571427
+      },
+      "text": "agricultural land converted to wetland or marsh"
+    },
+    {
+      "category": "permanent",
+      "fp_seasonal": 0,
+      "fp_transitions": {
+        "agriculture->wetlands": 3
+      },
+      "n_relevant": 14,
+      "precision_at_k": {
+        "1": 1.0,
+        "10": 0.7,
+        "3": 0.6666666666666666,
+        "5": 0.8
+      },
+      "recall_at_k": {
+        "1": 0.07142857142857142,
+        "10": 0.5,
+        "3": 0.14285714285714285,
+        "5": 0.2857142857142857
+      },
+      "text": "wetland drained and turned into farmland"
+    },
+    {
+      "category": "permanent",
+      "fp_seasonal": 0,
+      "fp_transitions": {
+        "wetlands->agriculture": 1,
+        "wetlands->soil": 2,
+        "wetlands->water": 4
+      },
+      "n_relevant": 19,
+      "precision_at_k": {
+        "1": 1.0,
+        "10": 0.3,
+        "3": 0.3333333333333333,
+        "5": 0.4
+      },
+      "recall_at_k": {
+        "1": 0.05263157894736842,
+        "10": 0.15789473684210525,
+        "3": 0.05263157894736842,
+        "5": 0.10526315789473684
+      },
+      "text": "land turning into wetland"
+    }
+  ],
+  "query_texts": [
+    "new water body or flooding",
+    "bare soil or land cleared",
+    "agricultural land converted to wetland or marsh",
+    "wetland drained and turned into farmland",
+    "land turning into wetland"
+  ],
+  "split": "train"
+}

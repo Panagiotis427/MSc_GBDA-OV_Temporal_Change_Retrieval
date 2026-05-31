@@ -58,7 +58,7 @@ step:
 │           │                                          RemoteCLIP, frozen)  │
 │           ▼                                                               │
 │  f_T1, f_T2  (L2-normed, [N, D])  ──cache──▶                              │
-│          data/cache/<dataset>__<encoder>[__<split>_<color>]__pairs.npz    │
+│   data/cache/<dataset>__<encoder>__<split>[_<color>][_lora]__pair_embeddings.npz │
 │                                       src/embeddings.py                   │
 └──────────────────────────────────────────────────────────────────────────┘
 
@@ -120,8 +120,10 @@ derived `PairLabel`s → Recall@K, mAP, plus a seasonal-vs-permanent
 
 | File | Role |
 |------|------|
-| `src/datasets/` | `TemporalDataset` protocol, `DENDataset` (raster), `DENNpyDataset` (DynNet `.npy` + `color_mode` rgb/nrg/ndvi via NIR infrared frames), `QFabricDataset`, layout-detecting registry + opts adapters |
+| `src/datasets/` | `TemporalDataset` protocol, `DENDataset` (raster), `DENNpyDataset` (DynNet `.npy` + `color_mode` rgb/nrg/ndvi via NIR infrared frames), `QFabricDataset` (`images_only` parquet → runs end-to-end via the project encoder), layout-detecting registry + opts adapters |
 | `src/queries/` | Per-dataset query sets (`den.py`); registry resolved by `dataset.name` |
+| `src/results_io.py` | serialize `BenchmarkReport` to JSON/CSV (torch-free); consumed by the figure scripts |
+| `src/error_analysis.py` | per-query confusion matrix + precision/recall (seasonal-vs-permanent error analysis) |
 | `src/encoders/` | `ImageTextEncoder` protocol; `clip_vitl14` (768-d), `georsclip` (512-d), `remoteclip` (768-d) |
 | `src/text_encoder.py` | frozen CLIP text tower (`text_model` + `text_projection`, device-aware) |
 | `src/features.py` | `compute_change_feature` (difference / concatenate) |
@@ -136,8 +138,12 @@ derived `PairLabel`s → Recall@K, mAP, plus a seasonal-vs-permanent
 | `src/app.py` | Gradio engine + UI (Dataset / Encoder / Approach selectors) |
 | `app.py` | HuggingFace Spaces entry point (uses tiny fixture by default; override via env vars) |
 | `scripts/download_den.py` | fetch + extract DEN subset, build label index |
+| `scripts/download_qfabric.py` | fetch a QFabric image subset from HuggingFace (images-only; structural 2nd-dataset demo) |
 | `scripts/make_den_fixture.py` | tiny synthetic DEN tree for fast tests |
-| `scripts/run_pipeline.py` | one-command run with `--train-split` / `--eval-splits` / `--color-mode` / `--lora`; cross-split mAP table |
+| `scripts/run_pipeline.py` | one-command run with `--train-split` / `--eval-splits` / `--color-mode` / `--lora` / `--results-dir`; cross-split mAP table |
+| `scripts/export_results.py` | regenerate benchmarks from cache → `results/*.json` + `macro_summary.csv` (`--confusion` for error analysis) |
+| `scripts/make_figures.py` | publication PNGs (recall curves, mAP bars, colour heatmap, seasonal drift, cross-split, confusion) from `results/` |
+| `scripts/make_comparison_figure.py` | static zero-shot-vs-PEFT top-K visual comparison per encoder |
 
 ## Run / install / tests
 
