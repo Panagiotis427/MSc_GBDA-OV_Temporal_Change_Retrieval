@@ -133,8 +133,11 @@ def main() -> None:
         print(f"\nTraining PEFT adapter ({args.mode}, {args.epochs} epochs)...")
         cfg = TrainConfig(mode=args.mode, epochs=args.epochs, seed=args.seed)
         adapter, _ = train_adapter(ds_train, store_train, enc, cfg)
+        # Tag non-default feature modes so a concatenate run never clobbers the
+        # committed difference adapters (difference -> no suffix, back-compat).
+        mode_tag = "" if args.mode == "difference" else f"_{args.mode}"
         adapter_path = (
-            f"models/{ds_train.name}__{enc.name}{color_tag}__adapter.pt"
+            f"models/{ds_train.name}__{enc.name}{color_tag}{mode_tag}__adapter.pt"
         )
         save_adapter(adapter_path, adapter, {
             "input_dim": adapter.input_dim,

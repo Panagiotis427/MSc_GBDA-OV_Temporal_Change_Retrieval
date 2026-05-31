@@ -57,26 +57,35 @@ Replace template captions (`"agriculture replaced by impervious surface"`) with 
 - **How:** For each `PairLabel`, prompt LLM with class names + change fraction; cache results; pass to `train.py` via `text_caption_for_pair()` override.
 - **Effort:** ~2 days.
 
-### QFabric — second dataset (structurally wired; labels pending)
+### QFabric — second dataset (two routes; mAP pipeline ready, encode pending)
 Demonstrates the dataset-agnostic abstraction on a second dataset with a
-different temporal axis (fixed-5 timepoints vs DEN's monthly series).
+different taxonomy (6 construction change-types) and temporal axis.
 
-- **Done:** `scripts/download_qfabric.py` pulls an image subset from HuggingFace
-  `EVER-Z/QFabric_mt_images_1024`; `QFabricDataset(images_only=True)` reads the
-  parquet images and runs through the **same** path as DEN
-  (`load_or_compute` → `ChangeRetriever` → Gradio app) with any project encoder.
-  `_qfabric_opts` drops generic kwargs (`color_mode`/`pairing`/`split`) the
-  loader doesn't accept. Verified end-to-end: `--dataset qfabric` zero-shot
-  retrieval returns ranked pairs.
-- **Deferred (decision):** the `EVER-Z` parquet is **images-only — no change/
-  status labels**, so `get_pair_label` returns `None` and there is no
-  label-grounded QFabric benchmark (no mAP) and no `src/queries/qfabric.py` yet.
-  To add quantitative QFabric results, supply a label source — TEOChatlas
-  (`jirvin16/TEOChatlas`), Granular AI GeoJSON polygons, or a manual `labels.csv`
-  sidecar keyed by location — then implement `get_pair_label` + a query set
-  mirroring `src/queries/den.py`.
-- **Run:** `python -m scripts.download_qfabric --dest data/QFabric --n-shards 8`
-  then `python -m src.app --dataset qfabric --root data/QFabric --approach zero_shot`.
+- **Qualitative (EVER-Z, done):** `scripts/download_qfabric.py` pulls an image
+  subset from `EVER-Z/QFabric_mt_images_1024`; `QFabricDataset(images_only=True)`
+  runs the same path as DEN (`load_or_compute` → `ChangeRetriever` → Gradio app).
+  `_qfabric_opts` drops generic kwargs. Verified: `--dataset qfabric` zero-shot
+  returns ranked pairs. (`get_pair_label` → None; EVER-Z is images-only.)
+- **Label-grounded (TEOChatlas, coded + unit-tested; encode pending):** the real
+  QFabric change-type labels are public in `jirvin16/TEOChatlas` (RQA2 questions),
+  joinable to the crop images by the shared filename scheme — **no manual rating,
+  no spatial join**. Implemented:
+  - `scripts/build_qfabric_labels.py` → `data/QFabric/qfabric_teo_labels.json`
+    (27,879 crop→change-type labels; commercial 11.4k / residential 11.2k /
+    demolition 3.0k / road 2.2k / industrial 156 / mega_projects 20).
+  - `src/datasets/qfabric_teo.py` (`TEOChatlasQFabricDataset`, dataset
+    `qfabric_teo`) — reads QFabric crops, before/after pairs, `get_pair_label`
+    returns the real change type; stratified `max_per_class` subsampling.
+  - `src/queries/qfabric.py` — 6 change-type queries.
+  - `scripts/benchmark_qfabric.py` — extract `QFabric/*` from the TEOChatlas eval
+    tar, encode 3 encoders, write `results/qfabric_teo__*.json`.
+  - **Remaining:** the one-time **13.9 GB** TEOChatlas eval image download + encode.
+    Local link is the bottleneck → run on **Kaggle/Colab** (datacenter bandwidth +
+    GPU), then drop the small result JSONs into `results/` for REPORT §7.8.
+- **Run (label-grounded):**
+  `python -m scripts.build_qfabric_labels` then
+  `python -m scripts.benchmark_qfabric --extract-from <eval tar> --crops-root data/QFabric/teochat_crops --extract-only`
+  then `python -m scripts.benchmark_qfabric --crops-root data/QFabric/teochat_crops --max-per-class 120`.
 
 ### fMoW-Sentinel pipeline
 Multi-temporal Sentinel-2 imagery, 63 land-use categories, worldwide coverage.

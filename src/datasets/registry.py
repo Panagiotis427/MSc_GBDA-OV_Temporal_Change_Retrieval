@@ -119,6 +119,23 @@ def _qfabric_opts(*, root=None, pairing=None, split=None, **extra) -> Dict[str, 
     return out
 
 
+def _qfabric_teo_factory(**kwargs: Any) -> TemporalDataset:
+    from .qfabric_teo import TEOChatlasQFabricDataset
+    return TEOChatlasQFabricDataset(**kwargs)
+
+
+def _qfabric_teo_opts(*, root=None, pairing=None, split=None, **extra) -> Dict[str, Any]:
+    """TEOChatlas-QFabric: ``root`` is a dir of extracted QFabric ``.tif`` crops.
+    Drops generic kwargs the loader ignores (color_mode/pairing/split — RGB,
+    fixed before/after axis, no splits). ``max_per_class`` / ``labels_path`` /
+    ``seed`` pass through via extra."""
+    extra.pop("color_mode", None)
+    out: Dict[str, Any] = dict(extra)
+    if root is not None:
+        out["root"] = root
+    return out
+
+
 def _dynamic_earthnet_factory(**kwargs: Any) -> TemporalDataset:
     """Auto-detect on-disk layout: the preprocessed DynNet gdown subset
     (``labels/*.npy`` + ``split.json``) vs the raster ``planet/<aoi>/*.tif``
@@ -146,4 +163,5 @@ def _dynamic_earthnet_opts(*, root=None, pairing=None, split=None, **extra) -> D
 
 
 register_dataset("qfabric", _qfabric_factory, _qfabric_opts)
+register_dataset("qfabric_teo", _qfabric_teo_factory, _qfabric_teo_opts)
 register_dataset("dynamic_earthnet", _dynamic_earthnet_factory, _dynamic_earthnet_opts)

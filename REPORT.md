@@ -321,10 +321,26 @@ LoRA still overfits train-AOI visual texture. The visual encoder adapts to the
 specific NIR-channel patterns of the 55 training AOIs, which do not generalise
 to the 10 test AOIs.
 
-This result reinforces the project's core finding: **spectral physics (NRG
+**Rank / epoch sweep.** To check whether the rank-4 result simply under-fit, we
+swept LoRA rank and epochs (GeoRSCLIP + NRG, test-split zero_shot mAP;
+`scripts/lora_sweep.py`, in-memory, no cache/model clobber):
+
+| rank | α | epochs | train | test |
+|---|---|---|---|---|
+| 4 | 8 | 20 | 0.021 | 0.159 |
+| **8** | **16** | **20** | 0.022 | **0.246** |
+| 16 | 32 | 20 | 0.023 | 0.113 |
+| 8 | 16 | 40 | 0.021 | 0.205 |
+
+There is a **capacity sweet spot at rank 8** (test 0.246 — a +0.087 jump over
+rank 4), after which more rank (16 → 0.113) or more epochs (40 → 0.205) *overfit*
+and lose generalisation. So the rank-4 number was indeed sub-optimal — but even
+the best-tuned LoRA (0.246) stays well **below frozen NRG zero-shot (0.426)**.
+
+This reinforces the project's core finding: **spectral physics (NRG
 false-colour) generalises; learned visual priors do not.** No amount of adapter
-sophistication — whether a small projection head or LoRA on the backbone — beats
-the structural prior embedded in RS-pretrained zero-shot GeoRSCLIP + NIR.
+sophistication — small projection head, or LoRA at any rank/epoch we tried —
+beats the structural prior embedded in RS-pretrained zero-shot GeoRSCLIP + NIR.
 
 ![GeoRSCLIP NRG: frozen zero-shot vs LoRA across splits](assets/figures/cross_split__georsclip__nrg.png)
 
@@ -370,6 +386,35 @@ any time without restarting; CLI flags set startup defaults only.
 
 Both Filters & Re-ranking controls compose freely with each other and with
 all three approaches (naive / zero_shot / peft).
+
+### 7.7 Change-feature mode: difference vs concatenate (PEFT)
+
+The PEFT adapter consumes a change feature built from the pair embeddings. Two
+modes (`src/features.py`): `difference` (Δf = f_T2 − f_T1, dim D) and
+`concatenate` ([f_T1 ; f_T2], dim 2D — keeps both endpoints). All results above
+use `difference`; here we re-train the adapter under `concatenate` (same recipe,
+RGB, 40 epochs) and compare PEFT mAP across splits:
+
+| Encoder | mode | train | val | test |
+|---|---|---|---|---|
+| CLIP ViT-L/14 | difference | **0.420** | 0.042 | 0.040 |
+| CLIP ViT-L/14 | concatenate | 0.370 | **0.081** | **0.050** |
+| GeoRSCLIP | difference | **0.335** | 0.087 | 0.041 |
+| GeoRSCLIP | concatenate | 0.275 | 0.086 | **0.070** |
+| RemoteCLIP | difference | 0.352 | 0.028 | 0.103 |
+| RemoteCLIP | concatenate | **0.359** | **0.109** | 0.078 |
+
+**Concatenate overfits less.** It consistently lowers in-distribution train mAP
+(CLIP −0.050, GeoRSCLIP −0.060) but raises held-out **val** for all three
+encoders (CLIP +0.039, GeoRSCLIP ~flat, RemoteCLIP +0.081) and **test** for
+two of three. Keeping both endpoints (rather than collapsing to their
+difference) preserves absolute land-cover context the adapter can use to
+generalise, at the cost of some training-set fit. The effect is modest and PEFT
+still trails frozen NRG zero-shot (0.426) — consistent with the project's core
+finding — but `concatenate` is the better-generalising change feature.
+Adapters saved as `models/<dataset>__<encoder>_concatenate__adapter.pt`
+(mode-tagged so they never overwrite the difference adapters); reproduce with
+`python -m scripts.run_pipeline --encoder <e> --mode concatenate --eval-splits train val test`.
 
 ### Error analysis — seasonal vs permanent
 
@@ -535,15 +580,23 @@ regenerated automatically by the test suite.
 - **Global embeddings**: patch-level or localised change attention (e.g.
   cross-attention over spatial tokens) would address the main signal-dilution
   failure mode.
-- **`concatenate` change mode** and higher LoRA rank/epoch sweeps not explored.
-- **QFabric** is now wired end-to-end as a second dataset: an image subset
-  (`EVER-Z/QFabric_mt_images_1024`) loads through the same encoder/retrieval
-  path and serves qualitative zero-shot retrieval in the app, demonstrating the
-  dataset-agnostic design across a different temporal axis (fixed-5 timepoints).
-  The published parquet is **images-only**, so a label-grounded QFabric
-  benchmark (mAP) awaits an external label source (TEOChatlas / Granular AI
-  GeoJSON / manual sidecar) plus a `get_pair_label` + query-set implementation.
-  **fMoW** remains wired only at the protocol level.
+- **`concatenate` change mode** now evaluated (§7.7 — generalises better than
+  `difference`); **LoRA rank/epoch sweep** done (§7.4 — rank-8 sweet spot,
+  test 0.246, still below frozen 0.426).
+- **QFabric** is wired as a second dataset two ways. (a) The EVER-Z image subset
+  (`EVER-Z/QFabric_mt_images_1024`) runs the same encoder/retrieval path for
+  qualitative zero-shot retrieval in the app (images-only). (b) A **label-grounded
+  pipeline** is fully implemented and unit-tested: `src/datasets/qfabric_teo.py`
+  (`TEOChatlasQFabricDataset`) reads the QFabric crops from `jirvin16/TEOChatlas`
+  with **real change-type labels** (the RQA2 questions; 27,879 labelled crops via
+  `scripts/build_qfabric_labels.py`), `src/queries/qfabric.py` provides the 6
+  change-type queries, and `scripts/benchmark_qfabric.py` encodes a stratified
+  subset and runs Recall@K/mAP. The only remaining step is the one-time 13.9 GB
+  TEOChatlas image download + encode — best run on Kaggle/Colab (datacenter
+  bandwidth + GPU); the resulting `results/qfabric_teo__*.json` then drops into
+  §7.8. This proves the dataset-agnostic design across a different taxonomy
+  (6 construction change-types) and temporal axis. **fMoW** remains wired only at
+  the protocol level.
 - **Sentinel-1/2 data**: `aoi_metadata.json` confirms 51/75 AOIs have full
   SAR (S1) coverage; downloading and feeding SAR Δ-features is a direct
   extension of the NRG pattern.

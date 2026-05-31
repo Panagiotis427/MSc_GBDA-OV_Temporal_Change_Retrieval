@@ -120,8 +120,8 @@ derived `PairLabel`s → Recall@K, mAP, plus a seasonal-vs-permanent
 
 | File | Role |
 |------|------|
-| `src/datasets/` | `TemporalDataset` protocol, `DENDataset` (raster), `DENNpyDataset` (DynNet `.npy` + `color_mode` rgb/nrg/ndvi via NIR infrared frames), `QFabricDataset` (`images_only` parquet → runs end-to-end via the project encoder), layout-detecting registry + opts adapters |
-| `src/queries/` | Per-dataset query sets (`den.py`); registry resolved by `dataset.name` |
+| `src/datasets/` | `TemporalDataset` protocol, `DENDataset` (raster), `DENNpyDataset` (DynNet `.npy` + `color_mode` rgb/nrg/ndvi via NIR infrared frames), `QFabricDataset` (`images_only` parquet), `TEOChatlasQFabricDataset` (`qfabric_teo` — QFabric crops + real change-type labels), layout-detecting registry + opts adapters |
+| `src/queries/` | Per-dataset query sets (`den.py`, `qfabric.py`); registry resolved by `dataset.name` |
 | `src/results_io.py` | serialize `BenchmarkReport` to JSON/CSV (torch-free); consumed by the figure scripts |
 | `src/error_analysis.py` | per-query confusion matrix + precision/recall (seasonal-vs-permanent error analysis) |
 | `src/encoders/` | `ImageTextEncoder` protocol; `clip_vitl14` (768-d), `georsclip` (512-d), `remoteclip` (768-d) |
@@ -138,12 +138,15 @@ derived `PairLabel`s → Recall@K, mAP, plus a seasonal-vs-permanent
 | `src/app.py` | Gradio engine + UI (Dataset / Encoder / Approach selectors) |
 | `app.py` | HuggingFace Spaces entry point (uses tiny fixture by default; override via env vars) |
 | `scripts/download_den.py` | fetch + extract DEN subset, build label index |
-| `scripts/download_qfabric.py` | fetch a QFabric image subset from HuggingFace (images-only; structural 2nd-dataset demo) |
+| `scripts/download_qfabric.py` | fetch a QFabric image subset from HuggingFace (images-only; qualitative demo) |
+| `scripts/build_qfabric_labels.py` | TEOChatlas RQA2 → `qfabric_teo_labels.json` (27,879 real crop→change-type labels) |
+| `scripts/benchmark_qfabric.py` | extract QFabric crops + encode + label-grounded change-type mAP (`qfabric_teo`) |
 | `scripts/make_den_fixture.py` | tiny synthetic DEN tree for fast tests |
-| `scripts/run_pipeline.py` | one-command run with `--train-split` / `--eval-splits` / `--color-mode` / `--lora` / `--results-dir`; cross-split mAP table |
+| `scripts/run_pipeline.py` | one-command run with `--train-split` / `--eval-splits` / `--color-mode` / `--mode` / `--lora` / `--results-dir`; cross-split mAP table |
 | `scripts/export_results.py` | regenerate benchmarks from cache → `results/*.json` + `macro_summary.csv` (`--confusion` for error analysis) |
 | `scripts/make_figures.py` | publication PNGs (recall curves, mAP bars, colour heatmap, seasonal drift, cross-split, confusion) from `results/` |
 | `scripts/make_comparison_figure.py` | static zero-shot-vs-PEFT top-K visual comparison per encoder |
+| `scripts/lora_sweep.py` | LoRA rank/epoch sweep (georsclip+nrg), in-memory, no cache/model clobber |
 
 ## Run / install / tests
 

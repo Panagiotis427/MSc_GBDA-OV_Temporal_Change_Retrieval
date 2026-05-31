@@ -29,3 +29,4 @@ def list_query_sets() -> List[str]:
 
 # Auto-register the built-in dataset query sets on first import.
 from . import den  # noqa: F401,E402
+from . import qfabric  # noqa: F401,E402
