@@ -103,7 +103,8 @@ def main() -> None:
         print(report.to_table())
         if args.results_dir:
             p = result_path(args.results_dir, args.dataset, enc.name, esplit,
-                            color=args.color_mode, approach=report.approach, lora=lora)
+                            color=args.color_mode, approach=report.approach,
+                            lora=lora, mode=args.mode)
             write_report(report, p, color_mode=args.color_mode, split=esplit, lora=lora)
             written.append(report.to_dict(color_mode=args.color_mode,
                                           split=esplit, lora=lora))

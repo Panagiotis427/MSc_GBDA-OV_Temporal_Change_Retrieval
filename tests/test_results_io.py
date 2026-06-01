@@ -75,6 +75,14 @@ def test_result_path_flag_combos(tmp_path):
     peft = results_io.result_path(tmp_path, "dynamic_earthnet", "remoteclip",
                                   "val", approach="peft")
     assert peft.name == "dynamic_earthnet__remoteclip__val__rgb__peft.json"
+    # mode only appears when not the default 'difference' -> no clobber of diff results
+    diff = results_io.result_path(tmp_path, "dynamic_earthnet", "clip_vitl14",
+                                  "train", approach="peft", mode="difference")
+    concat = results_io.result_path(tmp_path, "dynamic_earthnet", "clip_vitl14",
+                                    "train", approach="peft", mode="concatenate")
+    assert diff.name == "dynamic_earthnet__clip_vitl14__train__rgb__peft.json"
+    assert concat.name == "dynamic_earthnet__clip_vitl14__train__rgb__peft__concatenate.json"
+    assert diff != concat
 
 
 def test_write_report_idempotent(tmp_path):

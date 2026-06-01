@@ -38,3 +38,21 @@ def test_nrg_does_not_load_rgb_adapter(tmp_path):
     _save_rgb_adapter(tmp_path / "models")
     engine = SemanticChangeSearch.__new__(SemanticChangeSearch)
     assert engine._maybe_load_adapter(_cfg(tmp_path, "nrg")) is None
+
+
+def test_difference_mode_ignores_mode_tagged_adapter(tmp_path):
+    # run_pipeline saves concatenate adapters as ..._concatenate__adapter.pt;
+    # the app (difference, default) must NOT load a mode-tagged adapter.
+    # Use a fake encoder name so the _PROJECT_ROOT/models fallback (which holds
+    # the real clip_vitl14 adapter) can't accidentally satisfy the lookup.
+    models = tmp_path / "models"
+    models.mkdir(parents=True, exist_ok=True)
+    head = create_projection_head(input_dim=8, output_dim=8, hidden_dims=(16,))
+    save_adapter(str(models / "dynamic_earthnet__zzmock_concatenate__adapter.pt"),
+                 head, {"input_dim": 8, "output_dim": 8, "hidden_dims": [16],
+                        "feature_mode": "concatenate"})
+    cfg = RunConfig(dataset="dynamic_earthnet", encoder="zzmock",
+                    cache_dir=str(tmp_path / "cache"), color_mode="rgb")
+    engine = SemanticChangeSearch.__new__(SemanticChangeSearch)
+    # no plain ..._adapter.pt present -> difference-mode lookup returns None
+    assert engine._maybe_load_adapter(cfg) is None

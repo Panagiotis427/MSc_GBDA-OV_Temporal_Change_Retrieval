@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 
 from src.datasets.qfabric_teo import parse_crop
@@ -39,7 +39,10 @@ def _gpt_answer(conversations) -> str | None:
 
 def build(rqa2_path: str, out_path: str) -> dict:
     data = json.load(open(rqa2_path, encoding="utf-8"))
-    crop_type: dict[str, str] = {}
+    # A crop can have several RQA2 records (multiple polygons / overlapping
+    # answers). Resolve by MAJORITY VOTE over all answers for that crop_key —
+    # not last-write-wins (which mislabels ~16% of crops with conflicts).
+    votes: dict[str, Counter] = defaultdict(Counter)
     for r in data:
         vids = r.get("video") or []
         if not vids:
@@ -51,11 +54,14 @@ def build(rqa2_path: str, out_path: str) -> dict:
         parsed = parse_crop(vids[0])
         if parsed is None:
             continue
-        crop_key = parsed[0]
-        crop_type[crop_key] = matched[0]  # crop is polygon-centred -> one type
+        votes[parsed[0]][matched[0]] += 1
+    # most_common is deterministic for ties (insertion order); fine for labels.
+    crop_type = {ck: c.most_common(1)[0][0] for ck, c in votes.items()}
+    n_conflict = sum(1 for c in votes.values() if len(c) > 1)
     Path(out_path).parent.mkdir(parents=True, exist_ok=True)
     json.dump(crop_type, open(out_path, "w"), indent=0)
-    print(f"Wrote {len(crop_type)} crop labels -> {out_path}")
+    print(f"Wrote {len(crop_type)} crop labels -> {out_path} "
+          f"({n_conflict} crops had conflicting answers, resolved by majority)")
     print("change-type distribution:", dict(Counter(crop_type.values())))
     return crop_type
 

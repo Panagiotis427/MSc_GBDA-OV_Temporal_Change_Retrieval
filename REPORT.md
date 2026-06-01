@@ -273,8 +273,8 @@ Three colour modes compared (zero-shot mAP, all three splits):
 | Encoder | color | train | val | test |
 |---|---|---|---|---|
 | CLIP ViT-L/14 | RGB | 0.043 | 0.051 | 0.043 |
-| CLIP ViT-L/14 | NRG | 0.034 | 0.067 | 0.102 |
-| CLIP ViT-L/14 | NDVI | 0.032 | 0.044 | 0.062 |
+| CLIP ViT-L/14 | NRG | 0.033 | 0.066 | 0.104 |
+| CLIP ViT-L/14 | NDVI | 0.032 | 0.045 | 0.064 |
 | GeoRSCLIP | RGB | 0.040 | 0.036 | 0.299 |
 | GeoRSCLIP | **NRG** | 0.025 | 0.030 | **0.426** |
 | GeoRSCLIP | NDVI | 0.028 | 0.065 | 0.216 |
@@ -286,8 +286,8 @@ Three colour modes compared (zero-shot mAP, all three splits):
 
 ![Colour-mode ablation, zero-shot, test](assets/figures/color_ablation__zero_shot__test.png)
 
-NRG hurts on train (−0.009 to −0.032) but substantially helps on test
-(+0.059 CLIP, **+0.127 GeoRSCLIP**, +0.079 RemoteCLIP). NDVI sits
+NRG hurts on train (−0.010 to −0.034) but substantially helps on test
+(+0.061 CLIP, **+0.127 GeoRSCLIP**, +0.079 RemoteCLIP). NDVI sits
 between: it provides some NIR signal but collapses all spectral texture
 into a single channel replicated across R/G/B — the RS-pretrained encoders
 cannot exploit inter-channel colour contrasts that NRG preserves.
@@ -312,7 +312,7 @@ Results (GeoRSCLIP + NRG, rank=4, α=8, 20 epochs; zero-shot with LoRA-adapted e
 | split | zero_shot (frozen) | LoRA zero_shot |
 |---|---|---|
 | train | 0.025 | 0.021 |
-| val | 0.047 | 0.041 |
+| val | 0.030 | 0.041 |
 | test | **0.426** | 0.159 |
 
 **LoRA is worse than frozen zero-shot on all splits.** The cross-split drop
@@ -415,6 +415,49 @@ finding — but `concatenate` is the better-generalising change feature.
 Adapters saved as `models/<dataset>__<encoder>_concatenate__adapter.pt`
 (mode-tagged so they never overwrite the difference adapters); reproduce with
 `python -m scripts.run_pipeline --encoder <e> --mode concatenate --eval-splits train val test`.
+
+### 7.8 QFabric — second-dataset change-type retrieval (real labels)
+
+To validate the dataset-agnostic design *quantitatively* on a second dataset, we
+benchmark QFabric change-type retrieval. Images are the polygon-centred QFabric
+crops from `jirvin16/TEOChatlas`; labels are the **real QFabric change types**
+(the TEOChatlas RQA2 answers), joined to crops by the shared filename scheme — no
+manual rating, no spatial join (`scripts/build_qfabric_labels.py`,
+`src/datasets/qfabric_teo.py`). We take a **stratified ≤120 crops/class**
+subset (N = 2476 before/after pairs) and 6 change-type queries
+(`src/queries/qfabric.py`). Frozen encoders, RGB; mAP:
+
+| Encoder | naive | zero-shot |
+|---|---|---|
+| CLIP ViT-L/14 | **0.274** | 0.187 |
+| GeoRSCLIP | **0.269** | 0.182 |
+| RemoteCLIP | **0.233** | 0.180 |
+
+![QFabric change-type mAP by encoder x approach](assets/figures/map_bars__eval__rgb.png)
+
+**naive beats zero-shot — the opposite of DEN.** QFabric change *types*
+(residential / road / industrial …) are identifiable from the **after** image
+content alone, so `naive` (cos(text, f_T2)) wins; the directional Δ-similarity
+that helped on DEN here *adds noise*. The random-ranking baseline is the macro
+class prevalence, **0.167** (five common classes at ~0.19 prevalence + the rare
+mega_projects at 0.03). `naive` (0.274) sits **+0.11 above** chance; `zero_shot`
+(0.187) only **+0.02** — barely better than random.
+Per-query (CLIP naive, AP vs that query's prevalence): the signal is concentrated
+in **road** (AP 0.50, +0.30 — visually distinctive), **residential** (0.36, +0.17)
+and **industrial** (0.30, +0.10); **demolition** (0.25, +0.06) and **commercial**
+(0.22, +0.02) are weak; **mega_projects** (0.03) is *at/below* chance (80 pairs,
+semantically vague). Encoders are close (CLIP ≈ GeoRSCLIP > RemoteCLIP);
+RS-pretraining gives no edge on optical construction crops.
+
+> Recall@K is small by construction (~480 relevant pairs per query in a 2476-pair
+> corpus, so R@10 ≤ 0.02); **mAP against the 0.167 macro-prevalence baseline is the
+> meaningful signal** — naive is clearly above chance, zero-shot only marginally.
+
+**Takeaway:** the pipeline runs end-to-end on a dataset with a different taxonomy
+(6 construction change-types), sensor, and crop scale, with no code changes
+beyond a loader + query set — confirming the dataset-agnostic abstraction, and
+surfacing a genuinely different regime (after-image content > temporal Δ) from DEN.
+Reproduce with `scripts/build_qfabric_labels.py` + `scripts/benchmark_qfabric.py`.
 
 ### Error analysis — seasonal vs permanent
 
@@ -591,12 +634,12 @@ regenerated automatically by the test suite.
   with **real change-type labels** (the RQA2 questions; 27,879 labelled crops via
   `scripts/build_qfabric_labels.py`), `src/queries/qfabric.py` provides the 6
   change-type queries, and `scripts/benchmark_qfabric.py` encodes a stratified
-  subset and runs Recall@K/mAP. The only remaining step is the one-time 13.9 GB
-  TEOChatlas image download + encode — best run on Kaggle/Colab (datacenter
-  bandwidth + GPU); the resulting `results/qfabric_teo__*.json` then drops into
-  §7.8. This proves the dataset-agnostic design across a different taxonomy
-  (6 construction change-types) and temporal axis. **fMoW** remains wired only at
-  the protocol level.
+  subset and runs Recall@K/mAP. **Benchmarked — see §7.8** (N = 2476 pairs;
+  naive mAP ≈ 0.27 > zero-shot ≈ 0.18; road easiest, mega_projects hardest),
+  proving the dataset-agnostic design across a different taxonomy (6 construction
+  change-types), sensor, and crop scale. Remaining QFabric headroom: crop-precise
+  (polygon) grounding and the per-timepoint construction-status labels (RQA5)
+  for finer transition queries. **fMoW** remains wired only at the protocol level.
 - **Sentinel-1/2 data**: `aoi_metadata.json` confirms 51/75 AOIs have full
   SAR (S1) coverage; downloading and feeding SAR Δ-features is a direct
   extension of the NRG pattern.

@@ -57,7 +57,7 @@ Replace template captions (`"agriculture replaced by impervious surface"`) with 
 - **How:** For each `PairLabel`, prompt LLM with class names + change fraction; cache results; pass to `train.py` via `text_caption_for_pair()` override.
 - **Effort:** ~2 days.
 
-### QFabric — second dataset (two routes; mAP pipeline ready, encode pending)
+### QFabric — second dataset (BENCHMARKED, real labels) ✅
 Demonstrates the dataset-agnostic abstraction on a second dataset with a
 different taxonomy (6 construction change-types) and temporal axis.
 
@@ -79,9 +79,11 @@ different taxonomy (6 construction change-types) and temporal axis.
   - `src/queries/qfabric.py` — 6 change-type queries.
   - `scripts/benchmark_qfabric.py` — extract `QFabric/*` from the TEOChatlas eval
     tar, encode 3 encoders, write `results/qfabric_teo__*.json`.
-  - **Remaining:** the one-time **13.9 GB** TEOChatlas eval image download + encode.
-    Local link is the bottleneck → run on **Kaggle/Colab** (datacenter bandwidth +
-    GPU), then drop the small result JSONs into `results/` for REPORT §7.8.
+  - **Benchmarked (REPORT §7.8):** N = 2476 pairs, 6 change-type queries. naive
+    mAP ≈ 0.27 > zero-shot ≈ 0.18 (after-image content beats temporal Δ here —
+    opposite of DEN). Road easiest (AP 0.48), mega_projects hardest (0.03).
+  - **Headroom:** crop-precise polygon grounding; per-timepoint status labels
+    (RQA5) for finer transition queries.
 - **Run (label-grounded):**
   `python -m scripts.build_qfabric_labels` then
   `python -m scripts.benchmark_qfabric --extract-from <eval tar> --crops-root data/QFabric/teochat_crops --extract-only`

@@ -4,11 +4,15 @@ TEOChatlas-QFabric loader — a label-grounded second dataset.
 Unlike ``QFabricDataset`` (EVER-Z parquet, images-only), this reads the QFabric
 crops shipped in ``jirvin16/TEOChatlas`` eval images, which come with REAL
 change-type labels (the TEOChatlas RQA2 questions). Each crop is polygon-centred
-(~256 px) and has two timepoints (before -> after); the crop's change type
-(one of residential / commercial / industrial / road / demolition /
-mega_projects) labels the pair. This makes change-type retrieval directly
+(~256 px) and spans 2-5 timepoints (giving consecutive before->after pairs); the
+crop's change type (one of residential / commercial / industrial / road /
+demolition / mega_projects) labels EVERY pair of that crop — the crop is treated
+as a single change event. This makes change-type retrieval directly
 benchmarkable (Recall@K / mAP), proving the dataset-agnostic design on a second
 dataset with a different taxonomy and temporal axis.
+
+``QF_CHANGE_TYPES`` lists the canonical 6 classes (also the order used by the
+query set in ``src/queries/qfabric.py``).
 
 Filenames follow ``<loc>.d<N>.<MMDDYYYY>_<xoff>_<yoff>.tif``; a crop is keyed by
 ``<loc>_<xoff>_<yoff>`` and its timepoints are the distinct ``d<N>``. Labels are

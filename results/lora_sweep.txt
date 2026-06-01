@@ -1,0 +1,11 @@
+LoRA rank/epoch sweep — GeoRSCLIP + NRG, zero_shot mAP (REPORT §7.4)
+Reproduce: python -m scripts.lora_sweep --configs 4:20 8:20 16:20 8:40   (seed=42, in-memory)
+
+rank  alpha  epochs    train     test
+   4      8     20     0.0214   0.1587
+   8     16     20     0.0215   0.2458   <- sweet spot
+  16     32     20     0.0233   0.1129
+   8     16     40     0.0205   0.2050
+frozen zero-shot reference: train 0.025  test 0.426
+
+Finding: rank-8 best (test 0.246); more rank/epochs overfit; all LoRA < frozen 0.426.

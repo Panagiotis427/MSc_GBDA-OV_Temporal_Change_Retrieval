@@ -1,0 +1,14 @@
+Change-feature mode: difference vs concatenate — PEFT mAP (RGB, 40 epochs) (REPORT §7.7)
+Reproduce: python -m scripts.run_pipeline --encoder <e> --mode concatenate --eval-splits train val test
+Adapters saved mode-tagged: models/dynamic_earthnet__<e>_concatenate__adapter.pt (no clobber of difference).
+
+encoder       mode           train    val      test
+clip_vitl14   difference    0.4200   0.0417   0.0397
+clip_vitl14   concatenate   0.3704   0.0812   0.0500
+georsclip     difference    0.3353   0.0873   0.0413
+georsclip     concatenate   0.2750   0.0864   0.0697
+remoteclip    difference    0.3522   0.0279   0.1032
+remoteclip    concatenate   0.3591   0.1085   0.0784
+
+Finding: concatenate lowers train but raises held-out val for all 3 encoders
+(keeps both endpoints -> less overfit). difference values are from results/*.json.

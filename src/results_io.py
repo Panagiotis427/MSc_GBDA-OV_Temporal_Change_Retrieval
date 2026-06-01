@@ -27,10 +27,15 @@ def result_path(
     color: str = "rgb",
     approach: str = "zero_shot",
     lora: bool = False,
+    mode: str = "difference",
 ) -> Path:
-    """Stable JSON path for one (dataset, encoder, split, color, approach) run."""
+    """Stable JSON path for one run. ``mode`` (the change-feature mode) only
+    appears in the filename when it isn't the default ``difference`` — so a
+    ``concatenate`` run writes distinct files and never clobbers the difference
+    results."""
+    mode_tag = "" if mode == "difference" else f"__{mode}"
     lora_tag = "__lora" if lora else ""
-    name = f"{dataset}__{encoder}__{split}__{color}__{approach}{lora_tag}.json"
+    name = f"{dataset}__{encoder}__{split}__{color}__{approach}{mode_tag}{lora_tag}.json"
     return Path(results_dir) / name
 
 

@@ -71,6 +71,28 @@ def test_queries_registered_and_discriminative():
     assert res_q.predicate(PairLabel(change_type="road", stable=False)) is False
 
 
+def test_subsample_deterministic(tmp_path):
+    # 5 residential + 5 commercial crops; max_per_class=2 must pick the SAME 2
+    # across builds with the same seed.
+    imgs = tmp_path / "QFabric"; imgs.mkdir()
+    spec = {}
+    for ci, ct in enumerate(["residential", "commercial"]):
+        for k in range(5):
+            ck = f"{ci}{k}_0_0"
+            loc, xoff, yoff = ck.split("_")
+            for n in (1, 2):
+                Image.new("RGB", (8, 8), (k * 20, ci * 30, 40)).save(
+                    imgs / f"{loc}.d{n}.0101201{n}_{xoff}_{yoff}.tif")
+            spec[ck] = ct
+    labels = tmp_path / "qfabric_teo_labels.json"
+    json.dump(spec, open(labels, "w"))
+    a = build_dataset("qfabric_teo", root=str(imgs), labels_path=str(labels),
+                      max_per_class=2, seed=42).list_locations()
+    b = build_dataset("qfabric_teo", root=str(imgs), labels_path=str(labels),
+                      max_per_class=2, seed=42).list_locations()
+    assert a == b and len(a) == 4  # 2 classes x 2 crops, identical pick
+
+
 def test_end_to_end_benchmark(tmp_path):
     from src.embeddings import compute_pair_embeddings
     from src.retrieval import ChangeRetriever
