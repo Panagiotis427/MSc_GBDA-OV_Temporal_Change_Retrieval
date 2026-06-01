@@ -1,0 +1,141 @@
+{
+  "approach": "naive",
+  "color_mode": "rgb",
+  "dataset": "qfabric_teo",
+  "encoder": "remoteclip",
+  "k_values": [
+    1,
+    3,
+    5,
+    10
+  ],
+  "lora": false,
+  "macro": {
+    "mAP": 0.24452595604369634,
+    "recall_at_k": {
+      "1": 0.00183531746031746,
+      "10": 0.009573412698412699,
+      "3": 0.004712301587301587,
+      "5": 0.005753968253968254
+    },
+    "seasonal_drift_at_k": {
+      "1": 0.0,
+      "10": 0.0,
+      "3": 0.0,
+      "5": 0.0
+    }
+  },
+  "n_pairs": 2048,
+  "per_query": [
+    {
+      "ap": 0.45835521922197475,
+      "category": "permanent",
+      "n_relevant": 480,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.01875,
+        "3": 0.004166666666666667,
+        "5": 0.008333333333333333
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "new residential housing construction"
+    },
+    {
+      "ap": 0.2670369739240504,
+      "category": "permanent",
+      "n_relevant": 480,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.008333333333333333,
+        "3": 0.0020833333333333333,
+        "5": 0.004166666666666667
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "new commercial buildings or retail development"
+    },
+    {
+      "ap": 0.12871966696798062,
+      "category": "permanent",
+      "n_relevant": 112,
+      "recall_at_k": {
+        "1": 0.008928571428571428,
+        "10": 0.017857142857142856,
+        "3": 0.017857142857142856,
+        "5": 0.017857142857142856
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "new industrial facility or factory construction"
+    },
+    {
+      "ap": 0.35485235812151195,
+      "category": "permanent",
+      "n_relevant": 480,
+      "recall_at_k": {
+        "1": 0.0020833333333333333,
+        "10": 0.0125,
+        "3": 0.004166666666666667,
+        "5": 0.004166666666666667
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "new road or highway construction"
+    },
+    {
+      "ap": 0.2453961270986779,
+      "category": "permanent",
+      "n_relevant": 480,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "buildings demolished, structures torn down"
+    },
+    {
+      "ap": 0.012795390927982405,
+      "category": "permanent",
+      "n_relevant": 16,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "large-scale mega project under construction"
+    }
+  ],
+  "schema_version": 1,
+  "split": "test"
+}

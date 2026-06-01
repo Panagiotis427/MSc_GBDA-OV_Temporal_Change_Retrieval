@@ -82,6 +82,9 @@ different taxonomy (6 construction change-types) and temporal axis.
   - **Benchmarked (REPORT §7.8):** N = 2476 pairs, 6 change-type queries. naive
     mAP ≈ 0.27 > zero-shot ≈ 0.18 (after-image content beats temporal Δ here —
     opposite of DEN). Road easiest (AP 0.48), mega_projects hardest (0.03).
+  - **PEFT (REPORT §7.9):** adapter on a held-out train/test split — memorises
+    train (≈0.999) but on test is at-or-above naive (GeoRSCLIP 0.334, +0.06),
+    unlike DEN where PEFT collapses. `benchmark_qfabric.py --peft`.
   - **Headroom:** crop-precise polygon grounding; per-timepoint status labels
     (RQA5) for finer transition queries.
 - **Run (label-grounded):**

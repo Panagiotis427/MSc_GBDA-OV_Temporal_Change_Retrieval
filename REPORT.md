@@ -459,6 +459,41 @@ beyond a loader + query set — confirming the dataset-agnostic abstraction, and
 surfacing a genuinely different regime (after-image content > temporal Δ) from DEN.
 Reproduce with `scripts/build_qfabric_labels.py` + `scripts/benchmark_qfabric.py`.
 
+### 7.9 QFabric PEFT — does an adapter help on the second dataset?
+
+Closing the zero-shot-vs-PEFT comparison on QFabric: a stratified, crop-disjoint
+**train/test split** (train ≤120 crops/class, N=2422 pairs; held-out test N=2048),
+a ProjectionHead adapter trained on the train split with captions phrased like
+the queries (`text_caption_for_pair`, difference mode, 40 epochs), evaluated on
+both splits (`scripts/benchmark_qfabric.py --peft`):
+
+| Encoder | split | naive | zero-shot | PEFT |
+|---|---|---|---|---|
+| CLIP ViT-L/14 | train | 0.278 | 0.189 | **0.998** |
+| CLIP ViT-L/14 | test | 0.269 | 0.185 | 0.271 |
+| GeoRSCLIP | train | 0.271 | 0.180 | **0.999** |
+| GeoRSCLIP | test | 0.272 | 0.181 | **0.334** |
+| RemoteCLIP | train | 0.244 | 0.179 | **0.999** |
+| RemoteCLIP | test | 0.245 | 0.183 | **0.288** |
+
+![QFabric PEFT — test split, naive vs zero-shot vs PEFT](assets/figures/qfabric_peft_test.png)
+
+**PEFT overfits train on *both* datasets (≈0.999 here) — but generalises
+differently.** On held-out QFabric test the adapter is **at-or-above `naive`**:
+GeoRSCLIP **+0.062** (0.334, the best QFabric result in this report),
+RemoteCLIP +0.043 (0.288), CLIP neutral (0.271 ≈ 0.269). Contrast DEN §7.2,
+where PEFT test *collapsed below* zero-shot (0.428→0.039). 
+
+The difference is what the adapter has to learn. QFabric change *types* are
+recognisable, consistent visual categories (a road looks like a road across
+crops), so the head learns features that transfer to unseen crops. DEN's
+directional spectral transitions are subtle and AOI-specific, so the head
+memorises training-AOI statistics that don't transfer. **PEFT's value is
+dataset-dependent — harmful on DEN, mildly helpful on QFabric** — and the
+RS-pretrained GeoRSCLIP backbone benefits most from the adapter on construction
+imagery. Even so, QFabric PEFT (0.334) and DEN frozen NRG zero-shot (0.426)
+remain the respective per-dataset best; no single recipe dominates.
+
 ### Error analysis — seasonal vs permanent
 
 The benchmark reports seasonal drift @K (non-relevant top-K retrievals that
@@ -634,12 +669,14 @@ regenerated automatically by the test suite.
   with **real change-type labels** (the RQA2 questions; 27,879 labelled crops via
   `scripts/build_qfabric_labels.py`), `src/queries/qfabric.py` provides the 6
   change-type queries, and `scripts/benchmark_qfabric.py` encodes a stratified
-  subset and runs Recall@K/mAP. **Benchmarked — see §7.8** (N = 2476 pairs;
-  naive mAP ≈ 0.27 > zero-shot ≈ 0.18; road easiest, mega_projects hardest),
-  proving the dataset-agnostic design across a different taxonomy (6 construction
-  change-types), sensor, and crop scale. Remaining QFabric headroom: crop-precise
-  (polygon) grounding and the per-timepoint construction-status labels (RQA5)
-  for finer transition queries. **fMoW** remains wired only at the protocol level.
+  subset and runs Recall@K/mAP. **Benchmarked — see §7.8** (naive mAP ≈ 0.27 >
+  zero-shot ≈ 0.18) **and §7.9** (PEFT on a held-out split — overfits train ≈0.999
+  but generalises at-or-above naive on test, GeoRSCLIP 0.334; unlike DEN, where
+  PEFT collapses). Proves the dataset-agnostic design across a different taxonomy
+  (6 construction change-types), sensor, and crop scale. Remaining QFabric
+  headroom: crop-precise (polygon) grounding and the per-timepoint
+  construction-status labels (RQA5) for finer transition queries. **fMoW**
+  remains wired only at the protocol level.
 - **Sentinel-1/2 data**: `aoi_metadata.json` confirms 51/75 AOIs have full
   SAR (S1) coverage; downloading and feeding SAR Δ-features is a direct
   extension of the NRG pattern.

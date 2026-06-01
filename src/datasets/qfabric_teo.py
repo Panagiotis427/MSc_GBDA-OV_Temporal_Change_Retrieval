@@ -70,6 +70,8 @@ class TEOChatlasQFabricDataset:
         labels_path: Optional[str] = None,
         max_per_class: Optional[int] = None,
         seed: int = 42,
+        split: Optional[str] = None,
+        train_frac: float = 0.8,
     ) -> None:
         self.root = str(root)
         # crop_key -> {day: filepath}
@@ -93,12 +95,35 @@ class TEOChatlasQFabricDataset:
         # keep only labelled crops
         self._crops = {ck: d for ck, d in self._crops.items() if ck in self._labels}
 
+        # optional deterministic, stratified train/test split (for PEFT
+        # generalisation: train the adapter on `train`, evaluate on held-out
+        # `test`). split=None keeps the whole corpus (the §7.8 setup).
+        if split in ("train", "test"):
+            self._crops = self._train_test_split(split, train_frac, seed)
+
         # optional stratified subsample for a DEN-scale benchmark
         if max_per_class is not None:
             self._crops = self._subsample(max_per_class, seed)
 
         self._locations = sorted(self._crops)
         self._pairs_cache: Optional[List[PairKey]] = None
+
+    def _train_test_split(self, split: str, train_frac: float,
+                          seed: int) -> Dict[str, Dict[str, str]]:
+        """Partition crops per class (stratified, seeded) into train/test —
+        disjoint crop sets so no crop leaks across the split."""
+        by_type: Dict[str, List[str]] = defaultdict(list)
+        for ck in self._crops:
+            by_type[self._labels[ck]].append(ck)
+        rng = random.Random(seed)
+        keep = set()
+        for cks in by_type.values():
+            cks = sorted(cks)
+            rng.shuffle(cks)
+            cut = int(round(len(cks) * train_frac))
+            chosen = cks[:cut] if split == "train" else cks[cut:]
+            keep.update(chosen)
+        return {ck: d for ck, d in self._crops.items() if ck in keep}
 
     def _subsample(self, max_per_class: int, seed: int) -> Dict[str, Dict[str, str]]:
         by_type: Dict[str, List[str]] = defaultdict(list)
@@ -156,3 +181,18 @@ class TEOChatlasQFabricDataset:
         # A QFabric crop is change-centred: the pair shows that change type.
         return PairLabel(change_type=ct, stable=False,
                          dominant_t1_class=ct, dominant_t2_class=ct)
+
+    # Weak captions for PEFT supervision — phrased like the queries in
+    # src/queries/qfabric.py so the adapter is pulled toward the query space.
+    _CAPTIONS = {
+        "residential": "new residential housing construction",
+        "commercial": "new commercial buildings or retail development",
+        "industrial": "new industrial facility or factory construction",
+        "road": "new road or highway construction",
+        "demolition": "buildings demolished, structures torn down",
+        "mega_projects": "large-scale mega project under construction",
+    }
+
+    def text_caption_for_pair(self, pair: PairKey) -> str:
+        ct = self._labels.get(pair.location_id)
+        return self._CAPTIONS.get(ct, ct or "unknown change")

@@ -29,8 +29,10 @@ from src.benchmark import run_benchmark
 from src.datasets.registry import build_dataset
 from src.embeddings import load_or_compute
 from src.encoders import get_encoder
+from src.model import save_adapter
 from src.results_io import append_macro_csv, load_all, result_path, write_report
 from src.retrieval import ChangeRetriever
+from src.train import TrainConfig, train_adapter
 
 
 def extract_qfabric(tar_path: str, crops_root: str) -> int:
@@ -53,6 +55,73 @@ def extract_qfabric(tar_path: str, crops_root: str) -> int:
     return n
 
 
+def _run_zeroshot(args) -> list:
+    """Whole-corpus naive/zero_shot benchmark (REPORT §7.8)."""
+    written = []
+    for enc_name in args.encoders:
+        print(f"\n=== encoder: {enc_name} (zero-shot) ===")
+        enc = get_encoder(enc_name)
+        ds = build_dataset("qfabric_teo", root=args.crops_root, labels_path=args.labels,
+                           max_per_class=args.max_per_class, seed=args.seed)
+        store = load_or_compute(ds, enc, cache_dir=args.cache_dir,
+                                cache_tag=f"eval_mpc{args.max_per_class}")
+        retr = ChangeRetriever(store, enc)
+        for appr in ("naive", "zero_shot"):
+            rep = run_benchmark(ds, retr, approach=appr)
+            p = result_path(args.results_dir, "qfabric_teo", enc_name, "eval",
+                            color="rgb", approach=appr)
+            write_report(rep, p, color_mode="rgb", split="eval")
+            written.append(p.name)
+            print(f"  {appr:10s} mAP={rep.mAP:.4f}  N={rep.n_pairs}")
+    return written
+
+
+def _run_peft(args) -> list:
+    """Train a ProjectionHead adapter on a held-out train split; evaluate
+    naive/zero_shot/peft on train + test (REPORT §7.9). Difference mode."""
+    written = []
+    mpc = args.max_per_class
+    for enc_name in args.encoders:
+        print(f"\n=== encoder: {enc_name} (PEFT, difference) ===")
+        enc = get_encoder(enc_name)
+        ds_tr = build_dataset("qfabric_teo", root=args.crops_root, labels_path=args.labels,
+                              max_per_class=mpc, seed=args.seed, split="train")
+        store_tr = load_or_compute(ds_tr, enc, cache_dir=args.cache_dir,
+                                   cache_tag=f"train_mpc{mpc}")
+        print(f"  training adapter on {len(store_tr)} train pairs ({args.epochs} ep)...")
+        cfg = TrainConfig(mode="difference", epochs=args.epochs, seed=args.seed)
+        adapter, _ = train_adapter(ds_tr, store_tr, enc, cfg, verbose=False)
+        apath = f"models/qfabric_teo__{enc_name}__adapter.pt"
+        save_adapter(apath, adapter, {
+            "input_dim": adapter.input_dim, "output_dim": adapter.output_dim,
+            "hidden_dims": list(cfg.hidden_dims), "dropout_rate": cfg.dropout,
+            "feature_mode": "difference", "encoder_name": enc_name,
+            "dataset_name": "qfabric_teo",
+        })
+        print(f"  saved adapter -> {apath}")
+        for split in ("train", "test"):
+            ds = build_dataset("qfabric_teo", root=args.crops_root, labels_path=args.labels,
+                               max_per_class=mpc, seed=args.seed, split=split)
+            store = load_or_compute(ds, enc, cache_dir=args.cache_dir,
+                                    cache_tag=f"{split}_mpc{mpc}")
+            retr = ChangeRetriever(store, enc, feature_mode="difference")
+            for appr in ("naive", "zero_shot"):
+                rep = run_benchmark(ds, retr, approach=appr)
+                p = result_path(args.results_dir, "qfabric_teo", enc_name, split,
+                                color="rgb", approach=appr)
+                write_report(rep, p, color_mode="rgb", split=split)
+                written.append(p.name)
+                print(f"  [{split:5s}] {appr:10s} mAP={rep.mAP:.4f}  N={rep.n_pairs}")
+            retr.set_adapter(adapter, feature_mode="difference")
+            rep = run_benchmark(ds, retr, approach="peft")
+            p = result_path(args.results_dir, "qfabric_teo", enc_name, split,
+                            color="rgb", approach="peft")
+            write_report(rep, p, color_mode="rgb", split=split)
+            written.append(p.name)
+            print(f"  [{split:5s}] {'peft':10s} mAP={rep.mAP:.4f}  N={rep.n_pairs}")
+    return written
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="QFabric change-type retrieval benchmark")
     ap.add_argument("--crops-root", default="data/QFabric/teochat_crops")
@@ -67,6 +136,10 @@ def main() -> None:
     ap.add_argument("--extract-from", default=None,
                     help="TEOChatlas eval tar.gz to extract QFabric crops from first.")
     ap.add_argument("--extract-only", action="store_true")
+    ap.add_argument("--peft", action="store_true",
+                    help="Train a ProjectionHead adapter on a held-out train split and "
+                         "evaluate naive/zero_shot/peft on train+test (REPORT §7.9).")
+    ap.add_argument("--epochs", type=int, default=40)
     args = ap.parse_args()
 
     if args.extract_from:
@@ -74,24 +147,7 @@ def main() -> None:
         if args.extract_only:
             return
 
-    written = []
-    for enc_name in args.encoders:
-        print(f"\n=== encoder: {enc_name} ===")
-        enc = get_encoder(enc_name)
-        ds = build_dataset("qfabric_teo", root=args.crops_root,
-                           labels_path=args.labels, max_per_class=args.max_per_class,
-                           seed=args.seed)
-        store = load_or_compute(ds, enc, cache_dir=args.cache_dir,
-                                cache_tag=f"eval_mpc{args.max_per_class}")
-        retr = ChangeRetriever(store, enc)
-        for appr in ("naive", "zero_shot"):
-            rep = run_benchmark(ds, retr, approach=appr)
-            p = result_path(args.results_dir, "qfabric_teo", enc_name, "eval",
-                            color="rgb", approach=appr)
-            write_report(rep, p, color_mode="rgb", split="eval")
-            written.append(p.name)
-            print(f"  {appr:10s} mAP={rep.mAP:.4f}  N={rep.n_pairs}")
-            print(rep.to_table())
+    written = (_run_peft(args) if args.peft else _run_zeroshot(args))
 
     if written:
         all_recs = load_all(args.results_dir)

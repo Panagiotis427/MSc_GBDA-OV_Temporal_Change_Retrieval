@@ -93,6 +93,44 @@ def test_subsample_deterministic(tmp_path):
     assert a == b and len(a) == 4  # 2 classes x 2 crops, identical pick
 
 
+def _split_fixture(tmp_path):
+    imgs = tmp_path / "QFabric"; imgs.mkdir()
+    spec = {}
+    for ci, ct in enumerate(["residential", "commercial"]):
+        for k in range(5):
+            ck = f"{ci}{k}_0_0"
+            loc, xoff, yoff = ck.split("_")
+            for n in (1, 2):
+                Image.new("RGB", (8, 8), (k * 20, ci * 30, 40)).save(
+                    imgs / f"{loc}.d{n}.0101201{n}_{xoff}_{yoff}.tif")
+            spec[ck] = ct
+    labels = tmp_path / "qfabric_teo_labels.json"
+    json.dump(spec, open(labels, "w"))
+    return str(imgs), str(labels)
+
+
+def test_train_test_split_disjoint_and_stratified(tmp_path):
+    root, labels = _split_fixture(tmp_path)  # 5 residential + 5 commercial crops
+    tr = set(build_dataset("qfabric_teo", root=root, labels_path=labels,
+                           split="train", train_frac=0.8, seed=42).list_locations())
+    te = set(build_dataset("qfabric_teo", root=root, labels_path=labels,
+                           split="test", train_frac=0.8, seed=42).list_locations())
+    assert tr and te
+    assert tr.isdisjoint(te)               # no crop leaks across the split
+    assert len(tr) == 8 and len(te) == 2   # 80/20 per class (4+4 train, 1+1 test)
+
+
+def test_caption_matches_change_type(tmp_path):
+    root, labels, spec = _write_fixture(tmp_path)
+    ds = build_dataset("qfabric_teo", root=root, labels_path=labels)
+    pairs = ds.list_pairs()
+    caps = {ds.text_caption_for_pair(p) for p in pairs}
+    assert any("residential" in c for c in caps)
+    # caption is a templated phrase, not the bare class token
+    for p in pairs:
+        assert ds.text_caption_for_pair(p) != ds.get_pair_label(p).change_type
+
+
 def test_end_to_end_benchmark(tmp_path):
     from src.embeddings import compute_pair_embeddings
     from src.retrieval import ChangeRetriever

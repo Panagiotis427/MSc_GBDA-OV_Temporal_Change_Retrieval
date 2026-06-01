@@ -133,6 +133,8 @@ def _qfabric_teo_opts(*, root=None, pairing=None, split=None, **extra) -> Dict[s
     out: Dict[str, Any] = dict(extra)
     if root is not None:
         out["root"] = root
+    if split is not None:           # train|test partition (None/"all" => whole corpus)
+        out["split"] = split
     return out
 
 
