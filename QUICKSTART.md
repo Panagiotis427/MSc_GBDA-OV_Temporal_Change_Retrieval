@@ -120,6 +120,10 @@ comparison in `REPORT.md §7`.
 
 ### Individual stages
 
+> These are convenience entry points; the canonical, cache-consistent flow is
+> `scripts.run_pipeline` (above). Pass the same `--split` / `--color-mode` to every
+> stage so they share the split-tagged embedding cache.
+
 ```bash
 python -m src.embeddings --root data/DynamicEarthNet --encoder clip_vitl14 \
     --split train --color-mode rgb
@@ -128,8 +132,9 @@ python -m src.embeddings --root data/DynamicEarthNet --encoder clip_vitl14 \
 python -m src.benchmark  --root data/DynamicEarthNet --encoder clip_vitl14 --approach all
 # Recall@K / mAP / seasonal drift on cached embeddings.
 
-python -m src.train      --root data/DynamicEarthNet --encoder clip_vitl14
-# Train PEFT adapter only → models/<dataset>__<encoder>__adapter.pt
+python -m src.train      --root data/DynamicEarthNet --encoder clip_vitl14 --split train
+# Train PEFT adapter on the train split → models/<dataset>__<encoder>__adapter.pt
+# (omit --split and it defaults to the 110-pair 'test' split — not what the report trains on)
 
 python -m src.lora_train --root data/DynamicEarthNet --encoder georsclip --color-mode nrg
 # Train LoRA adapter on visual encoder; merges + re-caches embeddings automatically.

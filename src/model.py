@@ -207,6 +207,10 @@ class InfoNCELoss(nn.Module):
     """
     InfoNCE (Noise Contrastive Estimation) Loss for contrastive learning.
 
+    NOTE: reference implementation only — NOT the loss behind any reported
+    result. The live PEFT trainer uses ``_masked_infonce`` (train.py); the LoRA
+    trainer uses ``_infonce_loss`` (lora_train.py). Retained for reference/tests.
+
     This loss maximizes cosine similarity between matched (positive) pairs
     while minimizing similarity with all other pairs treated as negatives.
 

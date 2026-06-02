@@ -1,7 +1,7 @@
 """
 Ensure the deterministic synthetic DEN fixture exists before tests run, so the
-fast suite is self-contained (the fixture is gitignored — it is generated, not
-checked in).
+fast suite is self-contained. The fixture is committed to the repo; this only
+regenerates it if it is missing (e.g. a contributor deleted it).
 """
 from pathlib import Path
 

@@ -8,7 +8,9 @@ ordered pair list). This is the artefact every retrieval/benchmark/training
 step consumes — it decouples the (slow, GPU) encoding pass from the (fast,
 CPU) scoring passes and makes runs reproducible.
 
-Cache file: ``<cache_dir>/<dataset>__<encoder>__pair_embeddings.npz``
+Cache file: ``<cache_dir>/<dataset>__<encoder>[__<tag>]__pair_embeddings.npz``
+where ``<tag> = <split>[_<color>][_lora]`` (see ``cache_tag_for``); the rgb
+default adds no colour suffix.
 
 CLI:
     python -m src.embeddings --dataset dynamic_earthnet \

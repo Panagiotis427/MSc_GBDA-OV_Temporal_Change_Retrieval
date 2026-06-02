@@ -35,8 +35,8 @@ Generalisation result (held-out test split, 110 pairs — colour-mode ablation, 
 | Encoder | color | test mAP |
 |---|---|---|
 | CLIP ViT-L/14 | RGB | 0.043 |
-| CLIP ViT-L/14 | NRG | 0.102 |
-| CLIP ViT-L/14 | NDVI | 0.062 |
+| CLIP ViT-L/14 | NRG | 0.104 |
+| CLIP ViT-L/14 | NDVI | 0.064 |
 | GeoRSCLIP | RGB | 0.299 |
 | GeoRSCLIP | **NRG** | **0.426** |
 | GeoRSCLIP | NDVI | 0.216 |
@@ -255,6 +255,12 @@ mAP per split (RGB, `difference`):
 | RemoteCLIP ViT-L/14 | zero-shot | 0.057 | 0.025 | 0.050 |
 | RemoteCLIP ViT-L/14 | **PEFT** | **0.352** | **0.028** | **0.103** |
 
+> **Evaluation basis:** mAP is macro-averaged only over queries with ≥1 positive
+> in that corpus (zero-positive queries are dropped), so the evaluable query set
+> differs per split. The headline GeoRSCLIP NRG test result (0.426, §7.3) rests
+> on 3 evaluable wetland queries / 15 positives among 110 pairs — a small basis
+> that should be read alongside the number.
+
 Key finding: **PEFT overfits to train AOIs**. The adapter memorises spatial
 statistics of the 55 training locations rather than learning generalised
 change semantics. On unseen val and test AOIs, PEFT is equal to or worse than
@@ -305,7 +311,9 @@ CLIP and RemoteCLIP on their own training set, and requiring no training.
 LoRA applied to GeoRSCLIP's ViT-B-32 visual encoder targets `out_proj`, `c_fc`,
 `c_proj` in each ResBlock (attention output + FFN). 442K trainable params out of
 88M (0.5%). Training is online (no pre-cached embeddings; images loaded on-the-fly)
-using the same masked symmetric InfoNCE loss as ProjectionHead.
+using a masked symmetric InfoNCE loss in the same family as ProjectionHead — the two
+differ in how positives are handled (ProjectionHead averages over all same-caption
+positives; the LoRA path uses cross-entropy to a single diagonal positive).
 
 Results (GeoRSCLIP + NRG, rank=4, α=8, 20 epochs; zero-shot with LoRA-adapted embeddings):
 
@@ -445,7 +453,7 @@ mega_projects at 0.03). `naive` (0.274) sits **+0.11 above** chance; `zero_shot`
 Per-query (CLIP naive, AP vs that query's prevalence): the signal is concentrated
 in **road** (AP 0.50, +0.30 — visually distinctive), **residential** (0.36, +0.17)
 and **industrial** (0.30, +0.10); **demolition** (0.25, +0.06) and **commercial**
-(0.22, +0.02) are weak; **mega_projects** (0.03) is *at/below* chance (80 pairs,
+(0.22, +0.02) are weak; **mega_projects** (0.03) is *at/below* chance (76 pairs,
 semantically vague). Encoders are close (CLIP ≈ GeoRSCLIP > RemoteCLIP);
 RS-pretraining gives no edge on optical construction crops.
 
@@ -482,7 +490,7 @@ both splits (`scripts/benchmark_qfabric.py --peft`):
 differently.** On held-out QFabric test the adapter is **at-or-above `naive`**:
 GeoRSCLIP **+0.062** (0.334, the best QFabric result in this report),
 RemoteCLIP +0.043 (0.288), CLIP neutral (0.271 ≈ 0.269). Contrast DEN §7.2,
-where PEFT test *collapsed below* zero-shot (0.428→0.039). 
+where PEFT test *collapsed below* zero-shot (GeoRSCLIP RGB: zero-shot 0.299 → PEFT 0.041).
 
 The difference is what the adapter has to learn. QFabric change *types* are
 recognisable, consistent visual categories (a road looks like a road across
@@ -549,7 +557,7 @@ re-plottable); `make_figures` renders the bar/curve/heatmap/confusion PNGs.
 
 torch, torchvision, transformers, open-clip-torch, faiss-cpu, gradio,
 rasterio, pandas[parquet], pyarrow, pillow, opencv-python, numpy, gdown,
-pytest (pinned in `pyproject.toml`; install: `pip install -e .`).
+pytest (all pinned in `pyproject.toml`; installed in editable mode — see the §9 command below).
 
 ### Dataset size
 
@@ -641,8 +649,8 @@ python -m src.app --root data/DynamicEarthNet --encoder clip_vitl14 --split trai
 pytest -q --ignore=tests/test_text_encoder.py    # fast suite, deterministic, no network
 ```
 
-Seeds fixed; embeddings and adapters cached and keyed by (dataset, encoder),
-with cache invalidation on pair-set change. The synthetic fixture is
+Seeds fixed; embeddings and adapters cached and keyed by (dataset, encoder, split,
+colour mode) — LoRA caches add a `_lora` tag — with cache invalidation on pair-set change. The synthetic fixture is
 regenerated automatically by the test suite.
 
 ---

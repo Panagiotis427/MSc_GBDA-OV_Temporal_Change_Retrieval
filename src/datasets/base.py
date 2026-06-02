@@ -78,7 +78,7 @@ class TemporalDataset(Protocol):
 
     Required attributes:
         name: Short identifier, e.g. ``"qfabric"``, ``"dynamic_earthnet"``.
-        temporal_axis_type: One of ``"fixed-5"`` | ``"daily"`` | ``"snapshot"``.
+        temporal_axis_type: One of ``"fixed-5"`` | ``"daily"`` | ``"snapshot"`` | ``"pair"``.
             Hint for the pairing strategy; not enforced.
     """
 

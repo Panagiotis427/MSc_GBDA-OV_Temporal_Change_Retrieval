@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from collections import Counter, defaultdict
 from pathlib import Path
 
@@ -37,6 +38,24 @@ def _gpt_answer(conversations) -> str | None:
     return None
 
 
+def _match_classes(ans: str | None) -> list[str]:
+    """Classes named in *ans*, ordered by where they first appear.
+
+    Word-boundary match so "crossroad" / "roadway" / "broad" do NOT match the
+    "road" class, and the earliest-mentioned class comes first (the record's
+    subject) instead of ``_NORM`` dict-insertion order.
+    """
+    if not ans:
+        return []
+    hits = []
+    for k, v in _NORM.items():
+        m = re.search(rf"\b{re.escape(k)}\b", ans, flags=re.IGNORECASE)
+        if m:
+            hits.append((m.start(), v))
+    hits.sort()
+    return [v for _, v in hits]
+
+
 def build(rqa2_path: str, out_path: str) -> dict:
     data = json.load(open(rqa2_path, encoding="utf-8"))
     # A crop can have several RQA2 records (multiple polygons / overlapping
@@ -48,7 +67,7 @@ def build(rqa2_path: str, out_path: str) -> dict:
         if not vids:
             continue
         ans = _gpt_answer(r.get("conversations", []))
-        matched = [v for k, v in _NORM.items() if ans and k.lower() in ans.lower()]
+        matched = _match_classes(ans)
         if not matched:
             continue
         parsed = parse_crop(vids[0])

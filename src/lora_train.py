@@ -12,7 +12,9 @@ Architecture
   open_clip stores it as a combined parameter, not a sub-module.
 - Trainable params: ~442K for ViT-B-32 (0.5% of visual encoder).
 - Text encoder stays fully frozen throughout.
-- Loss: same masked symmetric InfoNCE used by ProjectionHead trainer.
+- Loss: masked symmetric InfoNCE, same family as the ProjectionHead trainer,
+  but differing in positive handling (cross-entropy to a single diagonal
+  positive here, vs ProjectionHead's mean over all same-caption positives).
 - After training: LoRA weights are merged into the base model via
   ``merge_and_unload()``, then embeddings are re-computed and cached.
 
@@ -271,7 +273,7 @@ def load_lora_into_encoder(encoder: Any, path: str | Path) -> None:
 def _main() -> None:
     ap = argparse.ArgumentParser(description="Train LoRA adapter on visual encoder")
     ap.add_argument("--root", default="data/DynamicEarthNet")
-    ap.add_argument("--dataset", default="dynamic_earthnet_pp")
+    ap.add_argument("--dataset", default="dynamic_earthnet")
     ap.add_argument("--split", default="train")
     ap.add_argument("--encoder", default="georsclip",
                     choices=["clip_vitl14", "georsclip", "remoteclip"])
