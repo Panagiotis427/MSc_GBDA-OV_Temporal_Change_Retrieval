@@ -154,7 +154,7 @@ testable in seconds with no network.
 4. **CLIP text sanity** — post-fix `encode_text` returns `[N, 768]`,
    L2-normalised, on CUDA; forest image correctly prefers "forest" over
    "city". Confirms the P1 fix.
-5. **Fast test suite (mock encoders, fixture, no network)** — **129 passed**.
+5. **Fast test suite (mock encoders, fixture, no network)** — **179 passed**.
    Covers embeddings cache + round-trip, retrieval (naive/zero_shot/peft),
    benchmark metrics (exact Recall@1/AP on engineered transitions), PEFT
    training (loss decreases, save/load, PEFT ≥ zero-shot), encoder
@@ -362,7 +362,7 @@ Post-retrieval re-ranking was evaluated on the held-out test split (110 pairs,
 |---|---|---|---|---|---|
 | baseline (no rerank) | 0.133 | **0.333** | **0.400** | **0.467** | **0.426** |
 | diversity | 0.133 | 0.267 | 0.267 | 0.267 | 0.344 |
-| coherence | 0.133 | 0.200 | 0.267 | 0.467 | 0.345 |
+| coherence | 0.133 | 0.200 | 0.267 | 0.467 | 0.339 |
 
 **Both re-ranking strategies reduce retrieval quality.** Diversity deduplicates
 locations, pushing relevant pairs from the same AOI out of the top window.
@@ -370,8 +370,10 @@ Coherence clusters geographically near the top-1 result, but relevant pairs
 are globally distributed (not spatially clustered). Neither strategy was
 designed to optimise semantic relevance — they trade mAP for UX properties:
 result variety (diversity) and spatial coherence (coherence). The gap
-(−0.082 mAP) is the cost of prioritising display ergonomics over ranking
-fidelity.
+(−0.082 mAP diversity, −0.087 coherence) is the cost of prioritising display
+ergonomics over ranking fidelity. Reproduce with `python -m scripts.eval_rerank`
+(default `geo_weight=0.3`; writes
+`results/dynamic_earthnet__georsclip__test_nrg__zero_shot__rerank.json`).
 
 ### 7.6 UI extensions (non-experiment)
 
@@ -604,7 +606,7 @@ The adapter is < 0.2 % of the backbone parameter count — the PEFT premise.
 | End-to-end query — CLIP text forward + scoring, 605 pairs | **10.5 ms** |
 | Embedding precompute — CLIP L/14, 1024²→224, GPU | **68 ms/tile** → 1210 tiles ≈ **82 s** (one-time, cached) |
 | PEFT training — 605 samples, 40 epochs, adapter only, GPU | **≈29 s** |
-| Fast test suite — 129 tests, mock encoders, CPU | ≈21 s |
+| Fast test suite — 179 tests, mock encoders, CPU | ≈21 s |
 
 All GPU figures measured on the RTX 4060 in a dedicated timed pass (run with
 no other GPU job, to avoid contention skew).
@@ -689,8 +691,8 @@ regenerated automatically by the test suite.
   SAR (S1) coverage; downloading and feeding SAR Δ-features is a direct
   extension of the NRG pattern.
 - **Re-ranking trades mAP for UX**: diversity and coherence re-ranking are
-  quantified in §7.5. Both reduce mAP (−0.082) vs baseline; they optimise
-  display variety, not retrieval quality.
+  quantified in §7.5. Both reduce mAP (−0.082 diversity, −0.087 coherence) vs
+  baseline; they optimise display variety, not retrieval quality.
 - **Human relevance judgements**: all mAP figures use LULC-derived
   pseudo-labels. Human-annotated query relevance would give a true IR benchmark.
 
