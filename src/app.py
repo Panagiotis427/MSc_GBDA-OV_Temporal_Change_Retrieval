@@ -482,7 +482,20 @@ class SemanticChangeSearch:
                     t2i = gr.Image(label="After", height=300, interactive=False)
                     hmi = gr.Image(label="Change heatmap (After)", height=300,
                                    interactive=False)
+                gr.Markdown(
+                    "_Heatmap (jet colormap) overlays the **After** image — "
+                    "**warm red/yellow = strongest match** to your query, "
+                    "**cool blue = weakest**._"
+                )
                 summary = gr.Markdown("*Press Search to retrieve.*")
+
+            # ---- All matches at a glance (top-K) ----
+            gr.Markdown("## All matches")
+            gallery = gr.Gallery(
+                label="Top-K change heatmaps — click any tile to enlarge",
+                columns=5, height=260, object_fit="contain",
+                show_label=True, interactive=False,
+            )
 
             with gr.Accordion("Results table", open=True):
                 table = gr.Dataframe(
@@ -496,8 +509,10 @@ class SemanticChangeSearch:
                 return f"<span class='conf-pill {cls}'>confidence {c:.2f}</span>"
 
             def handle(text, approach, top_k,
-                       geo_enabled, geo_region, rerank_enabled, rerank_strategy):
+                       geo_enabled, geo_region, rerank_enabled, rerank_strategy,
+                       progress=gr.Progress()):
                 try:
+                    progress(0.05, desc="Scoring corpus against your query…")
                     active_geo = geo_region if geo_enabled else "All"
                     active_rerank = rerank_strategy if rerank_enabled else None
                     evs = engine.query(
@@ -506,13 +521,23 @@ class SemanticChangeSearch:
                         rerank_strategy=active_rerank,
                     )
                 except Exception as exc:
-                    return None, None, None, f"**Error:** {exc}", []
+                    return None, None, None, f"**Error:** {exc}", [], []
                 if not evs:
-                    return None, None, None, "*No results.*", []
+                    return None, None, None, "*No results.*", [], []
+                progress(0.9, desc="Rendering results…")
                 top = evs[0]
                 rows = [[e.rank, e.location, e.t1_key, e.t2_key,
                          round(e.score, 4), e.confidence, e.caption,
                          e.seasonal_note] for e in evs]
+                # Gallery: prefer the localization heatmap, fall back to the After
+                # tile when a heatmap could not be generated for that pair.
+                gallery_items = [
+                    (img, f"#{e.rank} · {e.location} · "
+                          f"{e.t1_key}→{e.t2_key} · conf {e.confidence:.2f}")
+                    for e in evs
+                    for img in (e.heatmap or e.t2_img,)
+                    if img is not None
+                ]
                 md = (
                     f"### {top.caption}\n"
                     f"{_pill(top.confidence)} &nbsp; "
@@ -521,17 +546,17 @@ class SemanticChangeSearch:
                     f"**Score** `{top.score:.4f}`\n\n"
                     f"_Reasoning:_ {top.seasonal_note}."
                 )
-                return top.t1_img, top.t2_img, top.heatmap, md, rows
+                return top.t1_img, top.t2_img, top.heatmap, md, rows, gallery_items
 
             go.click(
                 handle,
                 [q, a_dd, k, geo_chk, geo_dd, rerank_chk, rerank_dd],
-                [t1i, t2i, hmi, summary, table],
+                [t1i, t2i, hmi, summary, table, gallery],
             )
             q.submit(
                 handle,
                 [q, a_dd, k, geo_chk, geo_dd, rerank_chk, rerank_dd],
-                [t1i, t2i, hmi, summary, table],
+                [t1i, t2i, hmi, summary, table, gallery],
             )
         return demo
 
