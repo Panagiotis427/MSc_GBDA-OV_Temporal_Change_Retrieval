@@ -56,19 +56,20 @@ def extract_qfabric(tar_path: str, crops_root: str) -> int:
 
 
 def _run_zeroshot(args) -> list:
-    """Whole-corpus naive/zero_shot benchmark (REPORT §7.8)."""
+    """Whole-corpus naive/zero_shot benchmark (REPORT §7.8 change-type /
+    §7.10 status-transition, selected by ``args.dataset``)."""
     written = []
     for enc_name in args.encoders:
         print(f"\n=== encoder: {enc_name} (zero-shot) ===")
         enc = get_encoder(enc_name)
-        ds = build_dataset("qfabric_teo", root=args.crops_root, labels_path=args.labels,
+        ds = build_dataset(args.dataset, root=args.crops_root, labels_path=args.labels,
                            max_per_class=args.max_per_class, seed=args.seed)
         store = load_or_compute(ds, enc, cache_dir=args.cache_dir,
-                                cache_tag=f"eval_mpc{args.max_per_class}")
+                                cache_tag=f"{args.cache_prefix}eval_mpc{args.max_per_class}")
         retr = ChangeRetriever(store, enc)
         for appr in ("naive", "zero_shot"):
             rep = run_benchmark(ds, retr, approach=appr)
-            p = result_path(args.results_dir, "qfabric_teo", enc_name, "eval",
+            p = result_path(args.results_dir, args.dataset, enc_name, "eval",
                             color="rgb", approach=appr)
             write_report(rep, p, color_mode="rgb", split="eval")
             written.append(p.name)
@@ -78,43 +79,43 @@ def _run_zeroshot(args) -> list:
 
 def _run_peft(args) -> list:
     """Train a ProjectionHead adapter on a held-out train split; evaluate
-    naive/zero_shot/peft on train + test (REPORT §7.9). Difference mode."""
+    naive/zero_shot/peft on train + test (REPORT §7.9 / §7.10). Difference mode."""
     written = []
     mpc = args.max_per_class
     for enc_name in args.encoders:
         print(f"\n=== encoder: {enc_name} (PEFT, difference) ===")
         enc = get_encoder(enc_name)
-        ds_tr = build_dataset("qfabric_teo", root=args.crops_root, labels_path=args.labels,
+        ds_tr = build_dataset(args.dataset, root=args.crops_root, labels_path=args.labels,
                               max_per_class=mpc, seed=args.seed, split="train")
         store_tr = load_or_compute(ds_tr, enc, cache_dir=args.cache_dir,
-                                   cache_tag=f"train_mpc{mpc}")
+                                   cache_tag=f"{args.cache_prefix}train_mpc{mpc}")
         print(f"  training adapter on {len(store_tr)} train pairs ({args.epochs} ep)...")
         cfg = TrainConfig(mode="difference", epochs=args.epochs, seed=args.seed)
         adapter, _ = train_adapter(ds_tr, store_tr, enc, cfg, verbose=False)
-        apath = f"models/qfabric_teo__{enc_name}__adapter.pt"
+        apath = f"models/{args.dataset}__{enc_name}__adapter.pt"
         save_adapter(apath, adapter, {
             "input_dim": adapter.input_dim, "output_dim": adapter.output_dim,
             "hidden_dims": list(cfg.hidden_dims), "dropout_rate": cfg.dropout,
             "feature_mode": "difference", "encoder_name": enc_name,
-            "dataset_name": "qfabric_teo",
+            "dataset_name": args.dataset,
         })
         print(f"  saved adapter -> {apath}")
         for split in ("train", "test"):
-            ds = build_dataset("qfabric_teo", root=args.crops_root, labels_path=args.labels,
+            ds = build_dataset(args.dataset, root=args.crops_root, labels_path=args.labels,
                                max_per_class=mpc, seed=args.seed, split=split)
             store = load_or_compute(ds, enc, cache_dir=args.cache_dir,
-                                    cache_tag=f"{split}_mpc{mpc}")
+                                    cache_tag=f"{args.cache_prefix}{split}_mpc{mpc}")
             retr = ChangeRetriever(store, enc, feature_mode="difference")
             for appr in ("naive", "zero_shot"):
                 rep = run_benchmark(ds, retr, approach=appr)
-                p = result_path(args.results_dir, "qfabric_teo", enc_name, split,
+                p = result_path(args.results_dir, args.dataset, enc_name, split,
                                 color="rgb", approach=appr)
                 write_report(rep, p, color_mode="rgb", split=split)
                 written.append(p.name)
                 print(f"  [{split:5s}] {appr:10s} mAP={rep.mAP:.4f}  N={rep.n_pairs}")
             retr.set_adapter(adapter, feature_mode="difference")
             rep = run_benchmark(ds, retr, approach="peft")
-            p = result_path(args.results_dir, "qfabric_teo", enc_name, split,
+            p = result_path(args.results_dir, args.dataset, enc_name, split,
                             color="rgb", approach="peft")
             write_report(rep, p, color_mode="rgb", split=split)
             written.append(p.name)
@@ -125,11 +126,15 @@ def _run_peft(args) -> list:
 def main() -> None:
     ap = argparse.ArgumentParser(description="QFabric change-type retrieval benchmark")
     ap.add_argument("--crops-root", default="data/QFabric/teochat_crops")
-    ap.add_argument("--labels", default="data/QFabric/qfabric_teo_labels.json")
+    ap.add_argument("--labels", default=None,
+                    help="Label sidecar; defaults per --status (change-type vs status).")
+    ap.add_argument("--status", action="store_true",
+                    help="Benchmark RQA5 status-transition retrieval (dataset "
+                         "'qfabric_status', REPORT §7.10) instead of RQA2 change-type.")
     ap.add_argument("--encoders", nargs="+",
                     default=["clip_vitl14", "georsclip", "remoteclip"])
     ap.add_argument("--max-per-class", type=int, default=120,
-                    help="Stratified cap per change type (DEN-scale corpus).")
+                    help="Stratified cap per class (DEN-scale corpus).")
     ap.add_argument("--cache-dir", default="data/cache")
     ap.add_argument("--results-dir", default="results")
     ap.add_argument("--seed", type=int, default=42)
@@ -138,9 +143,16 @@ def main() -> None:
     ap.add_argument("--extract-only", action="store_true")
     ap.add_argument("--peft", action="store_true",
                     help="Train a ProjectionHead adapter on a held-out train split and "
-                         "evaluate naive/zero_shot/peft on train+test (REPORT §7.9).")
+                         "evaluate naive/zero_shot/peft on train+test (REPORT §7.9/§7.10).")
     ap.add_argument("--epochs", type=int, default=40)
     args = ap.parse_args()
+
+    # Resolve the dataset track: RQA2 change-type (default) vs RQA5 status-transition.
+    args.dataset = "qfabric_status" if args.status else "qfabric_teo"
+    args.cache_prefix = "status_" if args.status else ""
+    if args.labels is None:
+        args.labels = ("data/QFabric/qfabric_status_labels.json" if args.status
+                       else "data/QFabric/qfabric_teo_labels.json")
 
     if args.extract_from:
         extract_qfabric(args.extract_from, args.crops_root)

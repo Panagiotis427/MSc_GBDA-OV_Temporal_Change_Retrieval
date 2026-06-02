@@ -154,7 +154,7 @@ testable in seconds with no network.
 4. **CLIP text sanity** — post-fix `encode_text` returns `[N, 768]`,
    L2-normalised, on CUDA; forest image correctly prefers "forest" over
    "city". Confirms the P1 fix.
-5. **Fast test suite (mock encoders, fixture, no network)** — **179 passed**.
+5. **Fast test suite (mock encoders, fixture, no network)** — **192 passed**.
    Covers embeddings cache + round-trip, retrieval (naive/zero_shot/peft),
    benchmark metrics (exact Recall@1/AP on engineered transitions), PEFT
    training (loss decreases, save/load, PEFT ≥ zero-shot), encoder
@@ -467,7 +467,10 @@ RS-pretraining gives no edge on optical construction crops.
 (6 construction change-types), sensor, and crop scale, with no code changes
 beyond a loader + query set — confirming the dataset-agnostic abstraction, and
 surfacing a genuinely different regime (after-image content > temporal Δ) from DEN.
-Reproduce with `scripts/build_qfabric_labels.py` + `scripts/benchmark_qfabric.py`.
+**§7.10 relabels the *same* crops along QFabric's temporal status axis and the
+regime flips back** — direct evidence the naive-vs-Δ trade-off is set by task
+geometry, not the dataset. Reproduce with `scripts/build_qfabric_labels.py` +
+`scripts/benchmark_qfabric.py`.
 
 ### 7.9 QFabric PEFT — does an adapter help on the second dataset?
 
@@ -503,6 +506,48 @@ dataset-dependent — harmful on DEN, mildly helpful on QFabric** — and the
 RS-pretrained GeoRSCLIP backbone benefits most from the adapter on construction
 imagery. Even so, QFabric PEFT (0.334) and DEN frozen NRG zero-shot (0.426)
 remain the respective per-dataset best; no single recipe dominates.
+
+### 7.10 QFabric status-transition retrieval (RQA5) — the regime flips
+
+§7.8 retrieved change *types* (residential/road/…), a property of the **after**
+image — so `naive` (cos(text, f_T2)) beat the directional `zero_shot` Δ. QFabric
+also ships a **temporal** task (TEOChatlas RQA5/RTQA5): the per-timepoint
+**development status** (`Greenland → Prior Construction → Land Cleared →
+Excavation → Materials Dumped → Construction Started → Construction Midway →
+Construction Done → Operational`). We join each RTQA answer to its frame
+("status of this region in Image N" → the N-th timepoint;
+`scripts/build_qfabric_status_labels.py`, dataset `qfabric_status`), so a pair
+(t1→t2) carries a **status transition**. Six transition queries
+(`src/queries/qfabric_status.py`, e.g. *"new building construction has started"*,
+*"building construction recently completed"*) are relevant only to pairs whose
+status actually **changes** src→dst — **stable pairs are hard negatives** (same
+end-state, no change), which is precisely what separates the Δ-signal from
+after-image content. Stratified ≤120 crops/final-status (N = 4200 pairs),
+frozen, RGB; mAP:
+
+| Encoder | naive | zero-shot |
+|---|---|---|
+| CLIP ViT-L/14 | 0.057 | **0.057** |
+| GeoRSCLIP | 0.079 | **0.084** |
+| RemoteCLIP | 0.064 | **0.072** |
+
+**The regime flips: `zero_shot` ≥ `naive` on *all three* encoders** (+0.0004 /
++0.0051 / +0.0074), the **opposite** of §7.8's change-type result (where `naive`
+won by ~0.09). The directional Δ is the right tool for *transitions*; after-image
+content is the right tool for *types* — one dataset, two tasks, two regimes. The
+edge is consistent but **small, and both sit just above the 0.043 macro
+prevalence baseline**: status-transition retrieval is genuinely hard zero-shot
+(long, irregular temporal baselines; subtle or rare transitions). Per-query the
+signal concentrates in the visually distinct, well-populated transitions —
+*land cleared* (AP 0.17) and *construction started* (0.18) — and collapses on the
+rare/long-range ones (*demolition* 0.01, n=32; *vacant→finished building* 0.02,
+n=64). GeoRSCLIP is again the strongest backbone (0.084), echoing §7.8.
+
+**Takeaway:** the same crops, relabelled along a *temporal* axis instead of a
+*categorical* one, invert which scoring approach wins — direct evidence that the
+zero-shot-vs-PEFT and naive-vs-Δ trade-offs are **task-geometry-dependent**, not
+dataset-dependent. Reproduce with `scripts/build_qfabric_status_labels.py` +
+`scripts/benchmark_qfabric.py --status`.
 
 ### Error analysis — seasonal vs permanent
 
@@ -606,7 +651,7 @@ The adapter is < 0.2 % of the backbone parameter count — the PEFT premise.
 | End-to-end query — CLIP text forward + scoring, 605 pairs | **10.5 ms** |
 | Embedding precompute — CLIP L/14, 1024²→224, GPU | **68 ms/tile** → 1210 tiles ≈ **82 s** (one-time, cached) |
 | PEFT training — 605 samples, 40 epochs, adapter only, GPU | **≈29 s** |
-| Fast test suite — 179 tests, mock encoders, CPU | ≈21 s |
+| Fast test suite — 192 tests, mock encoders, CPU | ≈21 s |
 
 All GPU figures measured on the RTX 4060 in a dedicated timed pass (run with
 no other GPU job, to avoid contention skew).
@@ -682,11 +727,14 @@ regenerated automatically by the test suite.
   subset and runs Recall@K/mAP. **Benchmarked — see §7.8** (naive mAP ≈ 0.27 >
   zero-shot ≈ 0.18) **and §7.9** (PEFT on a held-out split — overfits train ≈0.999
   but generalises at-or-above naive on test, GeoRSCLIP 0.334; unlike DEN, where
-  PEFT collapses). Proves the dataset-agnostic design across a different taxonomy
-  (6 construction change-types), sensor, and crop scale. Remaining QFabric
-  headroom: crop-precise (polygon) grounding and the per-timepoint
-  construction-status labels (RQA5) for finer transition queries. **fMoW**
-  remains wired only at the protocol level.
+  PEFT collapses). A second, **temporal** task on the same crops — RQA5
+  per-timepoint status transitions (`src/datasets/qfabric_status.py`,
+  `scripts/build_qfabric_status_labels.py`, `benchmark_qfabric.py --status`) — is
+  also benchmarked (**§7.10**): zero-shot Δ ≥ naive on all three encoders,
+  flipping the §7.8 regime. Proves the dataset-agnostic design across a different
+  taxonomy (6 construction change-types), sensor, and crop scale. Remaining
+  QFabric headroom: crop-precise (polygon) grounding. **fMoW** remains wired only
+  at the protocol level.
 - **Sentinel-1/2 data**: `aoi_metadata.json` confirms 51/75 AOIs have full
   SAR (S1) coverage; downloading and feeding SAR Δ-features is a direct
   extension of the NRG pattern.

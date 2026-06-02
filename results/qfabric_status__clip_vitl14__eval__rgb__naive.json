@@ -1,0 +1,141 @@
+{
+  "approach": "naive",
+  "color_mode": "rgb",
+  "dataset": "qfabric_status",
+  "encoder": "clip_vitl14",
+  "k_values": [
+    1,
+    3,
+    5,
+    10
+  ],
+  "lora": false,
+  "macro": {
+    "mAP": 0.05688860710032661,
+    "recall_at_k": {
+      "1": 0.0,
+      "10": 0.002770702890452876,
+      "3": 0.0,
+      "5": 0.0008169934640522876
+    },
+    "seasonal_drift_at_k": {
+      "1": 0.0,
+      "10": 0.0,
+      "3": 0.0,
+      "5": 0.0
+    }
+  },
+  "n_pairs": 4200,
+  "per_query": [
+    {
+      "ap": 0.08958410814139085,
+      "category": "permanent",
+      "n_relevant": 286,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.0034965034965034965,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "land cleared and prepared for new development"
+    },
+    {
+      "ap": 0.053874406768439104,
+      "category": "permanent",
+      "n_relevant": 212,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.0047169811320754715,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "excavation and earthworks begun on the site"
+    },
+    {
+      "ap": 0.10633188253887399,
+      "category": "permanent",
+      "n_relevant": 285,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.0035087719298245615,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "new building construction has started"
+    },
+    {
+      "ap": 0.06405681546440241,
+      "category": "permanent",
+      "n_relevant": 204,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.004901960784313725,
+        "3": 0.0,
+        "5": 0.004901960784313725
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "building construction recently completed"
+    },
+    {
+      "ap": 0.009931964669615642,
+      "category": "permanent",
+      "n_relevant": 32,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "buildings demolished, site cleared back to bare land"
+    },
+    {
+      "ap": 0.017552465019237625,
+      "category": "permanent",
+      "n_relevant": 64,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "vacant land developed into a finished building"
+    }
+  ],
+  "schema_version": 1,
+  "split": "eval"
+}
