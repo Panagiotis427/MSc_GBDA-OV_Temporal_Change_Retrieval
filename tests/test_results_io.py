@@ -104,6 +104,21 @@ def test_load_all_and_read(tmp_path):
     assert results_io.load_all(tmp_path / "does_not_exist") == []
 
 
+def test_load_all_skips_rerank(tmp_path):
+    """``*rerank*`` files use a different (nested-strategies) schema and must not
+    reach the macro CSV, where they flatten into a blank row."""
+    rep = _report()
+    p = results_io.result_path(tmp_path, "dynamic_earthnet", "clip_vitl14", "test")
+    results_io.write_report(rep, p, color_mode="rgb", split="test")
+    # drop a rerank sidecar with no top-level 'macro'
+    (tmp_path / "dynamic_earthnet__georsclip__test_nrg__zero_shot__rerank.json").write_text(
+        json.dumps({"dataset": "dynamic_earthnet", "strategies": {"baseline": {}}}),
+        encoding="utf-8",
+    )
+    recs = results_io.load_all(tmp_path)
+    assert len(recs) == 1 and recs[0]["encoder"] == "clip_vitl14"
+
+
 def test_append_macro_csv(tmp_path):
     rep = _report()
     rec = rep.to_dict(color_mode="rgb", split="test")

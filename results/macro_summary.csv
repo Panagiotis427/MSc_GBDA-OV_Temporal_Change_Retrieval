@@ -28,7 +28,6 @@ dynamic_earthnet,georsclip,test,nrg,zero_shot,True,110,0.15865835224811922,0.0,0
 dynamic_earthnet,georsclip,test,rgb,naive,False,110,0.0606682942989335,0.0,0.0,0.0,0.0,0.0
 dynamic_earthnet,georsclip,test,rgb,peft,False,110,0.04131516933450311,0.0,0.0,0.0,0.0,0.0
 dynamic_earthnet,georsclip,test,rgb,zero_shot,False,110,0.299305830707008,0.13333333333333333,0.26666666666666666,0.26666666666666666,0.26666666666666666,0.0
-dynamic_earthnet,georsclip,test,nrg,zero_shot,,110,,,,,,
 dynamic_earthnet,georsclip,train,ndvi,naive,False,605,0.022092481137090208,0.0,0.0,0.0,0.0,0.0
 dynamic_earthnet,georsclip,train,ndvi,zero_shot,False,605,0.027541229233733772,0.0,0.0,0.0,0.0,0.0
 dynamic_earthnet,georsclip,train,nrg,naive,False,605,0.02172426859371191,0.0,0.0,0.0,0.0,0.0

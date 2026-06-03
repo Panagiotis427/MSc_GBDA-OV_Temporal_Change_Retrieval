@@ -22,15 +22,16 @@ label-grounded benchmark, implemented PEFT training, finished/added the three
 encoders, rewired the Gradio app, and validated everything on a deterministic
 fixture and on real Dynamic EarthNet.
 
-Headline result (real DEN, train split, 605 pairs — in-distribution):
+Training-set fit (real DEN, train split, 605 pairs — the **PEFT column is the adapter scored on
+its own training pairs**, i.e. memorisation capacity, not a retrieval result; see §7.1):
 
-| Encoder | naive mAP | zero-shot mAP | **PEFT mAP** |
+| Encoder | naive mAP | zero-shot mAP | PEFT mAP (train-fit) |
 |---|---|---|---|
-| CLIP ViT-L/14 | 0.031 | 0.043 | **0.420** |
-| GeoRSCLIP ViT-B/32 | 0.027 | 0.040 | **0.335** |
-| RemoteCLIP ViT-L/14 | 0.024 | 0.057 | **0.352** |
+| CLIP ViT-L/14 | 0.031 | 0.043 | 0.420 |
+| GeoRSCLIP ViT-B/32 | 0.027 | 0.040 | 0.335 |
+| RemoteCLIP ViT-L/14 | 0.024 | 0.057 | 0.352 |
 
-Generalisation result (held-out test split, 110 pairs — colour-mode ablation, zero-shot):
+Headline result (held-out test split, 110 pairs — colour-mode ablation, zero-shot):
 
 | Encoder | color | test mAP |
 |---|---|---|
@@ -44,11 +45,15 @@ Generalisation result (held-out test split, 110 pairs — colour-mode ablation, 
 | RemoteCLIP | NRG | 0.129 |
 | RemoteCLIP | NDVI | 0.055 |
 
-**Key findings:** PEFT adapters overfit to train AOIs (mAP collapses on
-held-out splits). Zero-shot generalises better. NRG false-colour (NIR-Red-Green)
-outperforms RGB and NDVI for all encoders on unseen AOIs. NDVI collapses spectral
-texture to a single channel, losing the inter-channel contrasts NRG preserves.
-GeoRSCLIP + NRG zero-shot (0.426) is the best generalising configuration.
+**Key findings:** PEFT adapters only memorise train AOIs — the high train-fit numbers above are
+the adapter scored on its own training data and collapse to ≤ zero-shot (sometimes below random)
+on held-out splits; PEFT is not shown to help retrieval. Frozen zero-shot generalises better.
+NRG false-colour (NIR-Red-Green) outperforms RGB and NDVI for all encoders on unseen AOIs; NDVI
+collapses spectral texture to a single channel, losing the inter-channel contrasts NRG preserves.
+GeoRSCLIP + NRG zero-shot (0.426) is the best generalising configuration — FDR-significant vs a
+random-ranking baseline, but demonstrated on 3 wetland-transition queries, so it evidences
+wetland-formation retrieval rather than general open-vocabulary skill. Full random-baseline /
+significance analysis in **Appendix B**.
 
 ---
 
@@ -167,8 +172,8 @@ testable in seconds with no network.
    the test split is class-imbalanced toward agri/wetland; CLIP cannot resolve
    subtle agri↔wetland flips zero-shot.
 8. **Real DEN, train split (CLIP, 605 pairs)** — full pipeline incl. PEFT:
-   naive 0.031, zero-shot 0.043, **PEFT 0.420** mAP. Embeddings + adapter
-   cached.
+   naive 0.031, zero-shot 0.043, PEFT 0.420 mAP (train-fit — adapter scored on its own
+   training pairs; held-out verdict in §7.2). Embeddings + adapter cached.
 9. **Headless app smoke (real CLIP, train split)** — engine builds from cache;
    `zero_shot` top result a weak stable pair (consistent with §7), `peft` top
    result *"agriculture replaced by wetlands"* correctly matching the query,
@@ -209,7 +214,7 @@ testable in seconds with no network.
 
 ## 7. Results and analysis
 
-### 7.1 In-distribution (train split, 605 pairs, RGB)
+### 7.1 Training-set fit (train split, 605 pairs, RGB)
 
 `difference` change feature; mAP and macro Recall@10:
 
@@ -219,17 +224,25 @@ testable in seconds with no network.
 | GeoRSCLIP ViT-B/32 (512-d) | 0.027 | 0.040 | **0.335** | 0.26 |
 | RemoteCLIP ViT-L/14 (768-d) | 0.024 | 0.057 | **0.352** | 0.30 |
 
+> **Read this table as a sanity check, not a result.** The PEFT column is the adapter
+> **evaluated on the very pairs it was trained on** (`run_pipeline.py` trains on the train split,
+> then scores `peft` on the same split). It therefore measures how well the adapter can *fit*
+> the training set — i.e. memorisation capacity — not whether it retrieves change. A model that
+> can fit its training data is expected, not a finding. **The verdict on whether PEFT helps is
+> the held-out result in §7.2, where it collapses.** See Appendix B.5 for the leakage analysis
+> (on QFabric the same train-fit reaches mAP 0.998).
+
 - **Zero-shot is near chance.** Δ-similarity beats the naive image baseline
   marginally but neither separates change types. CLIP/GeoRSCLIP embed scene
   appearance, not directional land-cover transition; differencing two
   normalised global embeddings discards the localised change signal.
-- **PEFT is decisive.** A tiny adapter trained on weak label captions lifts
-  mAP ~8–10×. Central deliverable comparison — confirms the brief's premise.
-- **RS pretraining helps zero-shot; capacity wins PEFT.** RemoteCLIP has the
-  best zero-shot (0.057 vs CLIP 0.043, GeoRSCLIP 0.040). Under PEFT the
-  larger general backbone wins: CLIP ViT-L/14 0.420 > RemoteCLIP 0.352 >
-  GeoRSCLIP 0.335. Backbone capacity (L/14, 768-d) outweighs domain
-  pretraining once an adapter is learned.
+- **PEFT can fit the training pairs** (mAP ~8–10× the train zero-shot baseline). This only
+  confirms the adapter has the capacity to memorise the 55 training AOIs' statistics; it says
+  nothing about retrieval skill until evaluated out-of-distribution (§7.2).
+- **The train-fit ranking (CLIP 0.420 > RemoteCLIP 0.352 > GeoRSCLIP 0.335)** reflects backbone
+  capacity to memorise (larger L/14, 768-d fits hardest), not generalisation — the ordering
+  reverses on held-out test (§7.2/§7.3, where GeoRSCLIP leads). On zero-shot, RS pretraining
+  already helps in-sample (RemoteCLIP 0.057 > CLIP 0.043 > GeoRSCLIP 0.040).
 
 ![mAP by encoder x approach, train split](assets/figures/map_bars__train__rgb.png)
 
@@ -261,12 +274,16 @@ mAP per split (RGB, `difference`):
 > on 3 evaluable wetland queries / 15 positives among 110 pairs — a small basis
 > that should be read alongside the number.
 
-Key finding: **PEFT overfits to train AOIs**. The adapter memorises spatial
-statistics of the 55 training locations rather than learning generalised
-change semantics. On unseen val and test AOIs, PEFT is equal to or worse than
-zero-shot. GeoRSCLIP zero-shot on the test split achieves 0.299 mAP without
-any training — suggesting the test AOIs contain land-cover transitions that
-RS-domain features represent more discriminatively than train.
+Key finding: **PEFT overfits to train AOIs**. The bold **train** column is the adapter scored on
+its own training pairs (memorisation, not a held-out measurement — see §7.1 / Appendix B.5), so
+the only honest read of PEFT is the **val/test** columns. There it is **equal to or worse than
+zero-shot, and sometimes below random** (CLIP test PEFT 0.040 < random ≈ 0.083): the adapter
+memorises spatial statistics of the 55 training locations rather than learning generalised change
+semantics. GeoRSCLIP zero-shot on the test split achieves 0.299 mAP without any training —
+suggesting the test AOIs contain land-cover transitions that RS-domain features represent more
+discriminatively than train. (The per-split evaluable query sets differ — see the basis note
+below — so the train→test drop is not a like-for-like comparison either; the memorisation is
+clearest on QFabric, Appendix B.5, where train-fit hits 0.998.)
 
 The train spike then val/test collapse is the signature of the overfit:
 
@@ -303,8 +320,9 @@ NRG (0.426); GeoRSCLIP's RS5M pre-training gives it a stronger prior for
 the NIR-Green spectral contrast characteristic of vegetation transitions.
 
 **GeoRSCLIP + NRG zero-shot remains the best generalising configuration
-(0.426 mAP on unseen AOIs)** — exceeding even in-distribution PEFT for
-CLIP and RemoteCLIP on their own training set, and requiring no training.
+(0.426 mAP on unseen AOIs)** — higher than even the memorisation-inflated train-fit PEFT scores
+of CLIP and RemoteCLIP (§7.1, scored on their own training pairs), and requiring no training.
+(Caveat: this held-out 0.426 rests on 3 evaluable wetland queries — §7.2 basis note, Appendix B.)
 
 ### 7.4 LoRA adapter — visual encoder fine-tuning
 
@@ -658,8 +676,9 @@ no other GPU job, to avoid contention skew).
 
 ## 9. Reproducibility
 
-For a step-by-step run guide see [`QUICKSTART.md`](QUICKSTART.md). The commands below are the
-reproducibility recipe used to produce the numbers in this report.
+For a step-by-step run guide see the [Run / install / use](README.md#run--install--use) section
+of the README. The commands below are the reproducibility recipe used to produce the numbers in
+this report.
 
 ```bash
 pip install -e .
@@ -694,6 +713,13 @@ python -m scripts.run_pipeline --root data/DynamicEarthNet \
 python -m src.app --root data/DynamicEarthNet --encoder clip_vitl14 --split train   # Gradio UI
 
 pytest -q --ignore=tests/test_text_encoder.py    # fast suite, deterministic, no network
+
+# Regenerate result JSON/CSV + publication figures from cache
+python -m scripts.export_results --color-modes rgb nrg ndvi \
+    --approaches naive zero_shot peft --lora --confusion --results-dir results
+python -m scripts.make_figures --results-dir results --out-dir assets/figures
+# Statistical-validity audit (Appendix B): random-baseline + FDR over every result cell
+python -m scripts.significance_audit --csv results/results_audit_summary.csv
 ```
 
 Seeds fixed; embeddings and adapters cached and keyed by (dataset, encoder, split,
@@ -703,6 +729,14 @@ regenerated automatically by the test suite.
 ---
 
 ## 10. Limitations and future work
+
+> **Statistical-validity caveat.** The headline numbers below and in §7/§11 were re-audited
+> against a random-ranking baseline with FDR correction — see **Appendix B**. Two results are
+> load-bearing for that audit: (i) the **in-distribution PEFT figures (train split, §7.1/§11
+> point 1) are train-set evaluations of the adapter's own training pairs — memorisation, not
+> generalisation** (DEN train 0.42, QFabric train 0.998); quote PEFT from val/test only. (ii) The
+> DEN-test headline (GeoRSCLIP NRG 0.426) is FDR-significant vs random but rests on **only 3
+> wetland-transition queries** — internal validity, not demonstrated open-vocabulary generality.
 
 - **Weak supervision**: captions derived from dominant-class label flips, not
   human change descriptions — noisy and coarse.
@@ -755,22 +789,187 @@ PEFT** comparison across **three CLIP-variant encoders** on Dynamic EarthNet.
 
 Three complementary findings:
 
-1. **In-distribution**: PEFT adapters raise mAP ~8–10× over zero-shot
-   (0.043 → 0.420, CLIP L/14 on train split). Low-compute fine-tuning is
-   decisive for subtle agri/wetland change on familiar AOIs.
+1. **Adapters only memorise the training set.** PEFT reaches mAP ~8–10× the train
+   zero-shot baseline (0.043 → 0.420, CLIP L/14) — but this number is the adapter scored on its
+   **own training pairs** (§7.1), so it measures fit, not retrieval. The honest test is
+   out-of-distribution, and there it fails (finding 2). On QFabric the same train-fit reaches
+   mAP 0.998 (Appendix B.5) — unmistakably memorisation. Low-compute fine-tuning is **not** shown
+   to help retrieval.
 
-2. **Out-of-distribution**: PEFT collapses on unseen AOIs; zero-shot with the
-   on-disk NIR band as NRG false-colour is the best generalising approach.
-   GeoRSCLIP + NRG zero-shot achieves **0.426 mAP on held-out test AOIs**
-   with zero training — equal to the best in-distribution PEFT result from
-   the same encoder, and requiring no labels.
+2. **Out-of-distribution, frozen zero-shot wins.** On unseen AOIs PEFT collapses to ≤ zero-shot
+   (CLIP test PEFT 0.040, below the random-ranking baseline ≈ 0.083); zero-shot with the on-disk
+   NIR band as NRG false-colour is the best generalising approach. GeoRSCLIP + NRG zero-shot
+   reaches **0.426 mAP on held-out test AOIs** with zero training and FDR-significance vs random
+   (Appendix B.3) — though on a narrow basis of 3 evaluable wetland queries, so this is
+   demonstrated for wetland-formation, not claimed as general open-vocabulary retrieval.
 
 3. **LoRA does not close the gap**: LoRA fine-tuning of the visual encoder
    (0.5% trainable, peft, rank=4) achieves test mAP 0.159 — better than
    ProjectionHead PEFT (0.041) but still far below frozen zero-shot NRG
    (0.426). The finding is consistent: **spectral physics generalises;
-   learned visual priors — however parameter-efficient — do not.**
+   learned visual priors — however parameter-efficient — only memorise.**
 
 The contrast between these regimes maps directly onto the deliverable's
 grading expectation: a motivated comparison of zero-shot vs PEFT approaches,
-not merely a single best number. All three adapters confirm the same conclusion.
+not merely a single best number. All three adapters confirm the same conclusion — and the
+statistical-validity audit (Appendix B) backs it with random-baseline and FDR analysis.
+
+---
+
+# Appendix A — Code & contract audit
+
+*(11-dimension adversarial audit, 2026-06-02, baseline commit `c6d3c22`; refreshed 2026-06-03
+after the QFabric re-run and a full test pass. Originally `AUDIT.md`.)*
+
+**Verdict.** The core is sound: the three scoring formulas (`naive` / `zero_shot` / `peft`) match
+the contract and route through one `ChangeRetriever.score_all`; mAP / Recall@K / AP math is
+correct; architecture invariants hold (extension-points only, no shared-pipeline edits for
+QFabric); the cache is correctly keyed by split+colour (+`_lora` tag); no secrets; all doc links
+resolve; and nearly every reported number traces to a committed artifact. 52 of 53 findings
+confirmed under skeptic re-check, 1 refuted.
+
+**A.1 Substantive bug found and fixed.** The QFabric label join matched class names as
+*substrings* (`crossroad`→`road`) and broke multi-class ties by dict order. Fixed in
+`scripts/build_qfabric_labels.py` (`_match_classes`: word-boundary regex + earliest-mention
+order). **Re-run impact (this session):** regenerating all QFabric-TEO results against the
+corrected labels produced **byte-identical output** — the committed numbers already matched the
+fixed labels (see Appendix B.6). The "re-run on the other laptop" item is closed; data + GPU are
+on this machine.
+
+**A.2 Smaller fixes applied.** §1 headline CLIP test mAP reconciled with §7.3/CSV (NRG
+0.102→0.104, NDVI 0.062→0.064); §7.8 mega_projects 80→76 pairs; §7.9 figure paraphrase tied to
+real §7.2 cells; §9 cache-key wording; `embeddings.py` cache-path docstring; `lora_train` default
+dataset crash (`dynamic_earthnet_pp`→`dynamic_earthnet`); §7.2 footnote disclosing the 3-wetland
+headline basis. Test suite now runs **208 passed, 1 skipped** (supersedes the stale "129/192"
+counts).
+
+**A.3 Still open — your decision (thesis-component reuse, all high):**
+- Package installs under the generic top-level name **`src`** (no `src/__init__.py`) — collides
+  with the thesis repo's own `src`; thesis READMEs import a name
+  (`open_vocabulary_temporal_change_retrieval`) that doesn't exist → rename to a unique package.
+- **`requires-python = ">=3.12"`** blocks `pip install -e .` in the thesis envs (3.9/3.10) → lower.
+- **`compute_patch_text_similarity` min-max normalises per image to [0,1]** — breaks the
+  patch-level CLIP-difference baseline the Q2 plan builds on → add a raw-cosine patch path.
+- **`retrieve_changes(query, top_k=5)`** (Q4 Mode-A tool named in the plan) doesn't exist (real
+  entry is `ChangeRetriever.search`) → add a thin wrapper or correct the thesis docs.
+- GeoRSCLIP (ViT-B/32) gives only a 7×7 patch grid — coarse for a segmentation baseline.
+
+**A.4 Behaviour changes deferred (need a re-run to assess):** `change_type` forced to `"stable"`
+on large sub-dominant change (+ degenerate `"X replaced by X"` caption); DEN `.tif` loader
+min/max-stretches each tile independently → T1/T2 radiometrically incomparable for change scoring.
+
+**A.5 Unverified, flagged:** `lora_train._infonce_loss` masks with
+`masked_fill(~(pos_mask | eye), -1e9)`, which appears to zero the **true negatives** and keep
+only positives+diagonal in the softmax denominator — looks inverted. LoRA is a secondary ablation
+(§7.4), but verify before trusting LoRA numbers.
+
+---
+
+# Appendix B — Statistical-validity audit of the results
+
+*(2026-06-03. Reproduce with `python -m scripts.significance_audit` →
+[`results/results_audit_summary.csv`](results/results_audit_summary.csv). Originally
+`RESULTS_AUDIT.md`. This appendix asks "do the numbers mean anything?"; Appendix A asks "is the
+code right?")*
+
+**Method.** Each committed mAP cell was re-derived from its per-query records, compared to a
+**Monte-Carlo random-ranking baseline** (relevant set held fixed per query, ranking shuffled,
+4000 draws), and FDR-corrected (Benjamini-Hochberg) across the ~70 held-out cells.
+
+## B.1 Verdict
+
+The near-zero numbers are **not** a failure — but also not the result they look like.
+
+1. **The scary `R@1=0`, `R@10≈0.01` on QFabric is a metric artifact.** Recall@K here is
+   `(#relevant in top-K)/(total relevant)`; with 480 relevant pairs, R@10 is capped at
+   `10/480 = 0.021`. Use mAP for QFabric; R@K is only interpretable for DEN (≤5 relevant/query).
+2. **Judge mAP against the random-ranking baseline (~prevalence), not 0.** Random scores
+   mAP ≈ 0.17 on QFabric-TEO and ≈ 0.08 on DEN-test.
+3. **One robust, FDR-significant retrieval signal exists: GeoRSCLIP zero-shot on DEN**
+   (NRG 0.426, RGB 0.299, NDVI 0.216; BH-FDR ≤ 0.018). Everything else is a large-N significance
+   mirage (QFabric), a leakage number (train PEFT), or below random.
+4. **Even that cannot be claimed to *generalise*** — DEN-test evaluates only 3 wetland-transition
+   queries. Internal validity yes; open-vocabulary generality not demonstrated.
+
+## B.2 Two metric traps
+
+* **Recall@K is ceiling-bounded on QFabric** (`benchmark.py:257`): max R@10 = 0.021 (TEO) /
+  0.035 (status). Report Precision@K or R-precision there, or drop R@K.
+* **Random AP ≈ prevalence, not 0.** Simulated baselines: DEN-test ≈ 0.083 (the few-positive AP
+  estimator sits above bare prevalence 0.045), qfabric_teo ≈ 0.170, qfabric_status ≈ 0.045.
+
+## B.3 Significance — two different questions
+
+| Question | Test | Answer |
+|---|---|---|
+| Do scores rank relevant items above chance on *this* corpus? (internal) | permutation | Yes for many cells — but see large-N caveat |
+| Would the method work on a *new, unseen query*? (external) | needs many queries | **Unanswerable — 3–6 queries, all `permanent`** |
+
+**Large-N mirage (QFabric).** N = 2048–4200 makes the permutation null extremely tight, so even
+mAP 0.182 vs random 0.170 gives p < 0.01 and survives FDR — *significance with a negligible
+effect* (+6 % relative). Do not present QFabric zero-shot as "significantly working" without the
+effect size.
+
+| dataset | encoder | split | cm | approach | nq | mAP | rand | lift | BH-FDR | AP range |
+|---|---|---|---|---|---|---|---|---|---|---|
+| dynamic_earthnet | georsclip | test | nrg | zero_shot | 3 | **0.426** | 0.082 | 5.2× | **0.000** ✓ | [0.06, 0.63] |
+| dynamic_earthnet | georsclip | test | rgb | zero_shot | 3 | 0.299 | 0.084 | 3.6× | **0.002** ✓ | [0.03, 0.47] |
+| dynamic_earthnet | georsclip | test | ndvi | zero_shot | 3 | 0.216 | 0.083 | 2.6× | **0.018** ✓ | [0.07, 0.29] |
+| dynamic_earthnet | georsclip | test | nrg | naive | 3 | 0.155 | 0.083 | 1.9× | 0.111 ✗ | [0.07, 0.31] |
+| dynamic_earthnet | clip_vitl14 | test | * | * | 3 | ≤0.10 | 0.083 | ≤1.2× | 1.000 ✗ | ≈ random |
+| qfabric_teo | georsclip | test | rgb | naive | 6 | 0.272 | 0.170 | 1.6× | 0.000 ✓† | [0.01, 0.59] |
+| qfabric_teo | georsclip | test | rgb | zero_shot | 6 | 0.181 | 0.170 | 1.1× | 0.017 ✓† | [0.01, 0.28] |
+| qfabric_teo | georsclip | test | rgb | peft | 6 | 0.334 | 0.170 | 2.0× | 0.000 ✓† | [0.08, 0.49] |
+| qfabric_status | georsclip | eval | rgb | zero_shot | 6 | 0.084 | 0.045 | 1.9× | 0.000 ✓† | [0.01, 0.18] |
+
+✓ survives FDR. † significant but large-N mirage / small effect. The DEN NRG `[0.06,0.63]` range
+= 2 of 3 wetland queries work, one (`wetland drained → farmland`) is at chance.
+
+## B.4 Per-dataset
+
+* **DynamicEarthNet** — the only real signal, on a 3-query island. 10 queries registered; the
+  benchmark drops zero-positive queries per split (`benchmark.py:247`), leaving **test = 3
+  wetland transitions only** (building/urban/deforestation/snow never scored). train (5 queries:
+  water/bare-soil/wetland) and test are **different query subsets → not comparable**; the
+  `lora_sweep.txt` "train 0.025 / test 0.426" is an easier subset, not an improvement.
+  GeoRSCLIP ≫ CLIP ≈ RemoteCLIP; zero_shot ≫ naive (NRG 0.426 vs 0.155) — directional change
+  modelling genuinely helps here. NRG > RGB > NDVI.
+* **QFabric-TEO (change-type)** — appearance, not change. **naive (0.27) > peft-test (0.27–0.33)
+  > zero_shot (0.18 ≈ random).** Expected, not a bug: queries describe an *end-state*, so
+  `naive = cos(text, f_T2)` matches T2 appearance directly while `zero_shot` subtracts a
+  partly-correlated T1 term. The "change" approach barely clears random here.
+* **QFabric-STATUS (status-transition)** — at the floor. mAP 0.057–0.084 vs random 0.045;
+  FDR-significant only because N = 4200; effect tiny.
+
+## B.5 PEFT / LoRA — leakage and overfitting
+
+**Train-split PEFT/LoRA numbers are scored on the adapter's own training pairs** (`run_pipeline.py`
+:136 trains on `ds_train`, :156 scores `peft` on the same `ds_train`; `benchmark_qfabric.py`
+:88–122 likewise) → discard as memorisation: qfabric_teo train PEFT **0.998–0.999** (R@K =
+exactly k/n_relevant = perfect top-precision); DEN train PEFT 0.34–0.42 vs DEN-**test** 0.04.
+**On held-out data no adapter beats frozen zero-shot:** DEN PEFT-test 0.04–0.10 < zero-shot
+0.30–0.43 (on `clip_vitl14` PEFT-test 0.040 is *below* random 0.083); every LoRA config <
+frozen 0.426 (`lora_sweep.txt`); `difference` mode overfits hardest (train 0.42 → test 0.04,
+`concat_eval.txt`). Only TEO-test PEFT (0.27–0.33) modestly tops naive — fitting end-state
+appearance, not change. **Reporting rule: quote PEFT/LoRA from test/val only, never train.**
+
+## B.6 Bugs & data hygiene
+
+| # | Finding | Severity |
+|---|---|---|
+| B.6.1 | `macro_summary.csv` had a blank-metrics row — `load_all` mis-parsed the rerank JSON (nested `strategies`, no top-level `macro`). **Fixed:** `results_io.load_all` now skips `*rerank*`; CSV regenerated (96 clean rows); regression test added. | resolved |
+| B.6.2 | `seasonal_drift@k = 0.0` in every file — QFabric has no seasonal class and DEN's snow query is never evaluable → dead metric. Drop or document as N/A. | low |
+| B.6.3 | Suspected-stale QFabric-TEO results **refuted**: re-run produced byte-identical output (see A.1). | none |
+
+## B.7 What is defensible to claim
+
+**Can say:** GeoRSCLIP + zero-shot Δ-similarity retrieves wetland-formation on DEN-test
+significantly above random (NRG 0.426, FDR p < 0.001), best of 3 encoders / 3 bands; domain
+pretraining helps (GeoRSCLIP > CLIP-L/14 ≈ RemoteCLIP); on DEN directional change beats
+end-state matching, on QFabric the reverse (end-state queries).
+**Cannot say (without caveat):** "open-vocabulary works" (DEN-test = 3 wetland queries);
+"PEFT/LoRA improves retrieval" (never beats frozen zero-shot held-out; high numbers are train
+leakage); "QFabric change retrieval works" (zero-shot ≈ random).
+**Highest-impact next experiments:** (1) re-pair/re-split DEN so building/deforestation/water
+queries have test positives — the single biggest validity threat; (2) report effect size +
+permutation p alongside mAP in §7 tables; (3) replace R@K with P@K / R-precision for QFabric.

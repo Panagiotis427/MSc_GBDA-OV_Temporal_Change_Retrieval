@@ -61,11 +61,17 @@ def read_report(path: str | Path) -> Dict:
 
 
 def load_all(results_dir: str | Path) -> List[Dict]:
-    """Read every ``*.json`` result under *results_dir* (empty list if absent)."""
+    """Read every benchmark ``*.json`` result under *results_dir* (empty list if absent).
+
+    Skips ``*rerank*`` files: ``eval_rerank.py`` writes a different schema (nested
+    ``strategies`` blocks, no top-level ``macro``) that ``_macro_row`` would flatten
+    into a blank CSV row. Those are summarised by their own tooling, not the macro CSV.
+    """
     results_dir = Path(results_dir)
     if not results_dir.exists():
         return []
-    return [read_report(p) for p in sorted(results_dir.glob("*.json"))]
+    return [read_report(p) for p in sorted(results_dir.glob("*.json"))
+            if "rerank" not in p.name]
 
 
 _CSV_FIELDS = [
