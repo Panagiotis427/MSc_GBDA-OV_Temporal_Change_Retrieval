@@ -130,6 +130,19 @@ class OpenClipHFEncoder:
         except Exception:
             return None
 
+    def encode_image_patches(self, image: Image.Image) -> Optional[np.ndarray]:
+        """Per-patch embeddings projected into the shared space, L2-normalised,
+        as a ``[n_patches, D]`` float32 array (raw cosine-comparable — no per-image
+        min-max, unlike ``compute_patch_text_similarity``). ``None`` if the visual
+        tower is not a standard open_clip ViT. Used by patch-level retrieval."""
+        with torch.no_grad():
+            px = self._preprocess(image).unsqueeze(0).to(self.device)
+            patches = self._patch_tokens(px)
+            if patches is None:
+                return None
+            pf = F.normalize(patches, dim=-1).squeeze(0)   # [N, D]
+            return pf.cpu().numpy().astype(np.float32)
+
     def compute_patch_text_similarity(
         self, image: Image.Image, text: str
     ) -> np.ndarray:

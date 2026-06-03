@@ -757,9 +757,12 @@ regenerated automatically by the test suite.
   *fraction-based* relevance — which fixes the dominant-class-flip evaluation defect and makes 9/10
   change-types evaluable on the same data — CV mAP still tops out at ~0.15 and only large-area
   (wetland) transitions clear random; localised change (buildings, deforestation, soil) stays at
-  chance. Patch-level or localised change-attention (cross-attention over spatial tokens) is the
-  lever that would address this signal-dilution failure mode — more data is not (only *snow* is
-  genuinely absent from the subset).
+  chance. **This is now confirmed and partly fixed (B.10, "S3"):** a patch-level Δ-similarity
+  scorer (`scripts/patch_eval.py`) lifts GeoRSCLIP NRG CV mAP 0.147 → **0.195** and makes the
+  localised change-types (buildings, urban, water) FDR-significant — they were at chance under
+  global pooling. Remaining work: a global/patch hybrid (diffuse change still prefers global) and
+  a localised change-*attention* head; more data is not the lever (only *snow* is genuinely
+  absent from the subset).
 - **`concatenate` change mode** now evaluated (§7.7 — generalises better than
   `difference`); **LoRA rank/epoch sweep** done (§7.4 — rank-8 sweet spot,
   test 0.246, still below frozen 0.426).
@@ -1075,6 +1078,46 @@ real gain.
 dominant-class-flip relevance was a genuine evaluation defect (now fixable in-place, no new data);
 the *residual* weakness is a **method ceiling** — global VLM embeddings dilute localised change.
 The only data that is truly absent is **snow** (the 10th query, 0 positives at any threshold).
-The real lever for better numbers is a **localised / patch-level method** (§10 future work, "S3"),
+The real lever for better numbers is a **localised / patch-level method** (B.10, "S3"),
 not more data. Reproduce: `python -m scripts.cv_eval --encoder <e> --color-mode <c> --folds 5
 --relevance fraction [--peft]`.
+
+## B.10 S3 — patch-level (localised) scoring: confirmed partial fix
+
+B.9 pinned the residual weakness on global-embedding dilution. S3 tests the fix directly
+(`scripts/patch_eval.py`): score each pair from **per-patch** embeddings
+(`encoder.encode_image_patches`, raw cosine-comparable — no per-image min-max) instead of one
+global vector. For query `t` and spatially-aligned patch grids `P1,P2`:
+`patch_zeroshot = max_p(cos(t,P2_p) − cos(t,P1_p))` (most-activated change patch);
+`patch_top3` = mean of the top-3 such deltas. Same 75-AOI corpus, fraction relevance, 5-fold CV —
+directly comparable to B.9.
+
+| GeoRSCLIP NRG, fraction relevance | k-fold CV mAP | FDR-significant queries (of 9) |
+|---|---|---|
+| global zero-shot (B.9) | 0.147 ± 0.025 | 2 (wetland formation only) |
+| global PEFT k-fold (B.9) | 0.167 ± 0.058 | — |
+| patch_naive (max end-state) | 0.123 ± 0.027 | — |
+| patch_zeroshot (max Δ) | 0.162 ± 0.040 | 4 (+ buildings, urban) |
+| **patch_top3 (mean top-3 Δ)** | **0.195 ± 0.050** | **5** (buildings p=.001, urban p=.003, water p=.029, wetland→farmland p<.001, land→wetland p=.001) |
+| CLIP-L/14 NRG patch_top3 (256-patch grid) | 0.151 ± 0.048 | — |
+
+**Findings:**
+- **Patch scoring is the best DEN configuration found** — GeoRSCLIP NRG `patch_top3` reaches
+  **0.195 ± 0.050** CV mAP, ~30 % over the global zero-shot 0.147, and is the honest peak (the
+  old "0.426" was a lucky test fold, B.8).
+- **It rescues exactly the localised change-types global embeddings missed.** "New buildings"
+  (ap 0.02→0.13) and "urban expansion" go from chance to FDR-significant; "new water" too. This
+  is direct evidence the B.9 diagnosis was right: the failure was *global pooling*, not the data.
+- **Still only 5/9 queries.** Deforestation, forest-loss, bare-soil remain at chance; diffuse
+  large-area `ag→wetland` slightly *prefers* the global score (max/top-k patch aggregation favours
+  localised change) — so global and patch are **complementary**; a per-query or max(global,patch)
+  hybrid is the natural next step.
+- **RS pretraining beats grid resolution.** CLIP-L/14's finer 256-patch grid (0.151) does not beat
+  GeoRSCLIP's coarse 49-patch grid (0.195) — domain pretraining matters more than patch count.
+
+**Net:** S3 is a real, scope-preserving improvement — localised scoring roughly doubles the number
+of retrievable change-types and lifts CV mAP ~30 %, confirming the method (not the data) was the
+ceiling. Absolute numbers stay modest (best ~0.20), so the honest framing is unchanged: a *weak
+but now-better-understood* open-vocabulary signal, strongest on localised construction/water and
+large-area wetland change. Reproduce: `python -m scripts.patch_eval --encoder georsclip
+--color-mode nrg --approach patch_top3`.

@@ -90,6 +90,18 @@ class CLIPViTL14Encoder:
                 embs.append(feats.cpu().numpy())
         return np.concatenate(embs, axis=0)
 
+    def encode_image_patches(self, image: Image.Image) -> np.ndarray:
+        """Per-patch embeddings projected into the shared CLIP space, L2-normalised,
+        as a ``[n_patches, D]`` float32 array (raw cosine-comparable — no per-image
+        min-max). ViT-L/14 @224 → 256 patches. Used by patch-level retrieval."""
+        with torch.no_grad():
+            pixel_values = self._processor(images=image, return_tensors="pt").pixel_values.to(self.device)
+            vision_outputs = self._clip_model.vision_model(pixel_values=pixel_values)
+            patch_tokens = vision_outputs.last_hidden_state[:, 1:, :]
+            projected = self._clip_model.visual_projection(patch_tokens)
+            projected = F.normalize(projected, dim=-1).squeeze(0)   # [N, D]
+            return projected.cpu().numpy().astype(np.float32)
+
     def compute_patch_text_similarity(
         self,
         image: Image.Image,
