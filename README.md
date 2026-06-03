@@ -148,7 +148,7 @@ derived `PairLabel`s → Recall@K, mAP, plus a seasonal-vs-permanent
 | `scripts/make_comparison_figure.py` | static zero-shot-vs-PEFT top-K visual comparison per encoder |
 | `scripts/lora_sweep.py` | LoRA rank/epoch sweep (georsclip+nrg), in-memory, no cache/model clobber |
 | `scripts/significance_audit.py` | random-ranking baseline + permutation p + BH-FDR over every result cell → `results/results_audit_summary.csv` (REPORT Appendix B) |
-| `scripts/cv_eval.py` | full-corpus + k-fold AOI cross-validation with bootstrap CIs (REPORT Appendix B.8); merges cached split embeddings, no re-encode |
+| `scripts/cv_eval.py` | full-corpus + k-fold AOI cross-validation with bootstrap CIs; `--relevance fraction` swaps dominant-class-flip relevance for pixel-fraction (REPORT Appendix B.8–B.9); merges cached split embeddings, no re-encode |
 
 ## Run / install / use
 

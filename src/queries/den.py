@@ -6,7 +6,9 @@ is imported (``src.queries`` imports it at package load).
 """
 from __future__ import annotations
 
-from src.benchmark import Query, _t1, _transition
+from typing import List
+
+from src.benchmark import Query, _gained, _lost, _t1, _transition
 from . import register_queries
 
 # DEN LULC class names (must match src.datasets.dynamic_earthnet.CLASS_NAMES).
@@ -46,3 +48,37 @@ QUERIES = [
 
 
 register_queries("dynamic_earthnet", QUERIES)
+
+
+def frac_queries(thresh: float = 0.05) -> List[Query]:
+    """Fraction-based relevance variant of :data:`QUERIES` (same 10 texts).
+
+    A pair is relevant when the target class gains/loses >= ``thresh`` of valid
+    pixels — capturing localised change the dominant-class-flip predicates miss
+    (see ``benchmark._gained`` / ``_lost``). Directional pairs use the
+    discriminating side (e.g. wetland *drained* = wetlands lost). Used by
+    ``scripts/cv_eval.py --relevance fraction``; not registered as the default
+    so the committed dominant-flip numbers stay reproducible.
+    """
+    return [
+        Query("new buildings constructed on former agricultural land",
+              "permanent", _gained(IMPERVIOUS, thresh)),
+        Query("urban expansion replacing vegetation",
+              "permanent", _gained(IMPERVIOUS, thresh)),
+        Query("deforestation, forest cleared to bare soil",
+              "permanent", _lost(FOREST, thresh)),
+        Query("forest loss",
+              "permanent", _lost(FOREST, thresh)),
+        Query("new water body or flooding",
+              "permanent", _gained(WATER, thresh)),
+        Query("bare soil or land cleared",
+              "permanent", _gained(SOIL, thresh)),
+        Query("seasonal snow melting away",
+              "seasonal", _lost(SNOW, thresh)),
+        Query("agricultural land converted to wetland or marsh",
+              "permanent", _gained(WETLANDS, thresh)),
+        Query("wetland drained and turned into farmland",
+              "permanent", _lost(WETLANDS, thresh)),
+        Query("land turning into wetland",
+              "permanent", _gained(WETLANDS, thresh)),
+    ]

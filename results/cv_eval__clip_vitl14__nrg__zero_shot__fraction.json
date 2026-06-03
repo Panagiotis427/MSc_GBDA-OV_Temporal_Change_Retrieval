@@ -1,0 +1,174 @@
+{
+  "dataset": "dynamic_earthnet",
+  "encoder": "clip_vitl14",
+  "color_mode": "nrg",
+  "approach": "zero_shot",
+  "relevance": "fraction",
+  "frac_thresh": 0.05,
+  "n_evaluable_queries": 9,
+  "n_pairs": 825,
+  "n_aois": 75,
+  "folds": 5,
+  "full_corpus": {
+    "macro_mAP": 0.0927,
+    "per_query": [
+      {
+        "query": "new buildings constructed on former agricultural land",
+        "n_relevant": 14,
+        "ap": 0.0933,
+        "ci95": [
+          0.0121,
+          0.2814
+        ],
+        "rand_ap": 0.0245,
+        "perm_p": 0.01
+      },
+      {
+        "query": "urban expansion replacing vegetation",
+        "n_relevant": 14,
+        "ap": 0.0195,
+        "ci95": [
+          0.0091,
+          0.0493
+        ],
+        "rand_ap": 0.0242,
+        "perm_p": 0.5593
+      },
+      {
+        "query": "deforestation, forest cleared to bare soil",
+        "n_relevant": 13,
+        "ap": 0.0221,
+        "ci95": [
+          0.0106,
+          0.0442
+        ],
+        "rand_ap": 0.0232,
+        "perm_p": 0.3515
+      },
+      {
+        "query": "forest loss",
+        "n_relevant": 13,
+        "ap": 0.0221,
+        "ci95": [
+          0.0105,
+          0.0414
+        ],
+        "rand_ap": 0.0232,
+        "perm_p": 0.3545
+      },
+      {
+        "query": "new water body or flooding",
+        "n_relevant": 9,
+        "ap": 0.018,
+        "ci95": [
+          0.0061,
+          0.0397
+        ],
+        "rand_ap": 0.0182,
+        "perm_p": 0.2903
+      },
+      {
+        "query": "bare soil or land cleared",
+        "n_relevant": 25,
+        "ap": 0.0375,
+        "ci95": [
+          0.021,
+          0.0656
+        ],
+        "rand_ap": 0.0378,
+        "perm_p": 0.3655
+      },
+      {
+        "query": "agricultural land converted to wetland or marsh",
+        "n_relevant": 146,
+        "ap": 0.2064,
+        "ci95": [
+          0.1644,
+          0.2623
+        ],
+        "rand_ap": 0.1831,
+        "perm_p": 0.0673
+      },
+      {
+        "query": "wetland drained and turned into farmland",
+        "n_relevant": 162,
+        "ap": 0.2049,
+        "ci95": [
+          0.1677,
+          0.2487
+        ],
+        "rand_ap": 0.2026,
+        "perm_p": 0.396
+      },
+      {
+        "query": "land turning into wetland",
+        "n_relevant": 146,
+        "ap": 0.2109,
+        "ci95": [
+          0.1729,
+          0.2602
+        ],
+        "rand_ap": 0.183,
+        "perm_p": 0.0377
+      }
+    ]
+  },
+  "kfold_zero_shot": {
+    "macro_mAP_mean": 0.1389,
+    "macro_mAP_std": 0.0306,
+    "fold_macro": [
+      0.1544,
+      0.1144,
+      0.1862,
+      0.0987,
+      0.1406
+    ],
+    "per_query": {
+      "new buildings constructed on former agricultural land": {
+        "mean": 0.0738,
+        "std": 0.0827,
+        "n_folds": 3
+      },
+      "urban expansion replacing vegetation": {
+        "mean": 0.0418,
+        "std": 0.0365,
+        "n_folds": 3
+      },
+      "deforestation, forest cleared to bare soil": {
+        "mean": 0.0792,
+        "std": 0.0659,
+        "n_folds": 3
+      },
+      "forest loss": {
+        "mean": 0.06,
+        "std": 0.0175,
+        "n_folds": 3
+      },
+      "new water body or flooding": {
+        "mean": 0.0614,
+        "std": 0.0089,
+        "n_folds": 2
+      },
+      "bare soil or land cleared": {
+        "mean": 0.0705,
+        "std": 0.0348,
+        "n_folds": 5
+      },
+      "agricultural land converted to wetland or marsh": {
+        "mean": 0.233,
+        "std": 0.0767,
+        "n_folds": 5
+      },
+      "wetland drained and turned into farmland": {
+        "mean": 0.2167,
+        "std": 0.0685,
+        "n_folds": 5
+      },
+      "land turning into wetland": {
+        "mean": 0.2405,
+        "std": 0.0667,
+        "n_folds": 5
+      }
+    }
+  }
+}

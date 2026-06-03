@@ -68,6 +68,31 @@ def _transition(src=None, dst=None) -> Callable[[PairLabel], bool]:
     return pred
 
 
+# --- fraction-based relevance --------------------------------------------------
+# The default ``_transition`` predicate only fires when the *dominant* class of
+# the whole tile flips — discarding all localised change (a 10% wetland gain on
+# an agriculture-majority tile reads as "stable"). Empirically only 8.6% of DEN
+# pairs flip dominant class, almost all wetland<->agriculture, which starves
+# every other query of positives. These predicates instead use the per-class
+# pixel-change fractions ``derive_pair_label`` already computes, so a pair is
+# relevant when the target class gains/loses >= ``thresh`` of valid pixels.
+
+def _gained(cls: str, thresh: float = 0.05) -> Callable[[PairLabel], bool]:
+    def pred(lb: PairLabel) -> bool:
+        if lb is None:
+            return False
+        return lb.class_change_mask_fraction.get(cls, {}).get("gained_fraction", 0.0) >= thresh
+    return pred
+
+
+def _lost(cls: str, thresh: float = 0.05) -> Callable[[PairLabel], bool]:
+    def pred(lb: PairLabel) -> bool:
+        if lb is None:
+            return False
+        return lb.class_change_mask_fraction.get(cls, {}).get("lost_fraction", 0.0) >= thresh
+    return pred
+
+
 # Per-dataset query sets live in ``src/queries/`` (one module per dataset).
 # They self-register into the query registry and are resolved by
 # ``run_benchmark`` via ``dataset.name``.

@@ -103,6 +103,11 @@ def main() -> None:
     ap.add_argument("--results-dir", default="results")
     ap.add_argument("--folds", type=int, default=5)
     ap.add_argument("--approach", default="zero_shot", choices=["zero_shot", "naive"])
+    ap.add_argument("--relevance", default="dominant", choices=["dominant", "fraction"],
+                    help="dominant = committed dominant-class-flip queries; "
+                         "fraction = pixel-fraction relevance (S1, see benchmark._gained/_lost)")
+    ap.add_argument("--frac-thresh", type=float, default=0.05,
+                    help="pixel-fraction threshold for --relevance fraction")
     ap.add_argument("--peft", action="store_true", help="also run leakage-free k-fold PEFT")
     ap.add_argument("--epochs", type=int, default=40)
     ap.add_argument("--seed", type=int, default=42)
@@ -114,7 +119,12 @@ def main() -> None:
     store = _merge_stores("dynamic_earthnet", args.encoder, args.color_mode, args.cache_dir)
     assert len(store) == len(ds.list_pairs()), (len(store), len(ds.list_pairs()))
     pairs = store.pairs
-    queries = get_queries("dynamic_earthnet")
+    if args.relevance == "fraction":
+        from src.queries.den import frac_queries
+        queries = frac_queries(args.frac_thresh)
+        print(f"relevance=fraction (thresh={args.frac_thresh}) — pixel-fraction predicates")
+    else:
+        queries = get_queries("dynamic_earthnet")
     aois = sorted({p.location_id for p in pairs})
     print(f"corpus: {len(pairs)} pairs, {len(aois)} AOIs, {len(queries)} queries registered")
 
@@ -183,6 +193,8 @@ def main() -> None:
     out = {
         "dataset": "dynamic_earthnet", "encoder": args.encoder,
         "color_mode": args.color_mode, "approach": args.approach,
+        "relevance": args.relevance, "frac_thresh": args.frac_thresh,
+        "n_evaluable_queries": len(evaluable),
         "n_pairs": N, "n_aois": len(aois), "folds": args.folds,
         "full_corpus": {"macro_mAP": macro_full, "per_query": full},
         "kfold_zero_shot": {"macro_mAP_mean": cv_macro_mean, "macro_mAP_std": cv_macro_std,
@@ -230,7 +242,9 @@ def main() -> None:
         }
 
     Path(args.results_dir).mkdir(parents=True, exist_ok=True)
-    op = Path(args.results_dir) / f"cv_eval__{args.encoder}__{args.color_mode}__{args.approach}.json"
+    rel_tag = "" if args.relevance == "dominant" else f"__{args.relevance}"
+    op = (Path(args.results_dir) /
+          f"cv_eval__{args.encoder}__{args.color_mode}__{args.approach}{rel_tag}.json")
     op.write_text(json.dumps(out, indent=2), encoding="utf-8")
     print(f"\nfull-corpus macro mAP = {macro_full} ({len(full)} queries)")
     print(f"k-fold zero_shot macro mAP = {cv_macro_mean} ± {cv_macro_std} (n={args.folds} folds)")

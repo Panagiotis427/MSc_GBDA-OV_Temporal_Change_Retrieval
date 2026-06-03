@@ -753,9 +753,13 @@ regenerated automatically by the test suite.
   train AOI statistics (tested; see §7.4). Multi-AOI held-out training or
   domain-randomised augmentation would help. NRG zero-shot remains the most
   robust configuration.
-- **Global embeddings**: patch-level or localised change attention (e.g.
-  cross-attention over spatial tokens) would address the main signal-dilution
-  failure mode.
+- **Global embeddings are the real ceiling (not the data)**: Appendix B.9 shows that with
+  *fraction-based* relevance — which fixes the dominant-class-flip evaluation defect and makes 9/10
+  change-types evaluable on the same data — CV mAP still tops out at ~0.15 and only large-area
+  (wetland) transitions clear random; localised change (buildings, deforestation, soil) stays at
+  chance. Patch-level or localised change-attention (cross-attention over spatial tokens) is the
+  lever that would address this signal-dilution failure mode — more data is not (only *snow* is
+  genuinely absent from the subset).
 - **`concatenate` change mode** now evaluated (§7.7 — generalises better than
   `difference`); **LoRA rank/epoch sweep** done (§7.4 — rank-8 sweet spot,
   test 0.246, still below frozen 0.426).
@@ -1028,3 +1032,49 @@ artifacts and collapse to near-random:**
 wetland-formation change above chance"* — a narrow, single-direction, high-variance signal, not a
 0.426 open-vocabulary result. Reproduce: `python -m scripts.cv_eval --encoder georsclip
 --color-mode nrg --folds 5 [--peft]` → `results/cv_eval__*.json`.
+
+## B.9 Is it bad data, or a bad method? Fraction-based relevance separates the two
+
+The weak DEN numbers had two candidate causes: (i) **eval starvation** — the default relevance
+predicate (`benchmark._transition`) only fires when the *dominant class of the whole 1024² tile
+flips*, so localised change (a new building on an agriculture-majority tile) is labelled
+"stable". Only **8.6 % of pairs (71/825)** flip dominant class, and 44 of those are
+wetland↔agriculture — which is *why* only wetland queries had positives and 4 change-types had
+none. (ii) a **method limit** — global CLIP-embedding differencing may simply not encode
+localised change. The labels themselves are complete and dense (per-pixel 7-class, 24 months, all
+75 AOIs, none missing), so this is **not a missing-label problem**.
+
+To separate the two, `scripts/cv_eval.py --relevance fraction` re-derives relevance from the
+per-class pixel-change fractions `derive_pair_label` already computes (`benchmark._gained` /
+`_lost`, default threshold 5 % of valid pixels; `src/queries/den.py::frac_queries`). Same data,
+same queries, same cached embeddings — only the relevance rule changes:
+
+| config | dominant-flip: nq · CV mAP | fraction (≥5%): nq · CV mAP · FDR-sig queries |
+|---|---|---|
+| GeoRSCLIP NRG zero-shot | 6 · 0.099 ± 0.089 | **9 · 0.147 ± 0.025** · 2 (ag→wetland, land→wetland) |
+| CLIP-L/14 NRG zero-shot | 6 · 0.072 ± 0.020 | 9 · 0.139 ± 0.031 · 2 (new buildings, land→wetland) |
+| RemoteCLIP NRG zero-shot | 6 · 0.051 ± 0.023 | 9 · 0.140 ± 0.034 · 1 (new buildings) |
+| GeoRSCLIP RGB zero-shot | 6 · 0.066 ± 0.037 | 9 · 0.123 ± 0.030 · 1 (wetland→farmland) |
+| GeoRSCLIP NRG PEFT (k-fold) | — | 0.167 ± 0.058 |
+
+**What curation fixed (it was partly bad eval):** fraction relevance makes **9 of 10** queries
+evaluable (buildings 14, urban 14, deforestation 13, forest-loss 13, soil 25, water 9 positives —
+all previously 0–3), roughly **triples** full-corpus mAP (0.03→0.09) and **tightens** the CIs
+(more positives, std collapses from ±0.089 to ±0.025). So the dominant-flip relevance *was*
+starving the benchmark — a real, now-fixed evaluation bug.
+
+**What curation did NOT fix (the rest is the method):** even with dense, correct labels, only
+**1–2 of 9 queries beat random per config**, and no config exceeds **~0.15** CV mAP. Buildings,
+urban, deforestation, forest-loss, soil and water sit at chance (p = 0.12–0.96) despite hundreds
+of positives. The retrievable signal is confined to **large-area** transitions (wetland
+formation, and weakly "new buildings" for the L/14 backbones); **localised** change is not
+retrievable by global-embedding differencing. PEFT k-fold (0.167) ≈ zero-shot (0.147) — still no
+real gain.
+
+**Conclusion (answering "bad data?"):** not bad data, not missing labels. The benchmark's
+dominant-class-flip relevance was a genuine evaluation defect (now fixable in-place, no new data);
+the *residual* weakness is a **method ceiling** — global VLM embeddings dilute localised change.
+The only data that is truly absent is **snow** (the 10th query, 0 positives at any threshold).
+The real lever for better numbers is a **localised / patch-level method** (§10 future work, "S3"),
+not more data. Reproduce: `python -m scripts.cv_eval --encoder <e> --color-mode <c> --folds 5
+--relevance fraction [--peft]`.
