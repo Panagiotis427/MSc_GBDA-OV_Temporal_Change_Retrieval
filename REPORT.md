@@ -31,29 +31,33 @@ its own training pairs**, i.e. memorisation capacity, not a retrieval result; se
 | GeoRSCLIP ViT-B/32 | 0.027 | 0.040 | 0.335 |
 | RemoteCLIP ViT-L/14 | 0.024 | 0.057 | 0.352 |
 
-Headline result (held-out test split, 110 pairs — colour-mode ablation, zero-shot):
+Generalisation, held-out **test split** (110 pairs — colour-mode ablation, zero-shot). **These
+single-split numbers do not survive cross-validation — see the CV column and Appendix B.8;** the
+robust estimate is ~10× lower because this 110-pair split is a lucky high-wetland fold:
 
-| Encoder | color | test mAP |
-|---|---|---|
-| CLIP ViT-L/14 | RGB | 0.043 |
-| CLIP ViT-L/14 | NRG | 0.104 |
-| CLIP ViT-L/14 | NDVI | 0.064 |
-| GeoRSCLIP | RGB | 0.299 |
-| GeoRSCLIP | **NRG** | **0.426** |
-| GeoRSCLIP | NDVI | 0.216 |
-| RemoteCLIP | RGB | 0.050 |
-| RemoteCLIP | NRG | 0.129 |
-| RemoteCLIP | NDVI | 0.055 |
+| Encoder | color | test-split mAP | full-corpus mAP (825) | 5-fold CV mAP |
+|---|---|---|---|---|
+| CLIP ViT-L/14 | NRG | 0.104 | 0.030 | 0.072 ± 0.020 |
+| GeoRSCLIP | RGB | 0.299 | 0.032 | 0.066 ± 0.037 |
+| GeoRSCLIP | **NRG** | **0.426** | **0.037** | **0.099 ± 0.089** |
+| GeoRSCLIP | NDVI | 0.216 | — | — |
+| RemoteCLIP | NRG | 0.129 | 0.021 | 0.051 ± 0.023 |
+
+(Full per-band test-split table in §7.3.) Robust verdict: no configuration exceeds ~0.10 mAP
+under cross-validation; only GeoRSCLIP NRG shows any above-random per-query signal, confined to
+wetland-formation.
 
 **Key findings:** PEFT adapters only memorise train AOIs — the high train-fit numbers above are
 the adapter scored on its own training data and collapse to ≤ zero-shot (sometimes below random)
 on held-out splits; PEFT is not shown to help retrieval. Frozen zero-shot generalises better.
 NRG false-colour (NIR-Red-Green) outperforms RGB and NDVI for all encoders on unseen AOIs; NDVI
 collapses spectral texture to a single channel, losing the inter-channel contrasts NRG preserves.
-GeoRSCLIP + NRG zero-shot (0.426) is the best generalising configuration — FDR-significant vs a
-random-ranking baseline, but demonstrated on 3 wetland-transition queries, so it evidences
-wetland-formation retrieval rather than general open-vocabulary skill. Full random-baseline /
-significance analysis in **Appendix B**.
+GeoRSCLIP + NRG zero-shot (0.426) is the best configuration *on this 110-pair test split* — but
+that number does **not survive cross-validation**: on the full 75-AOI corpus the same config
+scores **0.037** mAP, and 5-fold leakage-free CV gives **0.099 ± 0.089** (the test split was a
+lucky high-wetland fold). The only robust, above-random signal is GeoRSCLIP retrieving
+**wetland-formation** change. Full random-baseline, FDR and cross-validation analysis in
+**Appendix B** (esp. B.8).
 
 ---
 
@@ -319,10 +323,13 @@ RemoteCLIP NRG (test 0.129) improves over RGB (0.050) but lags GeoRSCLIP
 NRG (0.426); GeoRSCLIP's RS5M pre-training gives it a stronger prior for
 the NIR-Green spectral contrast characteristic of vegetation transitions.
 
-**GeoRSCLIP + NRG zero-shot remains the best generalising configuration
-(0.426 mAP on unseen AOIs)** — higher than even the memorisation-inflated train-fit PEFT scores
-of CLIP and RemoteCLIP (§7.1, scored on their own training pairs), and requiring no training.
-(Caveat: this held-out 0.426 rests on 3 evaluable wetland queries — §7.2 basis note, Appendix B.)
+GeoRSCLIP + NRG zero-shot is the best configuration **on this 110-pair test split (0.426)** —
+but **this number is not robust.** Cross-validation over the full 75-AOI corpus (Appendix B.8)
+shows it falls to 0.037 (full corpus) / 0.099 ± 0.089 (5-fold); the test split happened to be a
+high-wetland "lucky fold" (CV folds span 0.033–0.271). The colour-mode *ordering* (NRG > NDVI >
+RGB) and encoder ordering (GeoRSCLIP ≫ CLIP ≈ RemoteCLIP) hold, but the absolute 0.426 should not
+be quoted as the generalisation result — the robust figure is ~0.10, and the only above-random
+signal is wetland-formation retrieval.
 
 ### 7.4 LoRA adapter — visual encoder fine-tuning
 
@@ -669,7 +676,7 @@ The adapter is < 0.2 % of the backbone parameter count — the PEFT premise.
 | End-to-end query — CLIP text forward + scoring, 605 pairs | **10.5 ms** |
 | Embedding precompute — CLIP L/14, 1024²→224, GPU | **68 ms/tile** → 1210 tiles ≈ **82 s** (one-time, cached) |
 | PEFT training — 605 samples, 40 epochs, adapter only, GPU | **≈29 s** |
-| Fast test suite — 192 tests, mock encoders, CPU | ≈21 s |
+| Fast test suite — 193 tests, mock encoders, CPU (full suite 209: 208 pass, 1 skip) | ≈21 s |
 
 All GPU figures measured on the RTX 4060 in a dedicated timed pass (run with
 no other GPU job, to avoid contention skew).
@@ -735,8 +742,10 @@ regenerated automatically by the test suite.
 > load-bearing for that audit: (i) the **in-distribution PEFT figures (train split, §7.1/§11
 > point 1) are train-set evaluations of the adapter's own training pairs — memorisation, not
 > generalisation** (DEN train 0.42, QFabric train 0.998); quote PEFT from val/test only. (ii) The
-> DEN-test headline (GeoRSCLIP NRG 0.426) is FDR-significant vs random but rests on **only 3
-> wetland-transition queries** — internal validity, not demonstrated open-vocabulary generality.
+> DEN-test headline (GeoRSCLIP NRG 0.426) **does not survive cross-validation**: on the full
+> 75-AOI corpus it is 0.037, and 5-fold leakage-free CV gives 0.099 ± 0.089 (Appendix B.8) — the
+> test split was a lucky high-wetland fold. The only robust signal is wetland-formation retrieval;
+> "open-vocabulary change retrieval" is **not** demonstrated on this data.
 
 - **Weak supervision**: captions derived from dominant-class label flips, not
   human change descriptions — noisy and coarse.
@@ -796,18 +805,19 @@ Three complementary findings:
    mAP 0.998 (Appendix B.5) — unmistakably memorisation. Low-compute fine-tuning is **not** shown
    to help retrieval.
 
-2. **Out-of-distribution, frozen zero-shot wins.** On unseen AOIs PEFT collapses to ≤ zero-shot
-   (CLIP test PEFT 0.040, below the random-ranking baseline ≈ 0.083); zero-shot with the on-disk
-   NIR band as NRG false-colour is the best generalising approach. GeoRSCLIP + NRG zero-shot
-   reaches **0.426 mAP on held-out test AOIs** with zero training and FDR-significance vs random
-   (Appendix B.3) — though on a narrow basis of 3 evaluable wetland queries, so this is
-   demonstrated for wetland-formation, not claimed as general open-vocabulary retrieval.
+2. **Out-of-distribution, frozen zero-shot beats PEFT — but the absolute signal is weak.** On
+   unseen AOIs PEFT collapses to ≤ zero-shot; zero-shot with the on-disk NIR band as NRG
+   false-colour is the best approach and RS-pretrained GeoRSCLIP leads. The often-quoted 0.426
+   (test split) is **not robust**: under 5-fold leakage-free cross-validation over all 75 AOIs it
+   is **0.099 ± 0.089** (full-corpus 0.037; Appendix B.8) — the test split was a lucky
+   high-wetland fold. The only above-random per-query signal is GeoRSCLIP retrieving
+   **wetland-formation**; general open-vocabulary change retrieval is not demonstrated on this
+   (agri/wetland-dominated) DEN subset.
 
-3. **LoRA does not close the gap**: LoRA fine-tuning of the visual encoder
-   (0.5% trainable, peft, rank=4) achieves test mAP 0.159 — better than
-   ProjectionHead PEFT (0.041) but still far below frozen zero-shot NRG
-   (0.426). The finding is consistent: **spectral physics generalises;
-   learned visual priors — however parameter-efficient — only memorise.**
+3. **No fine-tuning helps out-of-distribution.** Cross-validated PEFT (0.088 ± 0.035) is
+   indistinguishable from zero-shot (0.099); LoRA (best test 0.246, train ablation) also stays
+   below frozen zero-shot. Consistent conclusion: **spectral physics (NRG) carries the weak signal
+   that exists; learned visual priors — however parameter-efficient — only memorise the train set.**
 
 The contrast between these regimes maps directly onto the deliverable's
 grading expectation: a motivated comparison of zero-shot vs PEFT approaches,
@@ -885,11 +895,14 @@ The near-zero numbers are **not** a failure — but also not the result they loo
    `10/480 = 0.021`. Use mAP for QFabric; R@K is only interpretable for DEN (≤5 relevant/query).
 2. **Judge mAP against the random-ranking baseline (~prevalence), not 0.** Random scores
    mAP ≈ 0.17 on QFabric-TEO and ≈ 0.08 on DEN-test.
-3. **One robust, FDR-significant retrieval signal exists: GeoRSCLIP zero-shot on DEN**
-   (NRG 0.426, RGB 0.299, NDVI 0.216; BH-FDR ≤ 0.018). Everything else is a large-N significance
-   mirage (QFabric), a leakage number (train PEFT), or below random.
-4. **Even that cannot be claimed to *generalise*** — DEN-test evaluates only 3 wetland-transition
-   queries. Internal validity yes; open-vocabulary generality not demonstrated.
+3. **On the committed test split, GeoRSCLIP zero-shot on DEN looks strong** (NRG 0.426, RGB
+   0.299, NDVI 0.216; BH-FDR ≤ 0.018 vs random). Everything else is a large-N significance
+   mirage (QFabric), a leakage number (train PEFT), or below random. **But §B.3's per-split
+   significance is superseded by the cross-validation in §B.8** — see point 4.
+4. **That signal does not generalise / is not robust.** DEN-test evaluates only 3
+   wetland-transition queries, and **cross-validation (B.8) shows the 0.426 is a lucky-fold
+   artifact** — full-corpus 0.037, 5-fold 0.099 ± 0.089. The only above-random signal is
+   wetland-formation retrieval; open-vocabulary generality is not demonstrated.
 
 ## B.2 Two metric traps
 
@@ -925,6 +938,11 @@ effect size.
 ✓ survives FDR. † significant but large-N mirage / small effect. The DEN NRG `[0.06,0.63]` range
 = 2 of 3 wetland queries work, one (`wetland drained → farmland`) is at chance.
 
+> **The DEN rows above are the committed 110-pair test split and are *not* the generalisation
+> verdict.** §B.8 re-evaluates them under full-corpus + 5-fold AOI cross-validation: the 0.426 /
+> 0.299 / 0.216 fall to 0.037 / 0.032 / ~0.03 (CV 0.099 / 0.066 / —). Read B.8 as the final word
+> on DEN generalisation; this table only shows which *single-split* cells beat random.
+
 ## B.4 Per-dataset
 
 * **DynamicEarthNet** — the only real signal, on a 3-query island. 10 queries registered; the
@@ -958,18 +976,55 @@ appearance, not change. **Reporting rule: quote PEFT/LoRA from test/val only, ne
 | # | Finding | Severity |
 |---|---|---|
 | B.6.1 | `macro_summary.csv` had a blank-metrics row — `load_all` mis-parsed the rerank JSON (nested `strategies`, no top-level `macro`). **Fixed:** `results_io.load_all` now skips `*rerank*`; CSV regenerated (96 clean rows); regression test added. | resolved |
-| B.6.2 | `seasonal_drift@k = 0.0` in every file — QFabric has no seasonal class and DEN's snow query is never evaluable → dead metric. Drop or document as N/A. | low |
+| B.6.2 | `seasonal_drift@k = 0.0` in every file — QFabric has no seasonal class and DEN's snow query is never evaluable → uninformative on current data. **Resolved by documentation:** kept in the schema (cheap, and meaningful the moment a seasonal-positive corpus is added) but reported as N/A here; do not cite it. | resolved (documented) |
 | B.6.3 | Suspected-stale QFabric-TEO results **refuted**: re-run produced byte-identical output (see A.1). | none |
 
 ## B.7 What is defensible to claim
 
-**Can say:** GeoRSCLIP + zero-shot Δ-similarity retrieves wetland-formation on DEN-test
-significantly above random (NRG 0.426, FDR p < 0.001), best of 3 encoders / 3 bands; domain
-pretraining helps (GeoRSCLIP > CLIP-L/14 ≈ RemoteCLIP); on DEN directional change beats
-end-state matching, on QFabric the reverse (end-state queries).
-**Cannot say (without caveat):** "open-vocabulary works" (DEN-test = 3 wetland queries);
+**Can say:** GeoRSCLIP (RS-pretrained) + NRG zero-shot Δ-similarity retrieves **wetland-formation**
+change above chance under cross-validation (the only above-random per-query signal; B.8); domain
+pretraining helps (GeoRSCLIP > CLIP-L/14 ≈ RemoteCLIP); spectral NRG > NDVI > RGB; on DEN
+directional change beats end-state matching, on QFabric the reverse (end-state queries); learned
+adapters (PEFT/LoRA) only memorise — cross-validated PEFT (0.088) ≈ zero-shot (0.099).
+**Cannot say:** "open-vocabulary change retrieval works" — under CV no config exceeds ~0.10 mAP,
+the 0.426 was a lucky test fold (B.8), and 4 of 10 change-types have zero positives in the data;
 "PEFT/LoRA improves retrieval" (never beats frozen zero-shot held-out; high numbers are train
 leakage); "QFabric change retrieval works" (zero-shot ≈ random).
-**Highest-impact next experiments:** (1) re-pair/re-split DEN so building/deforestation/water
-queries have test positives — the single biggest validity threat; (2) report effect size +
-permutation p alongside mAP in §7 tables; (3) replace R@K with P@K / R-precision for QFabric.
+**Highest-impact next experiment:** acquire DEN AOIs (or a dataset) containing
+building/urban/deforestation/snow change so the 4 currently-absent query types are evaluable —
+the single biggest barrier to a real open-vocabulary claim (the within-data CV is now done, B.8).
+Also: report effect size + permutation p alongside mAP in §7; replace R@K with P@K for QFabric.
+
+## B.8 Cross-validated re-evaluation — the headline 0.426 does not survive
+
+The 3-query threat (B.4) was tested directly with `scripts/cv_eval.py`: merge the cached
+train+val+test embeddings (= all **75 AOIs / 825 pairs**, no re-encoding), then evaluate (a) on
+the **full corpus** with bootstrap CIs + permutation p, and (b) under **5-fold leakage-free AOI
+cross-validation**. Result — **the test-split headline numbers are small-corpus, lucky-fold
+artifacts and collapse to near-random:**
+
+| config | test-split (§7.3) | full-corpus mAP | 5-fold CV mAP | FDR-significant queries (full corpus) |
+|---|---|---|---|---|
+| GeoRSCLIP NRG zero-shot | 0.426 | **0.037** | **0.099 ± 0.089** | 2 — *land→wetland* (p=0.004), *ag→wetland* (p=0.010) |
+| GeoRSCLIP RGB zero-shot | 0.299 | 0.032 | 0.066 ± 0.037 | 1 — *wetland→farmland* (p=0.030) |
+| CLIP-L/14 NRG zero-shot | 0.104 | 0.030 | 0.072 ± 0.020 | **0** |
+| RemoteCLIP NRG zero-shot | 0.129 | 0.021 | 0.051 ± 0.023 | **0** |
+| GeoRSCLIP NRG PEFT (k-fold) | — | — | 0.088 ± 0.035 | — |
+
+- **The 0.426 was a lucky fold.** The 5 CV folds for GeoRSCLIP NRG span **0.033–0.271**; the
+  original 110-pair test split coincided with the easy high-wetland AOIs (the 0.271 fold). On the
+  full corpus the same config scores 0.037 — a ~11× drop. Smaller corpora inflate AP (fewer
+  distractors); the headline rode that plus an easy split.
+- **Only GeoRSCLIP shows any signal, and only for wetland *formation*.** `land→wetland` and
+  `agricultural→wetland` clear random (p<0.05); the reverse `wetland→farmland`, plus water-body /
+  bare-soil / forest-loss, are at or below chance. CLIP-L/14 and RemoteCLIP have **zero**
+  above-random queries on the full corpus. Even the significant queries have std ≈ mean across
+  folds (e.g. ag→wetland 0.166 ± 0.180) — high instability.
+- **Leakage-free PEFT confirms B.5.** Cross-validated PEFT (train on 4 folds, eval on the 5th)
+  scores 0.088 ± 0.035 — statistically indistinguishable from zero-shot's 0.099, and nowhere near
+  the train-fit 0.42. PEFT does not help once it cannot see the eval pairs.
+
+**Net:** the only defensible DEN claim is *"GeoRSCLIP (RS-pretrained, NRG) retrieves
+wetland-formation change above chance"* — a narrow, single-direction, high-variance signal, not a
+0.426 open-vocabulary result. Reproduce: `python -m scripts.cv_eval --encoder georsclip
+--color-mode nrg --folds 5 [--peft]` → `results/cv_eval__*.json`.

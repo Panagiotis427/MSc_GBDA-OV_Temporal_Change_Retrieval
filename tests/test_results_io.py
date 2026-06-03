@@ -110,9 +110,13 @@ def test_load_all_skips_rerank(tmp_path):
     rep = _report()
     p = results_io.result_path(tmp_path, "dynamic_earthnet", "clip_vitl14", "test")
     results_io.write_report(rep, p, color_mode="rgb", split="test")
-    # drop a rerank sidecar with no top-level 'macro'
+    # drop a rerank sidecar and a cv_eval sidecar, both with no top-level 'macro'
     (tmp_path / "dynamic_earthnet__georsclip__test_nrg__zero_shot__rerank.json").write_text(
         json.dumps({"dataset": "dynamic_earthnet", "strategies": {"baseline": {}}}),
+        encoding="utf-8",
+    )
+    (tmp_path / "cv_eval__georsclip__nrg__zero_shot.json").write_text(
+        json.dumps({"dataset": "dynamic_earthnet", "full_corpus": {"macro_mAP": 0.04}}),
         encoding="utf-8",
     )
     recs = results_io.load_all(tmp_path)

@@ -60,18 +60,24 @@ def read_report(path: str | Path) -> Dict:
         return json.load(f)
 
 
-def load_all(results_dir: str | Path) -> List[Dict]:
-    """Read every benchmark ``*.json`` result under *results_dir* (empty list if absent).
+#: filename substrings whose JSON uses a non-standard schema (no top-level ``macro``)
+#: and would otherwise flatten into a blank macro-CSV row. ``eval_rerank.py`` writes
+#: nested ``strategies`` blocks; ``cv_eval.py`` writes ``full_corpus`` / ``kfold_*``.
+_NON_BENCHMARK_RESULT_MARKERS = ("rerank", "cv_eval")
 
-    Skips ``*rerank*`` files: ``eval_rerank.py`` writes a different schema (nested
-    ``strategies`` blocks, no top-level ``macro``) that ``_macro_row`` would flatten
-    into a blank CSV row. Those are summarised by their own tooling, not the macro CSV.
+
+def load_all(results_dir: str | Path) -> List[Dict]:
+    """Read every standard benchmark ``*.json`` result under *results_dir*.
+
+    Skips sidecar files whose name contains a marker in
+    ``_NON_BENCHMARK_RESULT_MARKERS`` — they use different schemas and are
+    summarised by their own tooling, not the macro CSV. Empty list if absent.
     """
     results_dir = Path(results_dir)
     if not results_dir.exists():
         return []
     return [read_report(p) for p in sorted(results_dir.glob("*.json"))
-            if "rerank" not in p.name]
+            if not any(m in p.name for m in _NON_BENCHMARK_RESULT_MARKERS)]
 
 
 _CSV_FIELDS = [
