@@ -63,7 +63,7 @@ def read_report(path: str | Path) -> Dict:
 #: filename substrings whose JSON uses a non-standard schema (no top-level ``macro``)
 #: and would otherwise flatten into a blank macro-CSV row. ``eval_rerank.py`` writes
 #: nested ``strategies`` blocks; ``cv_eval.py`` writes ``full_corpus`` / ``kfold_*``.
-_NON_BENCHMARK_RESULT_MARKERS = ("rerank", "cv_eval")
+_NON_BENCHMARK_RESULT_MARKERS = ("rerank", "cv_eval", "patch_eval")
 
 
 def load_all(results_dir: str | Path) -> List[Dict]:

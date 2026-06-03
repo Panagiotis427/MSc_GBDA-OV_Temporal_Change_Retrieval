@@ -91,6 +91,12 @@ class ChangeRetriever:
     def score_all(self, query: str, approach: str = ZERO_SHOT) -> np.ndarray:
         """Return a score per pair, aligned with ``store.pairs`` (higher = better)."""
         t = self.encoder.encode_text(query)[0].astype(np.float32)  # (D,), L2-normed
+        return self.score_vec(t, approach)
+
+    def score_vec(self, t: np.ndarray, approach: str = ZERO_SHOT) -> np.ndarray:
+        """Score every pair against a precomputed (L2-normed) text vector ``t``.
+        Lets callers supply an ensembled query embedding (see
+        ``benchmark.encode_query``) without re-encoding per template."""
         if approach == NAIVE:
             return self._f_t2 @ t
         if approach == ZERO_SHOT:

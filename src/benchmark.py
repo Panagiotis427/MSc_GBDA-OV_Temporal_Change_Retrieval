@@ -33,6 +33,31 @@ from src.retrieval import APPROACHES, ChangeRetriever
 SNOW = "snow_and_ice"
 
 
+# Prompt templates for zero-shot text ensembling. Averaging a frozen encoder's
+# text embedding over several phrasings is a standard, training-free way to
+# stabilise CLIP retrieval (the query is short and prompt-sensitive). Stays
+# within the brief: frozen backbone, cosine scoring, no fine-tuning.
+PROMPT_TEMPLATES = (
+    "{q}",
+    "a satellite image showing {q}",
+    "remote sensing imagery of {q}",
+    "an aerial view of {q}",
+    "land-cover change: {q}",
+)
+
+
+def encode_query(encoder, text: str, ensemble: bool = False,
+                 templates=PROMPT_TEMPLATES) -> np.ndarray:
+    """Return an L2-normalised text embedding for *text*. With ``ensemble``,
+    average the encoder's embeddings over ``templates`` and renormalise."""
+    if not ensemble:
+        return encoder.encode_text(text)[0].astype(np.float32)
+    embs = encoder.encode_text([t.format(q=text) for t in templates]).astype(np.float32)
+    v = embs.mean(axis=0)
+    n = float(np.linalg.norm(v))
+    return v / n if n > 1e-8 else v
+
+
 def _t1(lb: PairLabel) -> Optional[str]:
     return lb.dominant_t1_class
 

@@ -34,10 +34,11 @@ from pathlib import Path
 
 import numpy as np
 
-from src.benchmark import _average_precision
+from src.benchmark import _average_precision, encode_query
 from src.datasets.dynamic_earthnet_pp import DENNpyDataset
 from src.encoders import get_encoder
 from src.queries.den import frac_queries
+from scripts.cv_eval import _merge_stores
 
 BOOTSTRAP = 1000
 PERM = 4000
@@ -72,16 +73,32 @@ def _encode_patches(ds, enc, cache_dir, enc_name, color):
     return p1, p2, pairs
 
 
-def _scores(P1, P2, t, approach):
+def _z(x):
+    s = x.std()
+    return (x - x.mean()) / (s + 1e-8)
+
+
+def _patch_score(P1, P2, t, approach):
     s2 = P2 @ t            # [N, n_patch]
     if approach == "patch_naive":
         return s2.max(axis=1)
     s1 = P1 @ t
     delta = s2 - s1        # [N, n_patch]
-    if approach == "patch_top3":
+    if approach == "patch_top3" or approach == "hybrid":
         k = min(3, delta.shape[1])
         return np.sort(delta, axis=1)[:, -k:].mean(axis=1)
     return delta.max(axis=1)   # patch_zeroshot
+
+
+def _scores(P1, P2, t, approach, G1=None, G2=None):
+    """Per-pair score. For ``hybrid``, fuse the global Δ-cosine and the
+    patch top-3 Δ by z-scoring each over the candidate set and summing
+    (rank-comparable; diffuse change favours global, localised favours patch)."""
+    if approach == "hybrid":
+        patch = _patch_score(P1, P2, t, "patch_top3")
+        glob = (G2 @ t) - (G1 @ t)
+        return _z(glob) + _z(patch)
+    return _patch_score(P1, P2, t, approach)
 
 
 def _rand_ap(R, N, rng):
@@ -107,7 +124,9 @@ def main() -> None:
     ap.add_argument("--cache-dir", default="data/cache")
     ap.add_argument("--results-dir", default="results")
     ap.add_argument("--approach", default="patch_zeroshot",
-                    choices=["patch_zeroshot", "patch_naive", "patch_top3"])
+                    choices=["patch_zeroshot", "patch_naive", "patch_top3", "hybrid"])
+    ap.add_argument("--prompt-ensemble", action="store_true",
+                    help="ensemble the query text embedding over prompt templates")
     ap.add_argument("--frac-thresh", type=float, default=0.05)
     ap.add_argument("--folds", type=int, default=5)
     ap.add_argument("--seed", type=int, default=42)
@@ -118,20 +137,30 @@ def main() -> None:
     ds = DENNpyDataset(root=args.root, split=None, color_mode=args.color_mode)
     P1, P2, pairs = _encode_patches(ds, enc, args.cache_dir, args.encoder, args.color_mode)
     N = len(pairs)
-    print(f"corpus {N} pairs, patch grid {P1.shape[1]}, D={P1.shape[2]}")
+    print(f"corpus {N} pairs, patch grid {P1.shape[1]}, D={P1.shape[2]}"
+          + (" | prompt-ensemble ON" if args.prompt_ensemble else ""))
+
+    # Global embeddings (for the hybrid approach), aligned to `pairs` order.
+    G1 = G2 = None
+    if args.approach == "hybrid":
+        gstore = _merge_stores("dynamic_earthnet", args.encoder, args.color_mode, args.cache_dir)
+        row = {(p.location_id, p.t1_key, p.t2_key): i for i, p in enumerate(gstore.pairs)}
+        idx = np.array([row[(p.location_id, p.t1_key, p.t2_key)] for p in pairs])
+        norm = lambda a: a / np.clip(np.linalg.norm(a, axis=1, keepdims=True), 1e-8, None)
+        G1, G2 = norm(gstore.f_t1[idx]), norm(gstore.f_t2[idx])
 
     queries = frac_queries(args.frac_thresh)
     labels = [ds.get_pair_label(p) for p in pairs]
     rel_all = {q.text: np.array([bool(lb is not None and q.predicate(lb)) for lb in labels])
                for q in queries}
     evaluable = [q for q in queries if rel_all[q.text].sum() > 0]
-    tvecs = {q.text: enc.encode_text(q.text)[0].astype(np.float32) for q in evaluable}
+    tvecs = {q.text: encode_query(enc, q.text, ensemble=args.prompt_ensemble) for q in evaluable}
 
     # full corpus
     full = []
     for q in evaluable:
         rel = rel_all[q.text]
-        sc = _scores(P1, P2, tvecs[q.text], args.approach)
+        sc = _scores(P1, P2, tvecs[q.text], args.approach, G1, G2)
         ap_obs = _average_precision(rel[np.argsort(-sc)])
         boot = np.empty(BOOTSTRAP)
         for b in range(BOOTSTRAP):
@@ -158,18 +187,22 @@ def main() -> None:
             rel = rel_all[q.text][idx]
             if rel.sum() == 0:
                 continue
-            sc = _scores(P1[idx], P2[idx], tvecs[q.text], args.approach)
+            sc = _scores(P1[idx], P2[idx], tvecs[q.text], args.approach,
+                         None if G1 is None else G1[idx], None if G2 is None else G2[idx])
             aps.append(_average_precision(rel[np.argsort(-sc)]))
         fold_macro.append(float(np.mean(aps)) if aps else 0.0)
 
     out = {"dataset": "dynamic_earthnet", "encoder": args.encoder, "color_mode": args.color_mode,
            "approach": args.approach, "relevance": "fraction", "frac_thresh": args.frac_thresh,
+           "prompt_ensemble": args.prompt_ensemble,
            "n_pairs": N, "patch_grid": int(P1.shape[1]), "n_evaluable_queries": len(evaluable),
            "full_corpus": {"macro_mAP": macro_full, "per_query": full},
            "kfold": {"macro_mAP_mean": round(float(np.mean(fold_macro)), 4),
                      "macro_mAP_std": round(float(np.std(fold_macro)), 4),
                      "fold_macro": [round(x, 4) for x in fold_macro]}}
-    op = Path(args.results_dir) / f"patch_eval__{args.encoder}__{args.color_mode}__{args.approach}.json"
+    ens = "__ens" if args.prompt_ensemble else ""
+    op = (Path(args.results_dir) /
+          f"patch_eval__{args.encoder}__{args.color_mode}__{args.approach}{ens}.json")
     Path(args.results_dir).mkdir(parents=True, exist_ok=True)
     op.write_text(json.dumps(out, indent=2), encoding="utf-8")
     print(f"\n[{args.approach}] full-corpus macro mAP = {macro_full}  "

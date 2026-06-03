@@ -119,6 +119,10 @@ def test_load_all_skips_rerank(tmp_path):
         json.dumps({"dataset": "dynamic_earthnet", "full_corpus": {"macro_mAP": 0.04}}),
         encoding="utf-8",
     )
+    (tmp_path / "patch_eval__georsclip__nrg__hybrid.json").write_text(
+        json.dumps({"dataset": "dynamic_earthnet", "kfold": {"macro_mAP_mean": 0.16}}),
+        encoding="utf-8",
+    )
     recs = results_io.load_all(tmp_path)
     assert len(recs) == 1 and recs[0]["encoder"] == "clip_vitl14"
 

@@ -36,7 +36,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.benchmark import _average_precision
+from src.benchmark import _average_precision, encode_query
 from src.datasets.dynamic_earthnet_pp import DENNpyDataset
 from src.embeddings import PairEmbeddingStore, cache_path
 from src.encoders import get_encoder
@@ -108,6 +108,9 @@ def main() -> None:
                          "fraction = pixel-fraction relevance (S1, see benchmark._gained/_lost)")
     ap.add_argument("--frac-thresh", type=float, default=0.05,
                     help="pixel-fraction threshold for --relevance fraction")
+    ap.add_argument("--prompt-ensemble", action="store_true",
+                    help="average the query text embedding over prompt templates "
+                         "(benchmark.PROMPT_TEMPLATES) instead of a single phrasing")
     ap.add_argument("--peft", action="store_true", help="also run leakage-free k-fold PEFT")
     ap.add_argument("--epochs", type=int, default=40)
     ap.add_argument("--seed", type=int, default=42)
@@ -131,14 +134,16 @@ def main() -> None:
     retr = ChangeRetriever(store, enc)
     rel_all = {q.text: _rel_vector(ds, pairs, q.predicate) for q in queries}
     evaluable = [q for q in queries if rel_all[q.text].sum() > 0]
-    print(f"evaluable on full corpus: {len(evaluable)} queries")
+    print(f"evaluable on full corpus: {len(evaluable)} queries"
+          + (" | prompt-ensemble ON" if args.prompt_ensemble else ""))
+    tvec = {q.text: encode_query(enc, q.text, ensemble=args.prompt_ensemble) for q in evaluable}
 
     # --- 1. full-corpus per-query AP + bootstrap CI + permutation p ----------
     full = []
     N = len(pairs)
     for q in evaluable:
         rel = rel_all[q.text]
-        scores = retr.score_all(q.text, approach=args.approach)
+        scores = retr.score_vec(tvec[q.text], approach=args.approach)
         order = np.argsort(-scores)
         ap_obs = _average_precision(rel[order])
         # bootstrap over pairs
@@ -179,7 +184,7 @@ def main() -> None:
             rel = rel_all[q.text][idx]
             if rel.sum() == 0:
                 continue
-            sc = rsub.score_all(q.text, approach=args.approach)
+            sc = rsub.score_vec(tvec[q.text], approach=args.approach)
             ap_k = _average_precision(rel[np.argsort(-sc)])
             cv_zs[q.text].append(ap_k)
             aps_this.append(ap_k)
@@ -194,6 +199,7 @@ def main() -> None:
         "dataset": "dynamic_earthnet", "encoder": args.encoder,
         "color_mode": args.color_mode, "approach": args.approach,
         "relevance": args.relevance, "frac_thresh": args.frac_thresh,
+        "prompt_ensemble": args.prompt_ensemble,
         "n_evaluable_queries": len(evaluable),
         "n_pairs": N, "n_aois": len(aois), "folds": args.folds,
         "full_corpus": {"macro_mAP": macro_full, "per_query": full},
@@ -226,7 +232,7 @@ def main() -> None:
                 rel = rel_all[q.text][test_idx]
                 if rel.sum() == 0:
                     continue
-                sc = rsub.score_all(q.text, approach="peft")
+                sc = rsub.score_vec(tvec[q.text], approach="peft")
                 ap_k = _average_precision(rel[np.argsort(-sc)])
                 peft_pq[q.text].append(ap_k)
                 aps_this.append(ap_k)
@@ -243,6 +249,7 @@ def main() -> None:
 
     Path(args.results_dir).mkdir(parents=True, exist_ok=True)
     rel_tag = "" if args.relevance == "dominant" else f"__{args.relevance}"
+    rel_tag += "__ens" if args.prompt_ensemble else ""
     op = (Path(args.results_dir) /
           f"cv_eval__{args.encoder}__{args.color_mode}__{args.approach}{rel_tag}.json")
     op.write_text(json.dumps(out, indent=2), encoding="utf-8")

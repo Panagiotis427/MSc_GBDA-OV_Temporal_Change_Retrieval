@@ -1123,3 +1123,32 @@ ceiling. Absolute numbers stay modest (best ~0.20), so the honest framing is unc
 but now-better-understood* open-vocabulary signal, strongest on localised construction/water and
 large-area wetland change. Reproduce: `python -m scripts.patch_eval --encoder georsclip
 --color-mode nrg --approach patch_top3`.
+
+## B.11 Two cheap in-scope tweaks tested — neither beats patch_top3 (honest negatives)
+
+Both stay within the brief (frozen backbone, cosine scoring, no fine-tuning) and reuse the cached
+embeddings (no GPU/data). GeoRSCLIP NRG, fraction relevance, 5-fold CV:
+
+| variant | CV mAP | vs patch_top3 0.195 |
+|---|---|---|
+| global zero-shot (baseline) | 0.147 ± 0.025 | — |
+| global zero-shot + prompt-ensemble | 0.146 ± 0.034 | wash |
+| **patch_top3 (best)** | **0.195 ± 0.050** | — |
+| patch_top3 + prompt-ensemble | 0.188 ± 0.057 | slightly worse |
+| hybrid (z-scored global Δ + patch top-3) | 0.160 ± 0.042 | **worse** |
+| hybrid + prompt-ensemble | 0.158 ± 0.043 | worse |
+
+- **Prompt ensembling** (averaging the query embedding over 5 templates, `benchmark.encode_query`,
+  `--prompt-ensemble`) is a **wash** — GeoRSCLIP's RS-text alignment gains nothing from generic
+  templates on these already-descriptive queries.
+- **Equal-weight hybrid** (`patch_eval.py --approach hybrid`: z-score the global Δ and the patch
+  top-3 score, sum) **hurts** (0.160 < 0.195): fusing the mostly-noise global signal dilutes the
+  stronger patch signal. The B.10 observation that the two are *complementary per-query* holds,
+  but a flat z-sum is the wrong fusion — a **query-type-gated or learned weighting** (global for
+  diffuse, patch for localised) would be needed, and is left as future work rather than tuned here
+  (out of scope to over-engineer).
+
+**Conclusion:** `patch_top3` remains the best DEN configuration (0.195 CV mAP). The two cheapest
+plausible add-ons do not help; reporting them is the honest outcome and rules them out with
+evidence. Reproduce: `python -m scripts.cv_eval ... --prompt-ensemble` /
+`python -m scripts.patch_eval ... --approach hybrid`.
