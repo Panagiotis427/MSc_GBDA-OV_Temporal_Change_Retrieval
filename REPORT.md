@@ -1092,6 +1092,8 @@ global vector. For query `t` and spatially-aligned patch grids `P1,P2`:
 `patch_top3` = mean of the top-3 such deltas. Same 75-AOI corpus, fraction relevance, 5-fold CV —
 directly comparable to B.9.
 
+![DEN result chain: the 0.426 test-split headline collapses to ~0.10 under cross-validation, then recovers to ~0.20 by fixing evaluation (S1, fraction relevance) and method (S3, patch scoring); per-query, S3 rescues localised change-types](assets/figures/cv_progression.png)
+
 | GeoRSCLIP NRG, fraction relevance | k-fold CV mAP | FDR-significant queries (of 9) |
 |---|---|---|
 | global zero-shot (B.9) | 0.147 ± 0.025 | 2 (wetland formation only) |
