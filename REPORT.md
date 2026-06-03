@@ -1152,3 +1152,38 @@ embeddings (no GPU/data). GeoRSCLIP NRG, fraction relevance, 5-fold CV:
 plausible add-ons do not help; reporting them is the honest outcome and rules them out with
 evidence. Reproduce: `python -m scripts.cv_eval ... --prompt-ensemble` /
 `python -m scripts.patch_eval ... --approach hybrid`.
+
+**Shipped in the deliverable app.** Because `patch_top3` is the best DEN config, it is now a
+selectable scoring mode in the Gradio engine ("Patch / localised (best on DEN)"): the app encodes
+per-patch embeddings for the loaded corpus once (lazily, cached for the session) and scores via
+`retrieval.top_patch_change_scores`. The search engine therefore demonstrates the strongest
+configuration, not only the global baselines.
+
+## B.12 Change-attention (training-free spatial aggregation) — refines, does not break the ceiling
+
+S3 (B.10) aggregates patches independently (top-3 Δ). Two **training-free** "change-attention"
+variants test whether *spatial structure* of the Δ-map helps — deliberately training-free to
+avoid the memorisation trap that sank every learned head (B.5): `patch_softattn` (query-conditioned
+softmax-weighted mean of the per-patch Δ, τ=0.03) and `patch_spatial` (reshape Δ to the patch grid,
+3×3 mean-smooth, then top-3 — rewards spatially-contiguous change). 5-fold CV, fraction relevance:
+
+| approach | GeoRSCLIP NRG (49-patch grid) | CLIP-L/14 NRG (256-patch grid) |
+|---|---|---|
+| patch_top3 (B.10 best) | **0.195 ± 0.050** | 0.151 ± 0.048 |
+| patch_softattn (τ=0.03) | 0.149 ± 0.057 | 0.154 ± 0.053 |
+| patch_spatial (3×3-smoothed) | 0.176 ± 0.068 | **0.169 ± 0.050** |
+
+- **Spatial coherence helps the *fine* grid, hurts the *coarse* one — as predicted.** On CLIP-L/14's
+  256-patch grid (where top-3 is noisy) smoothing lifts mAP 0.151→0.169 (+12 % rel, within fold
+  variance); on GeoRSCLIP's 7×7 grid it *over-smooths* the 1–3 genuine change patches and drops
+  0.195→0.176. Grid resolution determines whether spatial denoising helps.
+- **Soft-attention is a wash** — top-3 (hard, small-k) already sits at the sweet spot between max
+  (`patch_zeroshot` 0.162) and mean; softmax-weighting all patches only dilutes it.
+- **No variant beats GeoRSCLIP `patch_top3` (0.195).** The ~0.20 cross-validated ceiling is robust;
+  change-attention *refines* the aggregation but does not break the underlying frozen-VLM limit.
+
+**Learned attention (a trainable query→patch head) was deliberately not pursued:** B.5 showed every
+trained head on this data memorises train AOIs with no held-out gain, and B.12 shows the
+spatial-structure headroom is small (and grid-dependent) — so the likely outcome is a memorising
+head for a marginal, fold-noise-sized gain. Recorded as future work, not built. Reproduce:
+`python -m scripts.patch_eval --encoder <e> --color-mode nrg --approach patch_spatial|patch_softattn`.

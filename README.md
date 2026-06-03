@@ -149,7 +149,7 @@ derived `PairLabel`s → Recall@K, mAP, plus a seasonal-vs-permanent
 | `scripts/lora_sweep.py` | LoRA rank/epoch sweep (georsclip+nrg), in-memory, no cache/model clobber |
 | `scripts/significance_audit.py` | random-ranking baseline + permutation p + BH-FDR over every result cell → `results/results_audit_summary.csv` (REPORT Appendix B) |
 | `scripts/cv_eval.py` | full-corpus + k-fold AOI cross-validation with bootstrap CIs; `--relevance fraction` swaps dominant-class-flip relevance for pixel-fraction (REPORT Appendix B.8–B.9); merges cached split embeddings, no re-encode |
-| `scripts/patch_eval.py` | patch-level (localised) Δ-similarity change retrieval vs the global baseline (REPORT Appendix B.10, "S3"); caches per-patch embeddings via `encoder.encode_image_patches`. `--approach hybrid` fuses global+patch, `--prompt-ensemble` averages query templates (both ablated in B.11) |
+| `scripts/patch_eval.py` | patch-level (localised) Δ-similarity change retrieval vs the global baseline (REPORT Appendix B.10, "S3"); caches per-patch embeddings via `encoder.encode_image_patches`. `--approach hybrid` fuses global+patch (B.11), `patch_softattn`/`patch_spatial` are training-free change-attention variants (B.12), `--prompt-ensemble` averages query templates (B.11) |
 
 ## Run / install / use
 
@@ -197,8 +197,9 @@ python -m src.app --root data/DynamicEarthNet --encoder clip_vitl14
 Enter a query, press **Search**. Example queries: `agricultural land converted to wetland` ·
 `new buildings on former farmland` · `forest cleared to bare soil`. Results: T1 / T2 tiles side
 by side · heatmap on T2 · confidence (0–1) · permanence note (`permanent` / `likely SEASONAL` /
-`stable`) · ranked table. Two control accordions: **Settings** (Dataset / Encoder / Approach /
-Color Mode / LoRA — needs **Apply** to rebuild embeddings) and **Filters & Re-ranking**
+`stable`) · ranked table. Two control accordions: **Settings** (Dataset / Encoder / Approach —
+naive / zero-shot / **patch** (localised, best on DEN) / PEFT — / Color Mode / LoRA — needs
+**Apply** to rebuild embeddings) and **Filters & Re-ranking**
 (geographic filter, re-ranking — next **Search**, no Apply). Startup defaults via CLI flags:
 
 | Flag | Default | Notes |

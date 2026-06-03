@@ -78,7 +78,18 @@ def _z(x):
     return (x - x.mean()) / (s + 1e-8)
 
 
-def _patch_score(P1, P2, t, approach):
+def _smooth3x3(grid):
+    """3x3 mean smoothing of a [N, gh, gw] map with edge replication
+    (no SciPy). Rewards spatially-contiguous change over single-patch spikes."""
+    p = np.pad(grid, ((0, 0), (1, 1), (1, 1)), mode="edge")
+    acc = np.zeros_like(grid, dtype=np.float64)
+    for di in range(3):
+        for dj in range(3):
+            acc += p[:, di:di + grid.shape[1], dj:dj + grid.shape[2]]
+    return (acc / 9.0).astype(np.float32)
+
+
+def _patch_score(P1, P2, t, approach, tau: float = 0.03):
     s2 = P2 @ t            # [N, n_patch]
     if approach == "patch_naive":
         return s2.max(axis=1)
@@ -87,10 +98,27 @@ def _patch_score(P1, P2, t, approach):
     if approach == "patch_top3" or approach == "hybrid":
         k = min(3, delta.shape[1])
         return np.sort(delta, axis=1)[:, -k:].mean(axis=1)
-    return delta.max(axis=1)   # patch_zeroshot
+    if approach == "patch_zeroshot":
+        return delta.max(axis=1)
+    if approach == "patch_softattn":
+        # query-conditioned soft-attention: softmax(delta/tau)-weighted mean of delta.
+        # tau->0 recovers max, tau->inf recovers mean; a middle tau is a soft top-k.
+        w = np.exp((delta - delta.max(axis=1, keepdims=True)) / tau)
+        w /= w.sum(axis=1, keepdims=True)
+        return (w * delta).sum(axis=1)
+    if approach == "patch_spatial":
+        n = delta.shape[1]
+        side = int(round(n ** 0.5))
+        if side * side != n:                       # non-square grid -> fall back
+            k = min(3, n)
+            return np.sort(delta, axis=1)[:, -k:].mean(axis=1)
+        sm = _smooth3x3(delta.reshape(-1, side, side)).reshape(delta.shape[0], n)
+        k = min(3, n)
+        return np.sort(sm, axis=1)[:, -k:].mean(axis=1)
+    raise ValueError(f"unknown approach {approach!r}")
 
 
-def _scores(P1, P2, t, approach, G1=None, G2=None):
+def _scores(P1, P2, t, approach, G1=None, G2=None, tau: float = 0.03):
     """Per-pair score. For ``hybrid``, fuse the global Δ-cosine and the
     patch top-3 Δ by z-scoring each over the candidate set and summing
     (rank-comparable; diffuse change favours global, localised favours patch)."""
@@ -98,7 +126,7 @@ def _scores(P1, P2, t, approach, G1=None, G2=None):
         patch = _patch_score(P1, P2, t, "patch_top3")
         glob = (G2 @ t) - (G1 @ t)
         return _z(glob) + _z(patch)
-    return _patch_score(P1, P2, t, approach)
+    return _patch_score(P1, P2, t, approach, tau=tau)
 
 
 def _rand_ap(R, N, rng):
@@ -124,7 +152,10 @@ def main() -> None:
     ap.add_argument("--cache-dir", default="data/cache")
     ap.add_argument("--results-dir", default="results")
     ap.add_argument("--approach", default="patch_zeroshot",
-                    choices=["patch_zeroshot", "patch_naive", "patch_top3", "hybrid"])
+                    choices=["patch_zeroshot", "patch_naive", "patch_top3", "hybrid",
+                             "patch_softattn", "patch_spatial"])
+    ap.add_argument("--tau", type=float, default=0.03,
+                    help="softmax temperature for --approach patch_softattn")
     ap.add_argument("--prompt-ensemble", action="store_true",
                     help="ensemble the query text embedding over prompt templates")
     ap.add_argument("--frac-thresh", type=float, default=0.05)
@@ -160,7 +191,7 @@ def main() -> None:
     full = []
     for q in evaluable:
         rel = rel_all[q.text]
-        sc = _scores(P1, P2, tvecs[q.text], args.approach, G1, G2)
+        sc = _scores(P1, P2, tvecs[q.text], args.approach, G1, G2, tau=args.tau)
         ap_obs = _average_precision(rel[np.argsort(-sc)])
         boot = np.empty(BOOTSTRAP)
         for b in range(BOOTSTRAP):
@@ -188,13 +219,14 @@ def main() -> None:
             if rel.sum() == 0:
                 continue
             sc = _scores(P1[idx], P2[idx], tvecs[q.text], args.approach,
-                         None if G1 is None else G1[idx], None if G2 is None else G2[idx])
+                         None if G1 is None else G1[idx], None if G2 is None else G2[idx],
+                         tau=args.tau)
             aps.append(_average_precision(rel[np.argsort(-sc)]))
         fold_macro.append(float(np.mean(aps)) if aps else 0.0)
 
     out = {"dataset": "dynamic_earthnet", "encoder": args.encoder, "color_mode": args.color_mode,
            "approach": args.approach, "relevance": "fraction", "frac_thresh": args.frac_thresh,
-           "prompt_ensemble": args.prompt_ensemble,
+           "prompt_ensemble": args.prompt_ensemble, "tau": args.tau,
            "n_pairs": N, "patch_grid": int(P1.shape[1]), "n_evaluable_queries": len(evaluable),
            "full_corpus": {"macro_mAP": macro_full, "per_query": full},
            "kfold": {"macro_mAP_mean": round(float(np.mean(fold_macro)), 4),

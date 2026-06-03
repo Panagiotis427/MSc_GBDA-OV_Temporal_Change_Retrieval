@@ -113,6 +113,7 @@ class SemanticChangeSearch:
         if adapter is not None:
             self.retriever.set_adapter(adapter, cfg.feature_mode)
         self._adapter = adapter
+        self._patch_t1 = self._patch_t2 = None  # lazy patch-embedding cache
         self._init_extensions(cfg)
         return self
 
@@ -148,6 +149,7 @@ class SemanticChangeSearch:
         self._adapter = self._maybe_load_adapter(cfg)
         if self._adapter is not None:
             self.retriever.set_adapter(self._adapter, cfg.feature_mode)
+        self._patch_t1 = self._patch_t2 = None  # invalidate lazy patch cache on (re)build
         self._init_extensions(cfg)
 
     def _init_extensions(self, cfg: RunConfig) -> None:
@@ -182,6 +184,30 @@ class SemanticChangeSearch:
                 print(f"Adapter load failed ({exc}); PEFT disabled.")
         return None
 
+    # -- patch (localised) scoring --------------------------------------
+    def _patch_scores(self, text: str) -> np.ndarray:
+        """Localised patch-level Δ-similarity (REPORT Appendix B.10, best DEN
+        config). Encodes per-patch embeddings for the loaded corpus once, lazily,
+        then caches them on the engine for subsequent queries."""
+        from src.benchmark import encode_query
+        from src.retrieval import top_patch_change_scores
+        if getattr(self, "_patch_t1", None) is None:
+            p1, p2 = [], []
+            for pk in self.store.pairs:
+                im1, im2 = self.dataset.load_pair_images(pk)
+                a = self.encoder.encode_image_patches(im1)
+                b = self.encoder.encode_image_patches(im2)
+                if a is None or b is None:
+                    raise RuntimeError(
+                        f"{self.encoder.name} exposes no patch tokens; "
+                        "pick zero_shot/naive/peft.")
+                p1.append(a)
+                p2.append(b)
+            self._patch_t1 = np.stack(p1)
+            self._patch_t2 = np.stack(p2)
+        t = encode_query(self.encoder, text)
+        return top_patch_change_scores(self._patch_t1, self._patch_t2, t)
+
     # -- query ----------------------------------------------------------
     def query(
         self,
@@ -204,11 +230,14 @@ class SemanticChangeSearch:
         rerank_strategy: ``"diversity"``, ``"coherence"``, or ``None``
             (disabled).  Requires ``aoi_metadata.json``.
         """
-        if approach == "peft" and self.retriever.adapter is None:
-            raise RuntimeError(
-                "PEFT selected but no adapter found. Train one with "
-                "`python -m src.train` or pick zero_shot.")
-        scores = self.retriever.score_all(text, approach=approach)
+        if approach == "patch":
+            scores = self._patch_scores(text)
+        else:
+            if approach == "peft" and self.retriever.adapter is None:
+                raise RuntimeError(
+                    "PEFT selected but no adapter found. Train one with "
+                    "`python -m src.train` or pick zero_shot.")
+            scores = self.retriever.score_all(text, approach=approach)
 
         # Geographic filter — mask excluded pairs with -inf
         if geo_region not in ("All", "", None) and self._geo_filter is not None:
@@ -373,6 +402,7 @@ class SemanticChangeSearch:
                     choices=[
                         ("Naive (baseline)", "naive"),
                         ("Zero-shot (no training)", "zero_shot"),
+                        ("Patch / localised (best on DEN)", "patch"),
                         ("PEFT adapter (trained)", "peft"),
                     ],
                     value=engine.cfg.approach,
