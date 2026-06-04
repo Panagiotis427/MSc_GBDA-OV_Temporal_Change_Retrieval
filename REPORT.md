@@ -612,6 +612,37 @@ python -m scripts.make_comparison_figure --encoder clip_vitl14 --split train
 `export_results` writes one JSON per run + `macro_summary.csv` (machine-readable,
 re-plottable); `make_figures` renders the bar/curve/heatmap/confusion PNGs.
 
+### Direct seasonal-robustness probe — stable-pair Δ-similarity FPR gate
+
+`seasonal_drift@K` is uninformative on the current corpora (no snow/ice positives;
+reported N/A in §B.6.2), so seasonal robustness is also probed *directly*. The
+`zero_shot` score is lifted to a whole-image binary gate: for a change query `t` and
+a pair's L2-normalised global embeddings, `Δ = cos(t, f_T2) − cos(t, f_T1)`; the gate
+fires ("change") when `Δ > threshold`. On a **stable** pair `f_T1 ≈ f_T2`, so `Δ ≈ 0`
+for any query — every firing on a stable pair is a false positive. Sweeping the
+threshold over the stable subset (DEN's own `PairLabel.stable` flag) gives a
+false-positive-rate (FPR) curve that measures how often seasonal/illumination drift
+is mistaken for change. Implementation: [`src/seasonal_gate.py`](src/seasonal_gate.py)
+(`ImageLevelChangeGate`); driver: [`scripts/run_seasonal_gate.py`](scripts/run_seasonal_gate.py);
+unit tests in `tests/test_seasonal_gate.py`.
+
+Run (local, same RTX 4060 as §8; deterministic — frozen encoder):
+
+```
+python -m scripts.run_seasonal_gate --root data/DynamicEarthNet \
+    --encoder georsclip --color-mode rgb --split test
+```
+
+Result (populate from the run above; `mode=recomputed`):
+
+| split | encoder | color | n stable pairs | mean Δ-sim | FPR@0.00 | FPR@0.02 | FPR@0.05 | FPR@0.10 |
+|---|---|---|---|---|---|---|---|---|
+| test | georsclip | rgb | _tbd_ | _tbd_ | _tbd_ | _tbd_ | _tbd_ | _tbd_ |
+
+Expected shape (the hypothesis under test, not a measured number): stable pairs carry
+near-zero mean Δ-similarity, so the FPR should fall to ~0 once the threshold clears the
+noise floor — consistent with the GeoRSCLIP-best zero-shot reading in §7.
+
 ---
 
 ## 8. Resources and operational metrics
@@ -866,7 +897,10 @@ counts).
   (`open_vocabulary_temporal_change_retrieval`) that doesn't exist → rename to a unique package.
 - **`requires-python = ">=3.12"`** blocks `pip install -e .` in the thesis envs (3.9/3.10) → lower.
 - **`compute_patch_text_similarity` min-max normalises per image to [0,1]** — breaks the
-  patch-level CLIP-difference baseline the Q2 plan builds on → add a raw-cosine patch path.
+  patch-level CLIP-difference baseline the Q2 plan builds on → *resolved:* a raw-cosine patch
+  path already exists — `encode_image_patches` returns per-patch features whose cosines are
+  directly comparable across T1/T2 (no per-image min-max), as used by `scripts.patch_eval`;
+  `compute_patch_text_similarity` retains min-max for the heatmap UI only.
 - **`retrieve_changes(query, top_k=5)`** (Q4 Mode-A tool named in the plan) doesn't exist (real
   entry is `ChangeRetriever.search`) → add a thin wrapper or correct the thesis docs.
 - GeoRSCLIP (ViT-B/32) gives only a 7×7 patch grid — coarse for a segmentation baseline.

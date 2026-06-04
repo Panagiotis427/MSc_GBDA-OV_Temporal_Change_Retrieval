@@ -113,7 +113,16 @@ def resize_heatmap(
     target_height: int,
     target_width: int,
 ) -> np.ndarray:
-    """Bilinear-resize a patch grid to full image resolution."""
+    """Bilinear-resize a patch grid to full image resolution.
+
+    Display-oriented: the grid is quantised to ``uint8`` (``*255``) before
+    resizing and the output is clipped to ``[0, 1]``. Callers must therefore
+    pass a heatmap already normalised to ``[0, 1]`` — a **signed or raw-cosine
+    Δ map fed in directly loses its sign and is quantised to 8-bit precision**.
+    For change scoring on patch features (where the absolute, T1/T2-comparable
+    cosine matters), use ``encode_image_patches`` and difference the raw
+    per-patch cosines instead of routing them through this resizer.
+    """
     resized = cv2.resize(
         (heatmap * 255).astype(np.uint8),
         (target_width, target_height),
