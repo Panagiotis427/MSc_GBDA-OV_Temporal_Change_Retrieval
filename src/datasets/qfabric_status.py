@@ -143,6 +143,14 @@ class StatusQFabricDataset(TEOChatlasQFabricDataset):
     }
 
     def text_caption_for_pair(self, pair: PairKey) -> str:
+        # Weak PEFT caption keyed on the achieved (t2) status only — a
+        # deliberate end-state framing: it matches the query phrasing in
+        # src/queries/qfabric_status.py and keeps captions low-cardinality. A
+        # consequence is that a stable pair (status unchanged) and a
+        # transitioning pair that ends at the same status share a caption, so
+        # the PEFT supervision carries some change-vs-stable label noise. This
+        # is intentional and only affects the PEFT approach; the headline
+        # directional signal here is zero_shot (cos Δ), which ignores captions.
         st = self._status.get(pair.location_id, {})
         s2 = st.get(pair.t2_key)
         if s2 is None:

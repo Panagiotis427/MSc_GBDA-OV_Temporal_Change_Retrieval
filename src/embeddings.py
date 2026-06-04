@@ -43,9 +43,11 @@ def cache_tag_for(split: str, color_mode: str = "rgb", lora: bool = False) -> st
 
     Single source of truth for the cache-tag string, matching the layout the
     committed caches were written with by ``scripts.run_pipeline`` (rgb adds no
-    colour suffix; lora appends ``_lora``). Importers: ``run_pipeline``, the
-    ``embeddings`` CLI, ``app``, ``export_results``. Keeping this in one place
-    avoids the historical ``test``+``rgb``->empty-tag drift.
+    colour suffix; lora appends ``_lora``). Importers: ``run_pipeline``,
+    ``train``, ``cv_eval``, ``eval_rerank``, ``make_comparison_figure``, the
+    ``embeddings`` CLI, ``app``, ``export_results`` (grep ``cache_tag_for`` for
+    the authoritative list). Keeping this in one place avoids the historical
+    ``test``+``rgb``->empty-tag drift.
     """
     color_tag = f"_{color_mode}" if color_mode != "rgb" else ""
     lora_tag = "_lora" if lora else ""

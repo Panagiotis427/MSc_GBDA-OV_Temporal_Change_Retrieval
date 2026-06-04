@@ -38,6 +38,7 @@ from src.benchmark import _average_precision, encode_query
 from src.datasets.dynamic_earthnet_pp import DENNpyDataset
 from src.encoders import get_encoder
 from src.queries.den import frac_queries
+from src.stats import rand_ap
 from scripts.cv_eval import _merge_stores
 
 BOOTSTRAP = 1000
@@ -129,18 +130,8 @@ def _scores(P1, P2, t, approach, G1=None, G2=None, tau: float = 0.03):
     return _patch_score(P1, P2, t, approach, tau=tau)
 
 
-def _rand_ap(R, N, rng):
-    rel = np.zeros(N, bool)
-    rel[:R] = True
-    rng.shuffle(rel)
-    hits = np.cumsum(rel)
-    return float((hits / np.arange(1, N + 1))[rel].sum() / R)
-
-
 def _perm_p(N, n_rel, obs, rng, iters=PERM):
-    base = np.zeros(N, bool)
-    base[:n_rel] = True
-    draws = np.array([_rand_ap(n_rel, N, rng) for _ in range(iters)])
+    draws = np.array([rand_ap(n_rel, N, rng) for _ in range(iters)])
     return float((draws >= obs).mean()), float(draws.mean())
 
 

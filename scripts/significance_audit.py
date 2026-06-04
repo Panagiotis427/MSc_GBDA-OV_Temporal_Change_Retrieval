@@ -39,22 +39,15 @@ import os
 
 import numpy as np
 
+from src.stats import rand_ap
+
 ITERS = 4000
 SEED = 0
 
 
-def _random_ap(R: int, N: int, rng) -> float:
-    """AP of a uniformly random ranking of N items with R relevant (standard AP)."""
-    rel = np.zeros(N, dtype=bool)
-    rel[:R] = True
-    rng.shuffle(rel)
-    hits = np.cumsum(rel)
-    return float((hits / np.arange(1, N + 1))[rel].sum() / R)
-
-
 def _perm(rels, N, obs_map, rng, iters=ITERS):
     """Monte-Carlo null for the *macro* mAP (mean of per-query random APs)."""
-    draws = np.array([np.mean([_random_ap(R, N, rng) for R in rels])
+    draws = np.array([np.mean([rand_ap(R, N, rng) for R in rels])
                       for _ in range(iters)])
     return float((draws >= obs_map).mean()), float(draws.mean())
 
@@ -89,8 +82,14 @@ def collect(results_dir="results"):
     held = [r for r in rows if r["split"] in ("test", "eval", "val")]
     order = sorted(range(len(held)), key=lambda i: held[i]["perm_p"])
     m = len(held)
-    for rank, i in enumerate(order, 1):
-        held[i]["bh_fdr"] = round(min(1.0, held[i]["perm_p"] * m / rank), 4)
+    # Benjamini-Hochberg adjusted q-values. The raw p*m/rank is not monotone in
+    # rank, so the textbook step-up takes the running minimum from the largest
+    # p downward (a q-value is never below a higher-ranked one) and caps at 1.
+    running_min = 1.0
+    for rank in range(m, 0, -1):
+        i = order[rank - 1]
+        running_min = min(running_min, held[i]["perm_p"] * m / rank)
+        held[i]["bh_fdr"] = round(min(1.0, running_min), 4)
     for r in rows:
         r.setdefault("bh_fdr", "")  # train cells: no FDR (not in the family)
     return rows

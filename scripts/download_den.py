@@ -14,6 +14,7 @@ Steps
 5. Touch ``_done.marker``.
 """
 import argparse
+import json
 import os
 import tarfile
 import zipfile
@@ -69,13 +70,16 @@ def verify_layout(root: Path, min_aois: int = 5) -> None:
 
 
 def build_label_index(root: Path, pairing_strategy: str = "bimonthly") -> Path:
-    """Iterate all pairs and run ``derive_pair_label``; write parquet index."""
+    """Iterate all pairs via ``DENDataset`` and write the ``labels_index.parquet``.
+
+    Columns: ``location``, ``t1_key``, ``t2_key``, ``change_type``, ``stable``,
+    ``dominant_t1_class``, ``dominant_t2_class``, and ``class_change_fraction_json``
+    (JSON-encoded ``{class: {gained_fraction, lost_fraction}}`` per pair). The
+    fractions let the loader serve fraction-based relevance predicates without
+    re-reading rasters.
+    """
     import pandas as pd
-    from src.datasets.dynamic_earthnet import (
-        DENDataset,
-        derive_pair_label,
-        _load_label_tif,
-    )
+    from src.datasets.dynamic_earthnet import FRAC_JSON_COL, DENDataset
 
     print("Building labels_index.parquet ...")
     ds = DENDataset(root, pairing_strategy=pairing_strategy)
@@ -90,6 +94,12 @@ def build_label_index(root: Path, pairing_strategy: str = "bimonthly") -> Path:
             "stable": label.stable if label else True,
             "dominant_t1_class": label.dominant_t1_class if label else None,
             "dominant_t2_class": label.dominant_t2_class if label else None,
+            # Persist the per-class change fractions so the index fast-path can
+            # serve fraction-based relevance predicates without re-reading the
+            # rasters (and consistently with the scalar fields above).
+            FRAC_JSON_COL: json.dumps(
+                label.class_change_mask_fraction if label else {}
+            ),
         })
     df = pd.DataFrame(rows)
     out_path = root / "labels_index.parquet"

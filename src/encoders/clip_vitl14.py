@@ -97,6 +97,15 @@ class CLIPViTL14Encoder:
         with torch.no_grad():
             pixel_values = self._processor(images=image, return_tensors="pt").pixel_values.to(self.device)
             vision_outputs = self._clip_model.vision_model(pixel_values=pixel_values)
+            # Deliberately read the raw patch tokens (last_hidden_state) without
+            # the vision tower's post_layernorm — HF CLIP applies that LN only to
+            # the pooled CLS token, so dense per-patch features conventionally
+            # skip it (the MaskCLIP-style recipe). NOTE: the open_clip encoders
+            # (_openclip_base._patch_tokens) DO apply ln_post to patches, so the
+            # two encoder families normalise patches slightly differently. This
+            # is harmless for patch-level retrieval because every comparison is
+            # within a single encoder (patch_eval never mixes encoders); it would
+            # only matter if patch embeddings were ever compared across families.
             patch_tokens = vision_outputs.last_hidden_state[:, 1:, :]
             projected = self._clip_model.visual_projection(patch_tokens)
             projected = F.normalize(projected, dim=-1).squeeze(0)   # [N, D]

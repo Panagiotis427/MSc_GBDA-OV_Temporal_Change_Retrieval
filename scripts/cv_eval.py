@@ -38,7 +38,7 @@ import numpy as np
 
 from src.benchmark import _average_precision, encode_query
 from src.datasets.dynamic_earthnet_pp import DENNpyDataset
-from src.embeddings import PairEmbeddingStore, cache_path
+from src.embeddings import PairEmbeddingStore, cache_path, cache_tag_for
 from src.encoders import get_encoder
 from src.queries import get_queries
 from src.retrieval import ChangeRetriever
@@ -48,15 +48,14 @@ BOOTSTRAP = 1000
 PERM = 4000
 
 
-def _color_tag(split: str, color: str) -> str:
-    return split if color == "rgb" else f"{split}_{color}"
-
-
 def _merge_stores(dataset_name, encoder_name, color, cache_dir):
     """Concatenate the cached train/val/test stores into one 75-AOI corpus store."""
     pairs, f1, f2, dim = [], [], [], None
     for sp in SPLITS:
-        p = cache_path(cache_dir, dataset_name, encoder_name, tag=_color_tag(sp, color))
+        # Use the canonical cache-tag helper (single source of truth) rather
+        # than a local re-implementation, so this can never drift from the
+        # layout scripts.run_pipeline wrote the committed caches with.
+        p = cache_path(cache_dir, dataset_name, encoder_name, tag=cache_tag_for(sp, color))
         if not p.exists():
             raise FileNotFoundError(f"missing cache {p} — run the pipeline for split={sp} first")
         st = PairEmbeddingStore.load(p)
@@ -81,7 +80,13 @@ def _rel_vector(dataset, pairs, predicate):
 
 
 def _perm_p(rel_ranked_len, n_rel, obs_ap, rng, iters=PERM):
-    """P(random-ranking AP >= obs_ap) for a query with n_rel positives in N items."""
+    """P(random-ranking AP >= obs_ap) for a query with n_rel positives in N items.
+
+    Intentionally NOT replaced by ``src.stats.rand_ap`` (used by patch_eval /
+    significance_audit): this routine draws via ``rng.permutation`` whereas
+    ``rand_ap`` uses ``rng.shuffle``, so unifying them would change this script's
+    RNG draw sequence and perturb the already-committed ``cv_eval__*.json``.
+    """
     N = rel_ranked_len
     draws = np.empty(iters)
     base = np.zeros(N, bool)

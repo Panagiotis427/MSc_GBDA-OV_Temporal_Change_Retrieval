@@ -7,6 +7,12 @@ Expected on-disk layout (after running ``scripts/download_den.py``):
     ├── planet/<aoi_id>/<YYYY-MM-DD>.tif     (daily Planet-Fusion, 4-band RGBNIR)
     ├── labels/<aoi_id>/<YYYY-MM-01>.tif     (monthly 7-class LULC)
     └── labels_index.parquet                  (built by download_den.py)
+        columns: location, t1_key, t2_key, change_type, stable,
+        dominant_t1_class, dominant_t2_class, and (current schema)
+        ``class_change_fraction_json`` — a JSON string mapping each class name to
+        ``{"gained_fraction": float, "lost_fraction": float}``. Indexes built
+        before that column existed still load; the loader derives the fractions
+        from the rasters on demand as a fallback.
 
 Pairing strategies
 ------------------
@@ -23,6 +29,7 @@ Pairing strategies
 """
 from __future__ import annotations
 
+import json
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -38,6 +45,12 @@ from .base import PairKey, PairLabel
 # 7 LULC classes (Toker et al. 2022). Index 0 = nodata. Single source of
 # truth in ``_palette.py`` so loader, fixture generator, and tests cannot drift.
 from ._palette import DEN_CLASS_NAMES as CLASS_NAMES  # noqa: E402
+
+# Parquet column holding the JSON-encoded per-class change fractions. Single
+# source of truth shared by the reader (this module), the writer
+# (``scripts/download_den.build_label_index``), and the round-trip test, so the
+# name cannot drift between them.
+FRAC_JSON_COL = "class_change_fraction_json"
 
 
 def discover_aoi_dates(planet_dir: Path) -> Dict[str, List[str]]:
@@ -211,6 +224,16 @@ class DENDataset:
         # Load pre-built index if available (speeds up label access)
         if self._index_path.exists():
             self._index_df = pd.read_parquet(self._index_path)
+            if FRAC_JSON_COL not in self._index_df.columns:
+                import warnings
+                warnings.warn(
+                    f"{self._index_path} predates the '{FRAC_JSON_COL}' column; "
+                    "fraction-based relevance queries will derive fractions from "
+                    "the rasters per pair (slower, and impossible if the rasters "
+                    "are absent). Rebuild with: python -m scripts.download_den "
+                    "(or scripts.download_den.build_label_index).",
+                    stacklevel=2,
+                )
         else:
             self._index_df = None
 
@@ -269,12 +292,44 @@ class DENDataset:
             ]
             if len(row) == 1:
                 r = row.iloc[0]
+                # Per-class change fractions back the fraction-based relevance
+                # predicates (benchmark._gained / _lost); without them those
+                # queries silently match nothing. Prefer the fractions persisted
+                # in the index (raster-free, and consistent with the index's
+                # scalar fields since the same build_label_index pass wrote both).
+                # Older indexes predate that column -> best-effort derive from the
+                # rasters as a fallback, kept robust: only fill fractions if the
+                # rasters load cleanly (the index's scalar label is always used),
+                # since _derive_label catches only FileNotFoundError, not corrupt
+                # or dimension-mismatched rasters.
+                fractions: Dict[str, Dict[str, float]] = {}
+                frac_json = r.get(FRAC_JSON_COL)
+                if isinstance(frac_json, str):
+                    decoded = json.loads(frac_json)
+                    # Guard against a hand-edited/foreign index: downstream
+                    # predicates expect a dict-of-dicts, so anything else -> {}.
+                    fractions = decoded if isinstance(decoded, dict) else {}
+                else:
+                    try:
+                        derived = self._derive_label(pair)
+                        if derived is not None:
+                            fractions = derived.class_change_mask_fraction
+                    except FileNotFoundError:
+                        fractions = {}  # rasters absent — expected, stay quiet
+                    except Exception as exc:  # corrupt / mismatched raster
+                        import warnings
+                        warnings.warn(
+                            f"Could not derive change fractions for {pair}: "
+                            f"{exc!r}; leaving them empty.",
+                            stacklevel=2,
+                        )
+                        fractions = {}
                 label = PairLabel(
                     change_type=str(r["change_type"]),
                     stable=bool(r["stable"]),
                     dominant_t1_class=r.get("dominant_t1_class"),
                     dominant_t2_class=r.get("dominant_t2_class"),
-                    class_change_mask_fraction={},
+                    class_change_mask_fraction=fractions,
                 )
                 self._label_cache[cache_key] = label
                 return label

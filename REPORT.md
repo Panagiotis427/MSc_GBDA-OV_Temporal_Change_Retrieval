@@ -163,7 +163,7 @@ testable in seconds with no network.
 4. **CLIP text sanity** — post-fix `encode_text` returns `[N, 768]`,
    L2-normalised, on CUDA; forest image correctly prefers "forest" over
    "city". Confirms the P1 fix.
-5. **Fast test suite (mock encoders, fixture, no network)** — **192 passed**.
+5. **Fast test suite (mock encoders, fixture, no network)** — **197 passed**.
    Covers embeddings cache + round-trip, retrieval (naive/zero_shot/peft),
    benchmark metrics (exact Recall@1/AP on engineered transitions), PEFT
    training (loss decreases, save/load, PEFT ≥ zero-shot), encoder
@@ -857,7 +857,7 @@ on this machine.
 0.102→0.104, NDVI 0.062→0.064); §7.8 mega_projects 80→76 pairs; §7.9 figure paraphrase tied to
 real §7.2 cells; §9 cache-key wording; `embeddings.py` cache-path docstring; `lora_train` default
 dataset crash (`dynamic_earthnet_pp`→`dynamic_earthnet`); §7.2 footnote disclosing the 3-wetland
-headline basis. Test suite now runs **208 passed, 1 skipped** (supersedes the stale "129/192"
+headline basis. Test suite now runs **212 passed, 1 skipped** (supersedes the stale "129/192"
 counts).
 
 **A.3 Still open — your decision (thesis-component reuse, all high):**
@@ -903,7 +903,7 @@ The near-zero numbers are **not** a failure — but also not the result they loo
 2. **Judge mAP against the random-ranking baseline (~prevalence), not 0.** Random scores
    mAP ≈ 0.17 on QFabric-TEO and ≈ 0.08 on DEN-test.
 3. **On the committed test split, GeoRSCLIP zero-shot on DEN looks strong** (NRG 0.426, RGB
-   0.299, NDVI 0.216; BH-FDR ≤ 0.018 vs random). Everything else is a large-N significance
+   0.299, NDVI 0.216; BH-FDR ≤ 0.017 vs random). Everything else is a large-N significance
    mirage (QFabric), a leakage number (train PEFT), or below random. **But §B.3's per-split
    significance is superseded by the cross-validation in §B.8** — see point 4.
 4. **That signal does not generalise / is not robust.** DEN-test evaluates only 3
@@ -934,7 +934,7 @@ effect size.
 |---|---|---|---|---|---|---|---|---|---|---|
 | dynamic_earthnet | georsclip | test | nrg | zero_shot | 3 | **0.426** | 0.082 | 5.2× | **0.000** ✓ | [0.06, 0.63] |
 | dynamic_earthnet | georsclip | test | rgb | zero_shot | 3 | 0.299 | 0.084 | 3.6× | **0.002** ✓ | [0.03, 0.47] |
-| dynamic_earthnet | georsclip | test | ndvi | zero_shot | 3 | 0.216 | 0.083 | 2.6× | **0.018** ✓ | [0.07, 0.29] |
+| dynamic_earthnet | georsclip | test | ndvi | zero_shot | 3 | 0.216 | 0.083 | 2.6× | **0.017** ✓ | [0.07, 0.29] |
 | dynamic_earthnet | georsclip | test | nrg | naive | 3 | 0.155 | 0.083 | 1.9× | 0.111 ✗ | [0.07, 0.31] |
 | dynamic_earthnet | clip_vitl14 | test | * | * | 3 | ≤0.10 | 0.083 | ≤1.2× | 1.000 ✗ | ≈ random |
 | qfabric_teo | georsclip | test | rgb | naive | 6 | 0.272 | 0.170 | 1.6× | 0.000 ✓† | [0.01, 0.59] |

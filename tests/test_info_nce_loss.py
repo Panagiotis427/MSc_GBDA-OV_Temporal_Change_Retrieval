@@ -111,6 +111,10 @@ class TestInfoNCELoss:
         """Test that cosine similarity is computed correctly."""
         criterion = InfoNCELoss()
 
+        # Seed for determinism: the min<0 assertion below is almost always true
+        # for random high-dim vectors but not guaranteed, so an unseeded draw
+        # made this test flaky (it could occasionally see all-positive cosines).
+        torch.manual_seed(0)
         # Create two identical embeddings - cosine sim should be 1
         x = torch.randn(4, 768)
         sim_matrix = criterion._compute_similarities(x, x)

@@ -34,7 +34,7 @@ import torch.nn.functional as F
 
 from src.datasets.base import TemporalDataset
 from src.datasets.registry import get_dataset
-from src.embeddings import PairEmbeddingStore, load_or_compute
+from src.embeddings import PairEmbeddingStore, cache_tag_for, load_or_compute
 from src.encoders import get_encoder
 from src.model import ProjectionHead, create_projection_head, save_adapter
 from src.retrieval import ChangeRetriever
@@ -181,7 +181,13 @@ def main() -> None:
     ds = _build_den(args.dataset, args.root, args.pairing,
                     None if args.split == "all" else args.split)
     enc = get_encoder(args.encoder)
-    store = load_or_compute(ds, enc, cache_dir=args.cache_dir)
+    # Key the embedding cache by split (this CLI is rgb-only) via the canonical
+    # tag helper, matching scripts.run_pipeline. Without a tag this read/wrote
+    # the un-split-tagged cache, so it bypassed the split-keyed caches and
+    # different --split runs clobbered one shared file (the "test+rgb -> empty
+    # tag" drift cache_tag_for exists to prevent).
+    store = load_or_compute(ds, enc, cache_dir=args.cache_dir,
+                            cache_tag=cache_tag_for(args.split, "rgb"))
 
     cfg = TrainConfig(mode=args.mode, epochs=args.epochs,
                       batch_size=args.batch_size, lr=args.lr)
@@ -193,7 +199,11 @@ def main() -> None:
     print(f"\nTraining adapter ({args.mode}, {args.epochs} epochs)...")
     adapter, hist = train_adapter(ds, store, enc, cfg)
 
-    out = args.out or f"models/{ds.name}__{enc.name}__adapter.pt"
+    # Tag non-default feature modes so a `concatenate` run never clobbers the
+    # committed `difference` adapters (difference -> no suffix, back-compat;
+    # mirrors scripts.run_pipeline's adapter-path convention).
+    mode_tag = "" if args.mode == "difference" else f"_{args.mode}"
+    out = args.out or f"models/{ds.name}__{enc.name}{mode_tag}__adapter.pt"
     save_adapter(out, adapter, {
         "input_dim": adapter.input_dim, "output_dim": adapter.output_dim,
         "hidden_dims": list(cfg.hidden_dims), "dropout_rate": cfg.dropout,
