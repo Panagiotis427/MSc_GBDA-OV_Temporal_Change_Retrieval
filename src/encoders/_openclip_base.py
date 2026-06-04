@@ -9,13 +9,36 @@ architecture, then load a domain-specific state dict downloaded with
 """
 from __future__ import annotations
 
-from typing import List, Optional, Union
+import contextlib
+import logging
+from typing import Iterator, List, Optional, Union
 
 from src import _cache  # noqa: F401  sets HF_HOME before huggingface_hub
 import numpy as np
 import torch
 import torch.nn.functional as F
 from PIL import Image
+
+
+@contextlib.contextmanager
+def _silence_open_clip_random_init() -> Iterator[None]:
+    """Suppress open_clip's spurious ``No pretrained weights loaded ... Model
+    initialized randomly`` warning emitted while building the bare architecture.
+    It is misleading here: we immediately load the domain checkpoint over the
+    random init (see :func:`_load_state_dict_flexible`), so the model is never
+    left random. Scoped to the model-creation call only."""
+
+    class _Filter(logging.Filter):
+        def filter(self, record: logging.LogRecord) -> bool:  # noqa: A003
+            return "No pretrained weights loaded" not in record.getMessage()
+
+    root = logging.getLogger()
+    flt = _Filter()
+    root.addFilter(flt)
+    try:
+        yield
+    finally:
+        root.removeFilter(flt)
 
 
 def _load_state_dict_flexible(model, ckpt_path: str) -> None:
@@ -65,7 +88,8 @@ class OpenClipHFEncoder:
         )
         print(f"Loading {self.name}: {self._hf_repo}/{self._hf_file} "
               f"(arch {self._arch})")
-        model, _, preprocess = open_clip.create_model_and_transforms(self._arch)
+        with _silence_open_clip_random_init():
+            model, _, preprocess = open_clip.create_model_and_transforms(self._arch)
         ckpt_path = hf_hub_download(
             repo_id=self._hf_repo, filename=self._hf_file, cache_dir=cache_dir
         )
