@@ -17,16 +17,20 @@ Color mode `ndvi` benchmarked across all 3 encoders × 3 splits.
 
 - **Status:** Benchmarked; NRG > NDVI > RGB on test for all encoders. NDVI collapses spectral texture to 1 channel. In-app toggle: Settings → **Color mode** dropdown (`rgb` / `nrg` / `ndvi`). CLI: `--color-mode`. Results in REPORT.md §7.3.
 
-### Hosted demo
-Gradio app built. Root `app.py` and `requirements.txt` are ready for HuggingFace Spaces.
+### Hosted demo ✅
+Gradio app deployed to a public HuggingFace Space (slim fixture demo).
 
 - **Why:** Shareable link; no extra code changes.
-- **Status:** `app.py` (root entry point) + `requirements.txt` committed. Fixture at `tests/fixtures/den_tiny` is bundled. CLIP weights (~1.6 GB) auto-download from HF on first Space boot.
-- **How to deploy:**
-  1. Push repo to a public HF Space (SDK: Gradio, hardware: CPU Basic or GPU T4).
+- **Status:** **Deployed.** A slim Space branch (`space` remote) serves the
+  bundled `tests/fixtures/den_tiny` fixture — top-K heatmap gallery + search
+  progress, no model weights/assets shipped. `app.py` (root entry point) +
+  `requirements.txt` committed; CLIP weights (~1.6 GB) auto-download from HF on
+  first boot when run against real data.
+- **How to deploy (recorded for reuse):**
+  1. Push to a public HF Space (SDK: Gradio, hardware: CPU Basic or GPU T4).
   2. The Space runs `python app.py` → launches on port 7860.
   3. Override defaults via Space env vars: `DATASET_ROOT`, `ENCODER`.
-- **Effort:** ~30 min (HF account + Space creation + push).
+- **Effort:** ~30 min (done).
 
 ---
 
