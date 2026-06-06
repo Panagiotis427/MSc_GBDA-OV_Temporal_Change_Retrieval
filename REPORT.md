@@ -163,7 +163,7 @@ testable in seconds with no network.
 4. **CLIP text sanity** — post-fix `encode_text` returns `[N, 768]`,
    L2-normalised, on CUDA; forest image correctly prefers "forest" over
    "city". Confirms the P1 fix.
-5. **Fast test suite (mock encoders, fixture, no network)** — **197 passed**.
+5. **Fast test suite (mock encoders, fixture, no network)** — **203 passed**.
    Covers embeddings cache + round-trip, retrieval (naive/zero_shot/peft),
    benchmark metrics (exact Recall@1/AP on engineered transitions), PEFT
    training (loss decreases, save/load, PEFT ≥ zero-shot), encoder
@@ -637,11 +637,12 @@ Result (populate from the run above; `mode=recomputed`):
 
 | split | encoder | color | n stable pairs | mean Δ-sim | FPR@0.00 | FPR@0.02 | FPR@0.05 | FPR@0.10 |
 |---|---|---|---|---|---|---|---|---|
-| test | georsclip | rgb | _tbd_ | _tbd_ | _tbd_ | _tbd_ | _tbd_ | _tbd_ |
+| test | georsclip | rgb | 24 | 0.0125 | 0.875 | 0.333 | 0.000 | 0.000 |
 
-Expected shape (the hypothesis under test, not a measured number): stable pairs carry
-near-zero mean Δ-similarity, so the FPR should fall to ~0 once the threshold clears the
-noise floor — consistent with the GeoRSCLIP-best zero-shot reading in §7.
+Confirmed: stable pairs carry near-zero mean Δ-similarity (0.0125), so the FPR falls to
+0 once the threshold clears the noise floor (already 0 at 0.05) — consistent with the
+GeoRSCLIP-best zero-shot reading in §7. The 0.875 FPR at threshold 0.00 just reflects
+that any nonzero Δ trips a zero threshold; it is not a failure mode.
 
 ---
 
@@ -707,7 +708,7 @@ The adapter is < 0.2 % of the backbone parameter count — the PEFT premise.
 | End-to-end query — CLIP text forward + scoring, 605 pairs | **10.5 ms** |
 | Embedding precompute — CLIP L/14, 1024²→224, GPU | **68 ms/tile** → 1210 tiles ≈ **82 s** (one-time, cached) |
 | PEFT training — 605 samples, 40 epochs, adapter only, GPU | **≈29 s** |
-| Fast test suite — 197 tests, mock encoders, CPU (full suite 213: 212 pass, 1 skip) | ≈21 s |
+| Fast test suite — 203 tests, mock encoders, CPU (full suite 219: 218 pass, 1 skip) | ≈21 s |
 
 All GPU figures measured on the RTX 4060 in a dedicated timed pass (run with
 no other GPU job, to avoid contention skew).
@@ -888,7 +889,7 @@ on this machine.
 0.102→0.104, NDVI 0.062→0.064); §7.8 mega_projects 80→76 pairs; §7.9 figure paraphrase tied to
 real §7.2 cells; §9 cache-key wording; `embeddings.py` cache-path docstring; `lora_train` default
 dataset crash (`dynamic_earthnet_pp`→`dynamic_earthnet`); §7.2 footnote disclosing the 3-wetland
-headline basis. Test suite now runs **212 passed, 1 skipped** (supersedes the stale "129/192"
+headline basis. Test suite now runs **218 passed, 1 skipped** (supersedes the stale "129/192"
 counts).
 
 **A.3 Still open — your decision (thesis-component reuse, all high):**

@@ -1,0 +1,38 @@
+{
+  "dataset": "dynamic_earthnet",
+  "encoder": "georsclip",
+  "color_mode": "rgb",
+  "split": "test",
+  "approach": "zero_shot",
+  "metric": "stable_pair_fpr",
+  "n_queries": 10,
+  "queries": [
+    "new buildings constructed on former agricultural land",
+    "urban expansion replacing vegetation",
+    "deforestation, forest cleared to bare soil",
+    "forest loss",
+    "new water body or flooding",
+    "bare soil or land cleared",
+    "seasonal snow melting away",
+    "agricultural land converted to wetland or marsh",
+    "wetland drained and turned into farmland",
+    "land turning into wetland"
+  ],
+  "prompt_ensemble": false,
+  "thresholds": [
+    0.0,
+    0.02,
+    0.05,
+    0.1
+  ],
+  "mode": "recomputed",
+  "n_stable_pairs": 24,
+  "mean_delta_similarity": 0.01247912272810936,
+  "std_delta_similarity": 0.012788946740329266,
+  "fpr_by_threshold": {
+    "0.000": 0.875,
+    "0.020": 0.3333333333333333,
+    "0.050": 0.0,
+    "0.100": 0.0
+  }
+}
