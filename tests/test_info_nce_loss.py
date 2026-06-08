@@ -15,6 +15,7 @@ class TestInfoNCELoss:
     @pytest.fixture
     def sample_embeddings(self):
         """Create consistent test embeddings matching CLIP dimension."""
+        torch.manual_seed(0)  # determinism: temperature-effect assertions need non-degenerate sims
         batch_size = 8
         embed_dim = 768
         return torch.randn(2 * batch_size, embed_dim), torch.randn(batch_size, embed_dim)
@@ -60,6 +61,7 @@ class TestInfoNCELoss:
 
     def test_different_temperatures_on_same_data(self, sample_embeddings):
         """Test that we can override temperature on-the-fly."""
+        torch.manual_seed(0)  # determinism (unseeded embeddings can be degenerate)
         anchor = torch.randn(16, 768)
         positive = torch.randn(8, 768)
 

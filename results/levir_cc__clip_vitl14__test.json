@@ -1,0 +1,21 @@
+{
+  "dataset": "levir_cc",
+  "encoder": "clip_vitl14",
+  "split": "test",
+  "color_mode": "rgb",
+  "n_pairs": 1929,
+  "macro_prevalence_baseline": 0.3423,
+  "query_prevalence": {
+    "new buildings or houses constructed": 0.4515,
+    "a new road or street built": 0.4272,
+    "buildings demolished or removed": 0.1483
+  },
+  "approaches": {
+    "naive": {
+      "macro_mAP": 0.5432
+    },
+    "zero_shot": {
+      "macro_mAP": 0.4979
+    }
+  }
+}

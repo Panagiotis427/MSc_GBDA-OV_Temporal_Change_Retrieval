@@ -37,11 +37,11 @@ robust estimate is ~10× lower because this 110-pair split is a lucky high-wetla
 
 | Encoder | color | test-split mAP | full-corpus mAP (825) | 5-fold CV mAP |
 |---|---|---|---|---|
-| CLIP ViT-L/14 | NRG | 0.104 | 0.030 | 0.072 ± 0.020 |
+| CLIP ViT-L/14 | NRG | 0.104 | 0.030 | 0.076 ± 0.023 |
 | GeoRSCLIP | RGB | 0.299 | 0.032 | 0.085 ± 0.069 |
 | GeoRSCLIP | **NRG** | **0.426** | **0.037** | **0.100 ± 0.139** |
 | GeoRSCLIP | NDVI | 0.216 | — | — |
-| RemoteCLIP | NRG | 0.129 | 0.021 | 0.051 ± 0.023 |
+| RemoteCLIP | NRG | 0.129 | 0.021 | 0.053 ± 0.022 |
 
 (Full per-band test-split table in §7.3.) Robust verdict: no configuration exceeds ~0.10 mAP
 under cross-validation; only GeoRSCLIP NRG shows any above-random per-query signal, confined to
@@ -319,7 +319,9 @@ Three colour modes compared (zero-shot mAP, all three splits):
 | RemoteCLIP | NRG | 0.023 | 0.047 | 0.129 |
 | RemoteCLIP | NDVI | 0.022 | 0.048 | 0.055 |
 
-**NRG > NDVI > RGB on held-out test for all encoders.**
+**NRG is the best colour mode on held-out test for every encoder.** NDVI usually
+sits between NRG and RGB, except for GeoRSCLIP, whose anomalously high test RGB
+(0.299) exceeds its NDVI (0.216).
 
 ![Colour-mode ablation, zero-shot, test](assets/figures/color_ablation__zero_shot__test.png)
 
@@ -336,8 +338,8 @@ the NIR-Green spectral contrast characteristic of vegetation transitions.
 GeoRSCLIP + NRG zero-shot is the best configuration **on this 110-pair test split (0.426)** —
 but **this number is not robust.** Cross-validation over the full 75-AOI corpus (Appendix B.8)
 shows it falls to 0.037 (full corpus) / 0.100 ± 0.139 (5-fold); the test split happened to be a
-high-wetland "lucky fold" (CV folds span 0.033–0.271). The colour-mode *ordering* (NRG > NDVI >
-RGB) and encoder ordering (GeoRSCLIP ≫ CLIP ≈ RemoteCLIP) hold, but the absolute 0.426 should not
+high-wetland "lucky fold" (CV folds span 0.032–0.348). NRG remaining the best colour mode for
+every encoder, and the encoder ordering (GeoRSCLIP ≫ CLIP ≈ RemoteCLIP), both hold, but the absolute 0.426 should not
 be quoted as the generalisation result — the robust figure is ~0.10, and the only above-random
 signal is wetland-formation retrieval.
 
@@ -1070,7 +1072,7 @@ appearance, not change. **Reporting rule: quote PEFT/LoRA from test/val only, ne
 
 **Can say:** GeoRSCLIP (RS-pretrained) + NRG zero-shot Δ-similarity retrieves **wetland-formation**
 change above chance under cross-validation (the only above-random per-query signal; B.8); domain
-pretraining helps (GeoRSCLIP > CLIP-L/14 ≈ RemoteCLIP); spectral NRG > NDVI > RGB; on DEN
+pretraining helps (GeoRSCLIP > CLIP-L/14 ≈ RemoteCLIP); spectral NRG is the best colour mode; on DEN
 directional change beats end-state matching, on QFabric the reverse (end-state queries); learned
 adapters (PEFT/LoRA) only memorise — cross-validated PEFT (0.049) is at or below zero-shot (0.100).
 **Cannot say:** "open-vocabulary change retrieval works" — under CV no config exceeds ~0.10 mAP,
@@ -1094,21 +1096,21 @@ artifacts and collapse to near-random:**
 |---|---|---|---|---|
 | GeoRSCLIP NRG zero-shot | 0.426 | **0.037** | **0.100 ± 0.139** | 2 — *land→wetland* (q=0.022), *ag→wetland* (q=0.030) |
 | GeoRSCLIP RGB zero-shot | 0.299 | 0.032 | 0.085 ± 0.069 | 0 — none survive FDR (min q=0.18) |
-| CLIP-L/14 NRG zero-shot | 0.104 | 0.030 | 0.072 ± 0.020 | **0** |
-| RemoteCLIP NRG zero-shot | 0.129 | 0.021 | 0.051 ± 0.023 | **0** |
+| CLIP-L/14 NRG zero-shot | 0.104 | 0.030 | 0.076 ± 0.023 | **0** |
+| RemoteCLIP NRG zero-shot | 0.129 | 0.021 | 0.053 ± 0.022 | **0** |
 | GeoRSCLIP NRG PEFT (k-fold) | — | — | 0.049 ± 0.018 | — |
 
-- **The 0.426 was a lucky fold.** The 5 CV folds for GeoRSCLIP NRG span **0.033–0.271**; the
-  original 110-pair test split coincided with the easy high-wetland AOIs (the 0.271 fold). On the
+- **The 0.426 was a lucky fold.** The 5 CV folds for GeoRSCLIP NRG span **0.032–0.348**; the
+  original 110-pair test split coincided with the easy high-wetland AOIs (the 0.348 fold). On the
   full corpus the same config scores 0.037 — a ~11× drop. Smaller corpora inflate AP (fewer
   distractors); the headline rode that plus an easy split.
 - **Only GeoRSCLIP shows any signal, and only for wetland *formation*.** `land→wetland` and
   `agricultural→wetland` clear random (p<0.05); the reverse `wetland→farmland`, plus water-body /
   bare-soil / forest-loss, are at or below chance. CLIP-L/14 and RemoteCLIP have **zero**
   above-random queries on the full corpus. Even the significant queries have std ≈ mean across
-  folds (e.g. ag→wetland 0.166 ± 0.180) — high instability.
+  folds (e.g. ag→wetland 0.136 ± 0.202) — high instability.
 - **Leakage-free PEFT confirms B.5.** Cross-validated PEFT (train on 4 folds, eval on the 5th)
-  scores 0.049 ± 0.018 — statistically indistinguishable from zero-shot's 0.099, and nowhere near
+  scores 0.049 ± 0.018 — statistically indistinguishable from zero-shot's 0.100, and nowhere near
   the train-fit 0.42. PEFT does not help once it cannot see the eval pairs.
 
 **Net:** the only defensible DEN claim is *"GeoRSCLIP (RS-pretrained, NRG) retrieves
@@ -1135,8 +1137,8 @@ same queries, same cached embeddings — only the relevance rule changes:
 | config | dominant-flip: nq · CV mAP | fraction (≥5%): nq · CV mAP · FDR-sig queries |
 |---|---|---|
 | GeoRSCLIP NRG zero-shot | 6 · 0.100 ± 0.139 | **9 · 0.139 ± 0.024** · 2 (ag→wetland, land→wetland) |
-| CLIP-L/14 NRG zero-shot | 6 · 0.072 ± 0.020 | 9 · 0.139 ± 0.031 · 2 (new buildings, land→wetland) |
-| RemoteCLIP NRG zero-shot | 6 · 0.051 ± 0.023 | 9 · 0.140 ± 0.034 · 1 (new buildings) |
+| CLIP-L/14 NRG zero-shot | 6 · 0.076 ± 0.023 | 9 · 0.123 ± 0.029 · 0 (none) |
+| RemoteCLIP NRG zero-shot | 6 · 0.053 ± 0.022 | 9 · 0.134 ± 0.027 · 0 (none) |
 | GeoRSCLIP RGB zero-shot | 6 · 0.085 ± 0.069 | 9 · 0.115 ± 0.036 · 1 (wetland→farmland) |
 | GeoRSCLIP NRG PEFT (k-fold) | — | 0.196 ± 0.049 |
 
@@ -1147,10 +1149,10 @@ all previously 0–3), roughly **triples** full-corpus mAP (0.03→0.09) and **t
 starving the benchmark — a real, now-fixed evaluation bug.
 
 **What curation did NOT fix (the rest is the method):** even with dense, correct labels, only
-**1–2 of 9 queries beat random per config**, and no config exceeds **~0.15** CV mAP. Buildings,
-urban, deforestation, forest-loss, soil and water sit at chance (p = 0.12–0.96) despite hundreds
-of positives. The retrievable signal is confined to **large-area** transitions (wetland
-formation, and weakly "new buildings" for the L/14 backbones); **localised** change is not
+**0–2 of 9 queries beat random per config** (only GeoRSCLIP, on wetland formation), and no config
+exceeds **~0.15** CV mAP. Buildings, urban, deforestation, forest-loss, soil and water sit at
+chance after FDR correction despite hundreds of positives. The retrievable signal is confined to
+**large-area** transitions (wetland formation); **localised** change is not
 retrievable by global-embedding differencing. PEFT k-fold (0.196 ± 0.049) overlaps zero-shot (0.139 ± 0.024) within fold variance — still no
 real gain.
 
@@ -1178,8 +1180,8 @@ directly comparable to B.9.
 |---|---|---|
 | global zero-shot (B.9) | 0.139 ± 0.024 | 2 (wetland formation only) |
 | global PEFT k-fold (B.9) | 0.196 ± 0.049 | — |
-| patch_naive (max end-state) | 0.123 ± 0.027 | — |
-| patch_zeroshot (max Δ) | 0.162 ± 0.040 | 4 (+ buildings, urban) |
+| patch_naive (max end-state) | 0.111 ± 0.024 | — |
+| patch_zeroshot (max Δ) | 0.150 ± 0.028 | 1 (wetland→farmland) |
 | **patch_top3 (mean top-3 Δ)** | **0.193 ± 0.051** | **4** (buildings q=.003, urban q=.006, wetland→farmland q=.002, land→wetland q=.003; new-water q=.053 n.s.) |
 | CLIP-L/14 NRG patch_top3 (256-patch grid) | 0.149 ± 0.054 | — |
 
