@@ -5,11 +5,13 @@
   "approach": "patch_naive",
   "relevance": "fraction",
   "frac_thresh": 0.05,
+  "prompt_ensemble": false,
+  "tau": 0.03,
   "n_pairs": 825,
   "patch_grid": 49,
   "n_evaluable_queries": 9,
   "full_corpus": {
-    "macro_mAP": 0.0774,
+    "macro_mAP": 0.0773,
     "per_query": [
       {
         "query": "new buildings constructed on former agricultural land",
@@ -20,7 +22,8 @@
           0.0279
         ],
         "rand_ap": 0.0245,
-        "perm_p": 0.7695
+        "perm_p": 0.7696,
+        "bh_fdr": 0.9562
       },
       {
         "query": "urban expansion replacing vegetation",
@@ -31,7 +34,8 @@
           0.0403
         ],
         "rand_ap": 0.0242,
-        "perm_p": 0.4138
+        "perm_p": 0.4139,
+        "bh_fdr": 0.9101
       },
       {
         "query": "deforestation, forest cleared to bare soil",
@@ -42,7 +46,8 @@
           0.0347
         ],
         "rand_ap": 0.0232,
-        "perm_p": 0.5055
+        "perm_p": 0.5056,
+        "bh_fdr": 0.9101
       },
       {
         "query": "forest loss",
@@ -53,7 +58,8 @@
           0.052
         ],
         "rand_ap": 0.0232,
-        "perm_p": 0.3628
+        "perm_p": 0.3629,
+        "bh_fdr": 0.9101
       },
       {
         "query": "new water body or flooding",
@@ -64,7 +70,8 @@
           0.0353
         ],
         "rand_ap": 0.0182,
-        "perm_p": 0.2725
+        "perm_p": 0.2727,
+        "bh_fdr": 0.9101
       },
       {
         "query": "bare soil or land cleared",
@@ -75,7 +82,8 @@
           0.038
         ],
         "rand_ap": 0.0378,
-        "perm_p": 0.9643
+        "perm_p": 0.9643,
+        "bh_fdr": 0.9643
       },
       {
         "query": "agricultural land converted to wetland or marsh",
@@ -86,7 +94,8 @@
           0.214
         ],
         "rand_ap": 0.1831,
-        "perm_p": 0.6573
+        "perm_p": 0.6573,
+        "bh_fdr": 0.9562
       },
       {
         "query": "wetland drained and turned into farmland",
@@ -97,30 +106,32 @@
           0.2361
         ],
         "rand_ap": 0.2026,
-        "perm_p": 0.85
+        "perm_p": 0.85,
+        "bh_fdr": 0.9562
       },
       {
         "query": "land turning into wetland",
         "n_relevant": 146,
-        "ap": 0.2094,
+        "ap": 0.2093,
         "ci95": [
           0.1707,
           0.258
         ],
         "rand_ap": 0.183,
-        "perm_p": 0.0447
+        "perm_p": 0.045,
+        "bh_fdr": 0.405
       }
     ]
   },
   "kfold": {
-    "macro_mAP_mean": 0.1227,
-    "macro_mAP_std": 0.0265,
+    "macro_mAP_mean": 0.1107,
+    "macro_mAP_std": 0.0241,
     "fold_macro": [
-      0.1233,
-      0.0842,
-      0.1639,
-      0.1083,
-      0.1338
+      0.091,
+      0.0883,
+      0.1303,
+      0.102,
+      0.1419
     ]
   }
 }

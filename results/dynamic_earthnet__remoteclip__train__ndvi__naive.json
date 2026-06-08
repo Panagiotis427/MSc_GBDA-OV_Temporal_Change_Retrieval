@@ -11,7 +11,7 @@
   ],
   "lora": false,
   "macro": {
-    "mAP": 0.021493785083881244,
+    "mAP": 0.02149306607887958,
     "recall_at_k": {
       "1": 0.0,
       "10": 0.014285714285714285,
@@ -82,7 +82,7 @@
       "text": "agricultural land converted to wetland or marsh"
     },
     {
-      "ap": 0.03797548826999032,
+      "ap": 0.03797189324498202,
       "category": "permanent",
       "n_relevant": 14,
       "recall_at_k": {

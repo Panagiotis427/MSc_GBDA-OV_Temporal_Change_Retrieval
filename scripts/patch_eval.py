@@ -38,7 +38,7 @@ from src.benchmark import _average_precision, encode_query
 from src.datasets.dynamic_earthnet_pp import DENNpyDataset
 from src.encoders import get_encoder
 from src.queries.den import frac_queries
-from src.stats import rand_ap
+from src.stats import aoi_folds, bh_fdr, perm_p_value, rand_ap, rank_order
 from scripts.cv_eval import _merge_stores
 
 BOOTSTRAP = 1000
@@ -132,7 +132,7 @@ def _scores(P1, P2, t, approach, G1=None, G2=None, tau: float = 0.03):
 
 def _perm_p(N, n_rel, obs, rng, iters=PERM):
     draws = np.array([rand_ap(n_rel, N, rng) for _ in range(iters)])
-    return float((draws >= obs).mean()), float(draws.mean())
+    return perm_p_value(int(np.sum(draws >= obs)), iters), float(draws.mean())
 
 
 def main() -> None:
@@ -183,23 +183,26 @@ def main() -> None:
     for q in evaluable:
         rel = rel_all[q.text]
         sc = _scores(P1, P2, tvecs[q.text], args.approach, G1, G2, tau=args.tau)
-        ap_obs = _average_precision(rel[np.argsort(-sc)])
+        ap_obs = _average_precision(rel[rank_order(sc, rel)])
         boot = np.empty(BOOTSTRAP)
         for b in range(BOOTSTRAP):
             samp = rng.integers(0, N, N)
             r = rel[samp]
-            boot[b] = 0.0 if r.sum() == 0 else _average_precision(r[np.argsort(-sc[samp])])
+            boot[b] = 0.0 if r.sum() == 0 else _average_precision(r[rank_order(sc[samp], r)])
         p, randmean = _perm_p(N, int(rel.sum()), ap_obs, rng)
         full.append({"query": q.text, "n_relevant": int(rel.sum()), "ap": round(ap_obs, 4),
                      "ci95": [round(float(np.percentile(boot, 2.5)), 4),
                               round(float(np.percentile(boot, 97.5)), 4)],
                      "rand_ap": round(randmean, 4), "perm_p": round(p, 4)})
     macro_full = round(float(np.mean([r["ap"] for r in full])), 4) if full else 0.0
+    if full:
+        for r, qv in zip(full, bh_fdr([r["perm_p"] for r in full])):
+            r["bh_fdr"] = round(float(qv), 4)
 
-    # k-fold AOI CV
+    # k-fold AOI CV — shared, seed-only partition (src.stats.aoi_folds), identical
+    # to cv_eval.py's so the two scripts' CV mAPs are directly comparable.
     aois = sorted({p.location_id for p in pairs})
-    perm_aois = list(rng.permutation(aois))
-    aoi_fold = {a: i % args.folds for i, a in enumerate(perm_aois)}
+    aoi_fold = aoi_folds(aois, args.folds, args.seed)
     fold_of = np.array([aoi_fold[p.location_id] for p in pairs])
     fold_macro = []
     for k in range(args.folds):
@@ -212,7 +215,7 @@ def main() -> None:
             sc = _scores(P1[idx], P2[idx], tvecs[q.text], args.approach,
                          None if G1 is None else G1[idx], None if G2 is None else G2[idx],
                          tau=args.tau)
-            aps.append(_average_precision(rel[np.argsort(-sc)]))
+            aps.append(_average_precision(rel[rank_order(sc, rel)]))
         fold_macro.append(float(np.mean(aps)) if aps else 0.0)
 
     out = {"dataset": "dynamic_earthnet", "encoder": args.encoder, "color_mode": args.color_mode,
@@ -221,7 +224,8 @@ def main() -> None:
            "n_pairs": N, "patch_grid": int(P1.shape[1]), "n_evaluable_queries": len(evaluable),
            "full_corpus": {"macro_mAP": macro_full, "per_query": full},
            "kfold": {"macro_mAP_mean": round(float(np.mean(fold_macro)), 4),
-                     "macro_mAP_std": round(float(np.std(fold_macro)), 4),
+                     "macro_mAP_std": round(float(np.std(fold_macro, ddof=1))
+                                            if len(fold_macro) > 1 else 0.0, 4),
                      "fold_macro": [round(x, 4) for x in fold_macro]}}
     ens = "__ens" if args.prompt_ensemble else ""
     op = (Path(args.results_dir) /

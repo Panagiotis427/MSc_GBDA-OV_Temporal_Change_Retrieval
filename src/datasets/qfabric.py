@@ -104,15 +104,18 @@ class QFabricDataset:
             df = pd.read_parquet(pp)
             img_cols = [c for c in df.columns
                         if c.endswith("_image") and not c.endswith("_name")]
-            name_cols = [c for c in df.columns if c.endswith("_image_name")]
             for ri, row in df.iterrows():
                 loc = f"{shard}_r{int(ri):04d}"
                 imgs: List[Image.Image] = []
-                for ti, (ic, nc) in enumerate(zip(img_cols, name_cols)):
+                for ti, ic in enumerate(img_cols):
+                    # Derive the matching name column from the image column by name
+                    # (``t1_image`` -> ``t1_image_name``) rather than zipping two
+                    # independently-filtered lists, which would silently mis-pair a
+                    # timestamp with the wrong image if the columns were reordered.
+                    nc = ic + "_name"
                     imgs.append(Image.open(io.BytesIO(row[ic]["bytes"])).convert("RGB"))
-                    rows.append({"location": loc,
-                                 "timestamp": parse_date_from_filename(row[nc]),
-                                 "timepoint_idx": ti})
+                    ts = parse_date_from_filename(row[nc]) if nc in df.columns else pd.NaT
+                    rows.append({"location": loc, "timestamp": ts, "timepoint_idx": ti})
                 image_lookup[loc] = imgs
         return image_lookup, pd.DataFrame(rows)
 

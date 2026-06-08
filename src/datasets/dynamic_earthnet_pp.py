@@ -32,6 +32,7 @@ from __future__ import annotations
 import glob
 import json
 import re
+import warnings
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -62,7 +63,11 @@ def _month_selection(strategy: str) -> List[int]:
     if strategy == "bimonthly":
         return months[::2]
     if strategy == "seasonal-quartet":
-        return months[::6]            # ~one per season across the 2-year span
+        # One frame per season within the first year (≈ Jan / Apr / Jul / Oct):
+        # four distinct seasons. The previous ``months[::6]`` gave [0, 6, 12, 18],
+        # i.e. only winter/summer repeated across the 2-year span — not one per
+        # season, contradicting the name.
+        return [0, 3, 6, 9]
     raise ValueError(f"Unknown pairing_strategy: {strategy!r}")
 
 
@@ -75,6 +80,11 @@ def _compose_nrg(rgb_path: Path, infra_path: Path) -> Image.Image:
     if infra_path.exists():
         nir = np.array(Image.open(infra_path).convert("L"))
     else:
+        warnings.warn(
+            f"NIR frame missing ({infra_path.name}); NRG falls back to the red "
+            "channel, yielding a (R,R,G) image — colour-mode results will be "
+            "invalid for this frame.", RuntimeWarning, stacklevel=2,
+        )
         nir = rgb[:, :, 0]
     nrg = np.stack([nir, rgb[:, :, 0], rgb[:, :, 1]], axis=-1)
     return Image.fromarray(nrg.astype(np.uint8))
@@ -87,6 +97,11 @@ def _compose_ndvi(rgb_path: Path, infra_path: Path) -> Image.Image:
     if infra_path.exists():
         nir = np.array(Image.open(infra_path).convert("L")).astype(np.float32)
     else:
+        warnings.warn(
+            f"NIR frame missing ({infra_path.name}); NDVI falls back to the red "
+            "channel, yielding an all-zero index — colour-mode results will be "
+            "invalid for this frame.", RuntimeWarning, stacklevel=2,
+        )
         nir = red
     ndvi = (nir - red) / (nir + red + 1e-6)
     ndvi_u8 = np.clip((ndvi + 1.0) * 127.5, 0, 255).astype(np.uint8)
@@ -175,12 +190,15 @@ class DENNpyDataset:
         path = d / f"{location_id}_{didx}_{suffix}.jpeg"
         if path.exists():
             return path
-        cands = sorted(
-            glob.glob(str(d / f"{location_id}_*_{suffix}.jpeg")),
-            key=lambda p: int(re.search(rf"_(\d+)_{suffix}", p).group(1)),
-        )
+        def _fnum(p: str) -> int:
+            return int(re.search(rf"_(\d+)_{suffix}", p).group(1))
+
+        cands = sorted(glob.glob(str(d / f"{location_id}_*_{suffix}.jpeg")), key=_fnum)
         if cands:
-            return Path(cands[min(didx, len(cands) - 1)])
+            # Pick the candidate whose actual frame NUMBER is nearest to didx.
+            # (The old positional ``cands[min(didx, len-1)]`` silently returned the
+            # wrong frame whenever the frame numbering had gaps.)
+            return Path(min(cands, key=lambda p: abs(_fnum(p) - didx)))
         if required:
             raise FileNotFoundError(f"No {suffix} frames for {location_id}")
         return None

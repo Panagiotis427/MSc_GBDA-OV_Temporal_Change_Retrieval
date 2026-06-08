@@ -38,8 +38,8 @@ robust estimate is ~10× lower because this 110-pair split is a lucky high-wetla
 | Encoder | color | test-split mAP | full-corpus mAP (825) | 5-fold CV mAP |
 |---|---|---|---|---|
 | CLIP ViT-L/14 | NRG | 0.104 | 0.030 | 0.072 ± 0.020 |
-| GeoRSCLIP | RGB | 0.299 | 0.032 | 0.066 ± 0.037 |
-| GeoRSCLIP | **NRG** | **0.426** | **0.037** | **0.099 ± 0.089** |
+| GeoRSCLIP | RGB | 0.299 | 0.032 | 0.085 ± 0.069 |
+| GeoRSCLIP | **NRG** | **0.426** | **0.037** | **0.100 ± 0.139** |
 | GeoRSCLIP | NDVI | 0.216 | — | — |
 | RemoteCLIP | NRG | 0.129 | 0.021 | 0.051 ± 0.023 |
 
@@ -54,7 +54,7 @@ NRG false-colour (NIR-Red-Green) outperforms RGB and NDVI for all encoders on un
 collapses spectral texture to a single channel, losing the inter-channel contrasts NRG preserves.
 GeoRSCLIP + NRG zero-shot (0.426) is the best configuration *on this 110-pair test split* — but
 that number does **not survive cross-validation**: on the full 75-AOI corpus the same config
-scores **0.037** mAP, and 5-fold leakage-free CV gives **0.099 ± 0.089** (the test split was a
+scores **0.037** mAP, and 5-fold leakage-free CV gives **0.100 ± 0.139** (the test split was a
 lucky high-wetland fold). The only robust, above-random signal is GeoRSCLIP retrieving
 **wetland-formation** change. Full random-baseline, FDR and cross-validation analysis in
 **Appendix B** (esp. B.8).
@@ -163,7 +163,7 @@ testable in seconds with no network.
 4. **CLIP text sanity** — post-fix `encode_text` returns `[N, 768]`,
    L2-normalised, on CUDA; forest image correctly prefers "forest" over
    "city". Confirms the P1 fix.
-5. **Fast test suite (mock encoders, fixture, no network)** — **203 passed**.
+5. **Fast test suite (mock encoders, fixture, no network)** — **220 passed**.
    Covers embeddings cache + round-trip, retrieval (naive/zero_shot/peft),
    benchmark metrics (exact Recall@1/AP on engineered transitions), PEFT
    training (loss decreases, save/load, PEFT ≥ zero-shot), encoder
@@ -208,11 +208,12 @@ testable in seconds with no network.
     0.426 NRG vs 0.216 NDVI). NDVI collapses spectral texture to one channel,
     losing inter-channel contrasts NRG preserves.
 17. **LoRA adapter** — peft LoRA applied to GeoRSCLIP visual encoder (ViT-B-32),
-    targeting `out_proj`, `c_fc`, `c_proj` in each ResBlock (442K trainable /
-    88M total, 0.5%). Trained with online image loading (no pre-caching), same
+    targeting the FFN `c_fc`, `c_proj` in each ResBlock (368,640 trainable /
+    88M total, 0.42%; `out_proj` is a no-op on open_clip's fused attention and is
+    not targeted). Trained with online image loading (no pre-caching), same
     masked InfoNCE loss as ProjectionHead. GeoRSCLIP+NRG, 20 epochs, rank=4:
-    test mAP **0.159** — better than ProjectionHead PEFT (0.041) but below
-    zero-shot NRG (0.426). Confirms zero-shot as the best generalising approach.
+    fits train (0.025→0.153) but test mAP collapses to **0.071** — overfits, far
+    below zero-shot NRG (0.426). Confirms zero-shot as the best generalising approach.
 
 ---
 
@@ -325,7 +326,7 @@ the NIR-Green spectral contrast characteristic of vegetation transitions.
 
 GeoRSCLIP + NRG zero-shot is the best configuration **on this 110-pair test split (0.426)** —
 but **this number is not robust.** Cross-validation over the full 75-AOI corpus (Appendix B.8)
-shows it falls to 0.037 (full corpus) / 0.099 ± 0.089 (5-fold); the test split happened to be a
+shows it falls to 0.037 (full corpus) / 0.100 ± 0.139 (5-fold); the test split happened to be a
 high-wetland "lucky fold" (CV folds span 0.033–0.271). The colour-mode *ordering* (NRG > NDVI >
 RGB) and encoder ordering (GeoRSCLIP ≫ CLIP ≈ RemoteCLIP) hold, but the absolute 0.426 should not
 be quoted as the generalisation result — the robust figure is ~0.10, and the only above-random
@@ -333,9 +334,11 @@ signal is wetland-formation retrieval.
 
 ### 7.4 LoRA adapter — visual encoder fine-tuning
 
-LoRA applied to GeoRSCLIP's ViT-B-32 visual encoder targets `out_proj`, `c_fc`,
-`c_proj` in each ResBlock (attention output + FFN). 442K trainable params out of
-88M (0.5%). Training is online (no pre-cached embeddings; images loaded on-the-fly)
+LoRA applied to GeoRSCLIP's ViT-B-32 visual encoder targets the FFN `c_fc`,
+`c_proj` in each ResBlock. 368,640 trainable params out of
+88M (0.42%); the attention `out_proj` is **not** targeted — open_clip's
+`nn.MultiheadAttention` reads `out_proj.weight` directly and never calls
+`out_proj.forward`, so a LoRA wrapper there is a silent no-op. Training is online (no pre-cached embeddings; images loaded on-the-fly)
 using a masked symmetric InfoNCE loss in the same family as ProjectionHead — the two
 differ in how positives are handled (ProjectionHead averages over all same-caption
 positives; the LoRA path uses cross-entropy to a single diagonal positive).
@@ -344,31 +347,33 @@ Results (GeoRSCLIP + NRG, rank=4, α=8, 20 epochs; zero-shot with LoRA-adapted e
 
 | split | zero_shot (frozen) | LoRA zero_shot |
 |---|---|---|
-| train | 0.025 | 0.021 |
-| val | 0.030 | 0.041 |
-| test | **0.426** | 0.159 |
+| train | 0.025 | **0.153** |
+| val | 0.030 | **0.034** |
+| test | **0.426** | 0.071 |
 
-**LoRA is worse than frozen zero-shot on all splits.** The cross-split drop
-(0.426 → 0.159) is less severe than ProjectionHead PEFT (0.426 → 0.041), but
-LoRA still overfits train-AOI visual texture. The visual encoder adapts to the
-specific NIR-channel patterns of the 55 training AOIs, which do not generalise
-to the 10 test AOIs.
+**LoRA now fits train but collapses out-of-distribution.** With the corrected
+masked-InfoNCE loss (and FFN-only target), LoRA lifts train mAP 0.025 → 0.153 yet
+test falls to 0.071 — a textbook overfit, and on test it is *below* ProjectionHead
+PEFT (0.041 → 0.071 is still ≪ frozen 0.426). The visual encoder adapts to the
+specific NIR-channel patterns of the 55 training AOIs, which do not generalise to
+the 10 test AOIs.
 
-**Rank / epoch sweep.** To check whether the rank-4 result simply under-fit, we
-swept LoRA rank and epochs (GeoRSCLIP + NRG, test-split zero_shot mAP;
+**Rank / epoch sweep.** To check whether a different capacity changes this, we
+swept LoRA rank and epochs (GeoRSCLIP + NRG, zero_shot mAP;
 `scripts/lora_sweep.py`, in-memory, no cache/model clobber):
 
 | rank | α | epochs | train | test |
 |---|---|---|---|---|
-| 4 | 8 | 20 | 0.021 | 0.159 |
-| **8** | **16** | **20** | 0.022 | **0.246** |
-| 16 | 32 | 20 | 0.023 | 0.113 |
-| 8 | 16 | 40 | 0.021 | 0.205 |
+| 4 | 8 | 20 | 0.153 | 0.071 |
+| 8 | 16 | 20 | 0.168 | 0.070 |
+| 16 | 32 | 20 | 0.135 | 0.058 |
+| 8 | 16 | 40 | 0.146 | 0.059 |
 
-There is a **capacity sweet spot at rank 8** (test 0.246 — a +0.087 jump over
-rank 4), after which more rank (16 → 0.113) or more epochs (40 → 0.205) *overfit*
-and lose generalisation. So the rank-4 number was indeed sub-optimal — but even
-the best-tuned LoRA (0.246) stays well **below frozen NRG zero-shot (0.426)**.
+There is **no capacity sweet spot**: every rank/epoch fits train (0.13–0.17, well
+above the frozen 0.025) yet overfits to test 0.06–0.07. More rank or more epochs
+only memorise harder; the best test (0.071) stays well **below frozen NRG
+zero-shot (0.426)**. (The earlier "rank-8 sweet spot 0.246" reading was an
+artifact of a since-fixed LoRA loss bug plus a stale-cache reuse in the pipeline.)
 
 This reinforces the project's core finding: **spectral physics (NRG
 false-colour) generalises; learned visual priors do not.** No amount of adapter
@@ -708,7 +713,7 @@ The adapter is < 0.2 % of the backbone parameter count — the PEFT premise.
 | End-to-end query — CLIP text forward + scoring, 605 pairs | **10.5 ms** |
 | Embedding precompute — CLIP L/14, 1024²→224, GPU | **68 ms/tile** → 1210 tiles ≈ **82 s** (one-time, cached) |
 | PEFT training — 605 samples, 40 epochs, adapter only, GPU | **≈29 s** |
-| Fast test suite — 203 tests, mock encoders, CPU (full suite 219: 218 pass, 1 skip) | ≈47 s |
+| Fast test suite — 220 tests, mock encoders, CPU (full suite 236: 235 pass, 1 skip) | ≈70 s |
 
 All GPU figures measured on the RTX 4060 in a dedicated timed pass (run with
 no other GPU job, to avoid contention skew).
@@ -775,7 +780,7 @@ regenerated automatically by the test suite.
 > point 1) are train-set evaluations of the adapter's own training pairs — memorisation, not
 > generalisation** (DEN train 0.42, QFabric train 0.998); quote PEFT from val/test only. (ii) The
 > DEN-test headline (GeoRSCLIP NRG 0.426) **does not survive cross-validation**: on the full
-> 75-AOI corpus it is 0.037, and 5-fold leakage-free CV gives 0.099 ± 0.089 (Appendix B.8) — the
+> 75-AOI corpus it is 0.037, and 5-fold leakage-free CV gives 0.100 ± 0.139 (Appendix B.8) — the
 > test split was a lucky high-wetland fold. The only robust signal is wetland-formation retrieval;
 > "open-vocabulary change retrieval" is **not** demonstrated on this data.
 
@@ -790,14 +795,14 @@ regenerated automatically by the test suite.
   change-types evaluable on the same data — CV mAP still tops out at ~0.15 and only large-area
   (wetland) transitions clear random; localised change (buildings, deforestation, soil) stays at
   chance. **This is now confirmed and partly fixed (B.10, "S3"):** a patch-level Δ-similarity
-  scorer (`scripts/patch_eval.py`) lifts GeoRSCLIP NRG CV mAP 0.147 → **0.195** and makes the
+  scorer (`scripts/patch_eval.py`) lifts GeoRSCLIP NRG CV mAP 0.139 → **0.193** and makes the
   localised change-types (buildings, urban, water) FDR-significant — they were at chance under
   global pooling. Remaining work: a global/patch hybrid (diffuse change still prefers global) and
   a localised change-*attention* head; more data is not the lever (only *snow* is genuinely
   absent from the subset).
 - **`concatenate` change mode** now evaluated (§7.7 — generalises better than
-  `difference`); **LoRA rank/epoch sweep** done (§7.4 — rank-8 sweet spot,
-  test 0.246, still below frozen 0.426).
+  `difference`); **LoRA rank/epoch sweep** done (§7.4 — every config overfits,
+  best test ≈0.07, far below frozen 0.426).
 - **QFabric** is wired as a second dataset two ways. (a) The EVER-Z image subset
   (`EVER-Z/QFabric_mt_images_1024`) runs the same encoder/retrieval path for
   qualitative zero-shot retrieval in the app (images-only). (b) A **label-grounded
@@ -848,13 +853,13 @@ Three complementary findings:
    unseen AOIs PEFT collapses to ≤ zero-shot; zero-shot with the on-disk NIR band as NRG
    false-colour is the best approach and RS-pretrained GeoRSCLIP leads. The often-quoted 0.426
    (test split) is **not robust**: under 5-fold leakage-free cross-validation over all 75 AOIs it
-   is **0.099 ± 0.089** (full-corpus 0.037; Appendix B.8) — the test split was a lucky
+   is **0.100 ± 0.139** (full-corpus 0.037; Appendix B.8) — the test split was a lucky
    high-wetland fold. The only above-random per-query signal is GeoRSCLIP retrieving
    **wetland-formation**; general open-vocabulary change retrieval is not demonstrated on this
    (agri/wetland-dominated) DEN subset.
 
-3. **No fine-tuning helps out-of-distribution.** Cross-validated PEFT (0.088 ± 0.035) is
-   indistinguishable from zero-shot (0.099); LoRA (best test 0.246, train ablation) also stays
+3. **No fine-tuning helps out-of-distribution.** Cross-validated PEFT (0.049 ± 0.018) is
+   at or below zero-shot (0.100); LoRA (every config overfits, best test ≈0.07) also stays
    below frozen zero-shot. Consistent conclusion: **spectral physics (NRG) carries the weak signal
    that exists; learned visual priors — however parameter-efficient — only memorise the train set.**
 
@@ -889,7 +894,7 @@ on this machine.
 0.102→0.104, NDVI 0.062→0.064); §7.8 mega_projects 80→76 pairs; §7.9 figure paraphrase tied to
 real §7.2 cells; §9 cache-key wording; `embeddings.py` cache-path docstring; `lora_train` default
 dataset crash (`dynamic_earthnet_pp`→`dynamic_earthnet`); §7.2 footnote disclosing the 3-wetland
-headline basis. Test suite now runs **218 passed, 1 skipped** (supersedes the stale "129/192"
+headline basis. Test suite now runs **235 passed, 1 skipped** (supersedes the stale "129/192"
 counts).
 
 **A.3 Still open — your decision (thesis-component reuse, all high):**
@@ -943,7 +948,7 @@ The near-zero numbers are **not** a failure — but also not the result they loo
    significance is superseded by the cross-validation in §B.8** — see point 4.
 4. **That signal does not generalise / is not robust.** DEN-test evaluates only 3
    wetland-transition queries, and **cross-validation (B.8) shows the 0.426 is a lucky-fold
-   artifact** — full-corpus 0.037, 5-fold 0.099 ± 0.089. The only above-random signal is
+   artifact** — full-corpus 0.037, 5-fold 0.100 ± 0.139. The only above-random signal is
    wetland-formation retrieval; open-vocabulary generality is not demonstrated.
 
 ## B.2 Two metric traps
@@ -982,7 +987,7 @@ effect size.
 
 > **The DEN rows above are the committed 110-pair test split and are *not* the generalisation
 > verdict.** §B.8 re-evaluates them under full-corpus + 5-fold AOI cross-validation: the 0.426 /
-> 0.299 / 0.216 fall to 0.037 / 0.032 / ~0.03 (CV 0.099 / 0.066 / —). Read B.8 as the final word
+> 0.299 / 0.216 fall to 0.037 / 0.032 / ~0.03 (CV 0.100 / 0.085 / —). Read B.8 as the final word
 > on DEN generalisation; this table only shows which *single-split* cells beat random.
 
 ## B.4 Per-dataset
@@ -1027,7 +1032,7 @@ appearance, not change. **Reporting rule: quote PEFT/LoRA from test/val only, ne
 change above chance under cross-validation (the only above-random per-query signal; B.8); domain
 pretraining helps (GeoRSCLIP > CLIP-L/14 ≈ RemoteCLIP); spectral NRG > NDVI > RGB; on DEN
 directional change beats end-state matching, on QFabric the reverse (end-state queries); learned
-adapters (PEFT/LoRA) only memorise — cross-validated PEFT (0.088) ≈ zero-shot (0.099).
+adapters (PEFT/LoRA) only memorise — cross-validated PEFT (0.049) is at or below zero-shot (0.100).
 **Cannot say:** "open-vocabulary change retrieval works" — under CV no config exceeds ~0.10 mAP,
 the 0.426 was a lucky test fold (B.8), and 4 of 10 change-types have zero positives in the data;
 "PEFT/LoRA improves retrieval" (never beats frozen zero-shot held-out; high numbers are train
@@ -1047,11 +1052,11 @@ artifacts and collapse to near-random:**
 
 | config | test-split (§7.3) | full-corpus mAP | 5-fold CV mAP | FDR-significant queries (full corpus) |
 |---|---|---|---|---|
-| GeoRSCLIP NRG zero-shot | 0.426 | **0.037** | **0.099 ± 0.089** | 2 — *land→wetland* (p=0.004), *ag→wetland* (p=0.010) |
-| GeoRSCLIP RGB zero-shot | 0.299 | 0.032 | 0.066 ± 0.037 | 1 — *wetland→farmland* (p=0.030) |
+| GeoRSCLIP NRG zero-shot | 0.426 | **0.037** | **0.100 ± 0.139** | 2 — *land→wetland* (q=0.022), *ag→wetland* (q=0.030) |
+| GeoRSCLIP RGB zero-shot | 0.299 | 0.032 | 0.085 ± 0.069 | 0 — none survive FDR (min q=0.18) |
 | CLIP-L/14 NRG zero-shot | 0.104 | 0.030 | 0.072 ± 0.020 | **0** |
 | RemoteCLIP NRG zero-shot | 0.129 | 0.021 | 0.051 ± 0.023 | **0** |
-| GeoRSCLIP NRG PEFT (k-fold) | — | — | 0.088 ± 0.035 | — |
+| GeoRSCLIP NRG PEFT (k-fold) | — | — | 0.049 ± 0.018 | — |
 
 - **The 0.426 was a lucky fold.** The 5 CV folds for GeoRSCLIP NRG span **0.033–0.271**; the
   original 110-pair test split coincided with the easy high-wetland AOIs (the 0.271 fold). On the
@@ -1063,7 +1068,7 @@ artifacts and collapse to near-random:**
   above-random queries on the full corpus. Even the significant queries have std ≈ mean across
   folds (e.g. ag→wetland 0.166 ± 0.180) — high instability.
 - **Leakage-free PEFT confirms B.5.** Cross-validated PEFT (train on 4 folds, eval on the 5th)
-  scores 0.088 ± 0.035 — statistically indistinguishable from zero-shot's 0.099, and nowhere near
+  scores 0.049 ± 0.018 — statistically indistinguishable from zero-shot's 0.099, and nowhere near
   the train-fit 0.42. PEFT does not help once it cannot see the eval pairs.
 
 **Net:** the only defensible DEN claim is *"GeoRSCLIP (RS-pretrained, NRG) retrieves
@@ -1089,16 +1094,16 @@ same queries, same cached embeddings — only the relevance rule changes:
 
 | config | dominant-flip: nq · CV mAP | fraction (≥5%): nq · CV mAP · FDR-sig queries |
 |---|---|---|
-| GeoRSCLIP NRG zero-shot | 6 · 0.099 ± 0.089 | **9 · 0.147 ± 0.025** · 2 (ag→wetland, land→wetland) |
+| GeoRSCLIP NRG zero-shot | 6 · 0.100 ± 0.139 | **9 · 0.139 ± 0.024** · 2 (ag→wetland, land→wetland) |
 | CLIP-L/14 NRG zero-shot | 6 · 0.072 ± 0.020 | 9 · 0.139 ± 0.031 · 2 (new buildings, land→wetland) |
 | RemoteCLIP NRG zero-shot | 6 · 0.051 ± 0.023 | 9 · 0.140 ± 0.034 · 1 (new buildings) |
-| GeoRSCLIP RGB zero-shot | 6 · 0.066 ± 0.037 | 9 · 0.123 ± 0.030 · 1 (wetland→farmland) |
-| GeoRSCLIP NRG PEFT (k-fold) | — | 0.167 ± 0.058 |
+| GeoRSCLIP RGB zero-shot | 6 · 0.085 ± 0.069 | 9 · 0.115 ± 0.036 · 1 (wetland→farmland) |
+| GeoRSCLIP NRG PEFT (k-fold) | — | 0.196 ± 0.049 |
 
 **What curation fixed (it was partly bad eval):** fraction relevance makes **9 of 10** queries
 evaluable (buildings 14, urban 14, deforestation 13, forest-loss 13, soil 25, water 9 positives —
 all previously 0–3), roughly **triples** full-corpus mAP (0.03→0.09) and **tightens** the CIs
-(more positives, std collapses from ±0.089 to ±0.025). So the dominant-flip relevance *was*
+(more positives, std tightens from ±0.139 to ±0.024). So the dominant-flip relevance *was*
 starving the benchmark — a real, now-fixed evaluation bug.
 
 **What curation did NOT fix (the rest is the method):** even with dense, correct labels, only
@@ -1106,7 +1111,7 @@ starving the benchmark — a real, now-fixed evaluation bug.
 urban, deforestation, forest-loss, soil and water sit at chance (p = 0.12–0.96) despite hundreds
 of positives. The retrievable signal is confined to **large-area** transitions (wetland
 formation, and weakly "new buildings" for the L/14 backbones); **localised** change is not
-retrievable by global-embedding differencing. PEFT k-fold (0.167) ≈ zero-shot (0.147) — still no
+retrievable by global-embedding differencing. PEFT k-fold (0.196 ± 0.049) overlaps zero-shot (0.139 ± 0.024) within fold variance — still no
 real gain.
 
 **Conclusion (answering "bad data?"):** not bad data, not missing labels. The benchmark's
@@ -1131,16 +1136,16 @@ directly comparable to B.9.
 
 | GeoRSCLIP NRG, fraction relevance | k-fold CV mAP | FDR-significant queries (of 9) |
 |---|---|---|
-| global zero-shot (B.9) | 0.147 ± 0.025 | 2 (wetland formation only) |
-| global PEFT k-fold (B.9) | 0.167 ± 0.058 | — |
+| global zero-shot (B.9) | 0.139 ± 0.024 | 2 (wetland formation only) |
+| global PEFT k-fold (B.9) | 0.196 ± 0.049 | — |
 | patch_naive (max end-state) | 0.123 ± 0.027 | — |
 | patch_zeroshot (max Δ) | 0.162 ± 0.040 | 4 (+ buildings, urban) |
-| **patch_top3 (mean top-3 Δ)** | **0.195 ± 0.050** | **5** (buildings p=.001, urban p=.003, water p=.029, wetland→farmland p<.001, land→wetland p=.001) |
-| CLIP-L/14 NRG patch_top3 (256-patch grid) | 0.151 ± 0.048 | — |
+| **patch_top3 (mean top-3 Δ)** | **0.193 ± 0.051** | **4** (buildings q=.003, urban q=.006, wetland→farmland q=.002, land→wetland q=.003; new-water q=.053 n.s.) |
+| CLIP-L/14 NRG patch_top3 (256-patch grid) | 0.149 ± 0.054 | — |
 
 **Findings:**
 - **Patch scoring is the best DEN configuration found** — GeoRSCLIP NRG `patch_top3` reaches
-  **0.195 ± 0.050** CV mAP, ~30 % over the global zero-shot 0.147, and is the honest peak (the
+  **0.193 ± 0.051** CV mAP, ~39 % over the global zero-shot 0.139, and is the honest peak (the
   old "0.426" was a lucky test fold, B.8).
 - **It rescues exactly the localised change-types global embeddings missed.** "New buildings"
   (ap 0.02→0.13) and "urban expansion" go from chance to FDR-significant; "new water" too. This
@@ -1149,8 +1154,8 @@ directly comparable to B.9.
   large-area `ag→wetland` slightly *prefers* the global score (max/top-k patch aggregation favours
   localised change) — so global and patch are **complementary**; a per-query or max(global,patch)
   hybrid is the natural next step.
-- **RS pretraining beats grid resolution.** CLIP-L/14's finer 256-patch grid (0.151) does not beat
-  GeoRSCLIP's coarse 49-patch grid (0.195) — domain pretraining matters more than patch count.
+- **RS pretraining beats grid resolution.** CLIP-L/14's finer 256-patch grid (0.149) does not beat
+  GeoRSCLIP's coarse 49-patch grid (0.193) — domain pretraining matters more than patch count.
 
 **Net:** S3 is a real, scope-preserving improvement — localised scoring roughly doubles the number
 of retrievable change-types and lifts CV mAP ~30 %, confirming the method (not the data) was the
@@ -1164,26 +1169,26 @@ large-area wetland change. Reproduce: `python -m scripts.patch_eval --encoder ge
 Both stay within the brief (frozen backbone, cosine scoring, no fine-tuning) and reuse the cached
 embeddings (no GPU/data). GeoRSCLIP NRG, fraction relevance, 5-fold CV:
 
-| variant | CV mAP | vs patch_top3 0.195 |
+| variant | CV mAP | vs patch_top3 0.193 |
 |---|---|---|
-| global zero-shot (baseline) | 0.147 ± 0.025 | — |
-| global zero-shot + prompt-ensemble | 0.146 ± 0.034 | wash |
-| **patch_top3 (best)** | **0.195 ± 0.050** | — |
-| patch_top3 + prompt-ensemble | 0.188 ± 0.057 | slightly worse |
-| hybrid (z-scored global Δ + patch top-3) | 0.160 ± 0.042 | **worse** |
-| hybrid + prompt-ensemble | 0.158 ± 0.043 | worse |
+| global zero-shot (baseline) | 0.139 ± 0.024 | — |
+| global zero-shot + prompt-ensemble | 0.142 ± 0.029 | wash |
+| **patch_top3 (best)** | **0.193 ± 0.051** | — |
+| patch_top3 + prompt-ensemble | 0.195 ± 0.048 | wash |
+| hybrid (z-scored global Δ + patch top-3) | 0.165 ± 0.050 | **worse** |
+| hybrid + prompt-ensemble | 0.159 ± 0.046 | worse |
 
 - **Prompt ensembling** (averaging the query embedding over 5 templates, `benchmark.encode_query`,
   `--prompt-ensemble`) is a **wash** — GeoRSCLIP's RS-text alignment gains nothing from generic
   templates on these already-descriptive queries.
 - **Equal-weight hybrid** (`patch_eval.py --approach hybrid`: z-score the global Δ and the patch
-  top-3 score, sum) **hurts** (0.160 < 0.195): fusing the mostly-noise global signal dilutes the
+  top-3 score, sum) **hurts** (0.165 < 0.193): fusing the mostly-noise global signal dilutes the
   stronger patch signal. The B.10 observation that the two are *complementary per-query* holds,
   but a flat z-sum is the wrong fusion — a **query-type-gated or learned weighting** (global for
   diffuse, patch for localised) would be needed, and is left as future work rather than tuned here
   (out of scope to over-engineer).
 
-**Conclusion:** `patch_top3` remains the best DEN configuration (0.195 CV mAP). The two cheapest
+**Conclusion:** `patch_top3` remains the best DEN configuration (0.193 CV mAP). The two cheapest
 plausible add-ons do not help; reporting them is the honest outcome and rules them out with
 evidence. Reproduce: `python -m scripts.cv_eval ... --prompt-ensemble` /
 `python -m scripts.patch_eval ... --approach hybrid`.
@@ -1204,17 +1209,17 @@ softmax-weighted mean of the per-patch Δ, τ=0.03) and `patch_spatial` (reshape
 
 | approach | GeoRSCLIP NRG (49-patch grid) | CLIP-L/14 NRG (256-patch grid) |
 |---|---|---|
-| patch_top3 (B.10 best) | **0.195 ± 0.050** | 0.151 ± 0.048 |
-| patch_softattn (τ=0.03) | 0.149 ± 0.057 | 0.154 ± 0.053 |
-| patch_spatial (3×3-smoothed) | 0.176 ± 0.068 | **0.169 ± 0.050** |
+| patch_top3 (B.10 best) | **0.193 ± 0.051** | 0.149 ± 0.054 |
+| patch_softattn (τ=0.03) | 0.137 ± 0.042 | 0.139 ± 0.043 |
+| patch_spatial (3×3-smoothed) | 0.168 ± 0.045 | **0.163 ± 0.046** |
 
 - **Spatial coherence helps the *fine* grid, hurts the *coarse* one — as predicted.** On CLIP-L/14's
-  256-patch grid (where top-3 is noisy) smoothing lifts mAP 0.151→0.169 (+12 % rel, within fold
+  256-patch grid (where top-3 is noisy) smoothing lifts mAP 0.149→0.163 (+9 % rel, within fold
   variance); on GeoRSCLIP's 7×7 grid it *over-smooths* the 1–3 genuine change patches and drops
-  0.195→0.176. Grid resolution determines whether spatial denoising helps.
+  0.193→0.168. Grid resolution determines whether spatial denoising helps.
 - **Soft-attention is a wash** — top-3 (hard, small-k) already sits at the sweet spot between max
-  (`patch_zeroshot` 0.162) and mean; softmax-weighting all patches only dilutes it.
-- **No variant beats GeoRSCLIP `patch_top3` (0.195).** The ~0.20 cross-validated ceiling is robust;
+  (`patch_zeroshot` 0.150) and mean; softmax-weighting all patches only dilutes it.
+- **No variant beats GeoRSCLIP `patch_top3` (0.193).** The ~0.20 cross-validated ceiling is robust;
   change-attention *refines* the aggregation but does not break the underlying frozen-VLM limit.
 
 **Learned attention (a trainable query→patch head) was deliberately not pursued:** B.5 showed every

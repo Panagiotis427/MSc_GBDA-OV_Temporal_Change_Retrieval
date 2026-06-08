@@ -6,6 +6,7 @@
   "relevance": "fraction",
   "frac_thresh": 0.05,
   "prompt_ensemble": false,
+  "tau": 0.03,
   "n_pairs": 825,
   "patch_grid": 49,
   "n_evaluable_queries": 9,
@@ -21,7 +22,8 @@
           0.1446
         ],
         "rand_ap": 0.0245,
-        "perm_p": 0.0255
+        "perm_p": 0.0257,
+        "bh_fdr": 0.0578
       },
       {
         "query": "urban expansion replacing vegetation",
@@ -32,7 +34,8 @@
           0.2392
         ],
         "rand_ap": 0.0242,
-        "perm_p": 0.0187
+        "perm_p": 0.019,
+        "bh_fdr": 0.057
       },
       {
         "query": "deforestation, forest cleared to bare soil",
@@ -43,7 +46,8 @@
           0.056
         ],
         "rand_ap": 0.0232,
-        "perm_p": 0.2487
+        "perm_p": 0.2489,
+        "bh_fdr": 0.32
       },
       {
         "query": "forest loss",
@@ -54,7 +58,8 @@
           0.0917
         ],
         "rand_ap": 0.0232,
-        "perm_p": 0.2127
+        "perm_p": 0.2129,
+        "bh_fdr": 0.3194
       },
       {
         "query": "new water body or flooding",
@@ -65,7 +70,8 @@
           0.0268
         ],
         "rand_ap": 0.0182,
-        "perm_p": 0.4475
+        "perm_p": 0.4476,
+        "bh_fdr": 0.5035
       },
       {
         "query": "bare soil or land cleared",
@@ -76,7 +82,8 @@
           0.0571
         ],
         "rand_ap": 0.0378,
-        "perm_p": 0.536
+        "perm_p": 0.5361,
+        "bh_fdr": 0.5361
       },
       {
         "query": "agricultural land converted to wetland or marsh",
@@ -87,7 +94,8 @@
           0.2998
         ],
         "rand_ap": 0.1831,
-        "perm_p": 0.0008
+        "perm_p": 0.001,
+        "bh_fdr": 0.0045
       },
       {
         "query": "wetland drained and turned into farmland",
@@ -98,7 +106,8 @@
           0.2765
         ],
         "rand_ap": 0.2026,
-        "perm_p": 0.058
+        "perm_p": 0.0582,
+        "bh_fdr": 0.1048
       },
       {
         "query": "land turning into wetland",
@@ -109,19 +118,20 @@
           0.3455
         ],
         "rand_ap": 0.183,
-        "perm_p": 0.0
+        "perm_p": 0.0002,
+        "bh_fdr": 0.0018
       }
     ]
   },
   "kfold": {
-    "macro_mAP_mean": 0.1605,
-    "macro_mAP_std": 0.0415,
+    "macro_mAP_mean": 0.1654,
+    "macro_mAP_std": 0.0504,
     "fold_macro": [
-      0.2299,
-      0.1282,
-      0.1868,
-      0.1241,
-      0.1336
+      0.1181,
+      0.2134,
+      0.2237,
+      0.1206,
+      0.1512
     ]
   }
 }

@@ -24,6 +24,7 @@ import numpy as np
 from src.benchmark import Query, _is_seasonal, _t1, _t2
 from src.datasets.base import PairLabel
 from src.retrieval import ChangeRetriever
+from src.stats import rank_order
 
 
 def _actual_transition(lb: Optional[PairLabel]) -> str:
@@ -129,7 +130,7 @@ def build_confusion(
         if rel.sum() == 0:
             continue  # not evaluable in this corpus
         scores = retriever.score_all(q.text, approach=approach)
-        order = np.argsort(-scores)
+        order = rank_order(scores, rel)
 
         prec, rec = {}, {}
         for kk in k_values:

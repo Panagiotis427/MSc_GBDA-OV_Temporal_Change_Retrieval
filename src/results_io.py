@@ -63,7 +63,7 @@ def read_report(path: str | Path) -> Dict:
 #: filename substrings whose JSON uses a non-standard schema (no top-level ``macro``)
 #: and would otherwise flatten into a blank macro-CSV row. ``eval_rerank.py`` writes
 #: nested ``strategies`` blocks; ``cv_eval.py`` writes ``full_corpus`` / ``kfold_*``.
-_NON_BENCHMARK_RESULT_MARKERS = ("rerank", "cv_eval", "patch_eval")
+_NON_BENCHMARK_RESULT_MARKERS = ("rerank", "cv_eval", "patch_eval", "seasonal_gate")
 
 
 def load_all(results_dir: str | Path) -> List[Dict]:
@@ -76,8 +76,17 @@ def load_all(results_dir: str | Path) -> List[Dict]:
     results_dir = Path(results_dir)
     if not results_dir.exists():
         return []
-    return [read_report(p) for p in sorted(results_dir.glob("*.json"))
-            if not any(m in p.name for m in _NON_BENCHMARK_RESULT_MARKERS)]
+    out: List[Dict] = []
+    for p in sorted(results_dir.glob("*.json")):
+        if any(m in p.name for m in _NON_BENCHMARK_RESULT_MARKERS):
+            continue
+        rec = read_report(p)
+        # Defensive: only standard per-split benchmark reports carry "macro".
+        # Any sidecar with a different schema (new marker not yet listed) is
+        # skipped rather than crashing downstream figure/CSV tooling.
+        if isinstance(rec, dict) and "macro" in rec:
+            out.append(rec)
+    return out
 
 
 _CSV_FIELDS = [

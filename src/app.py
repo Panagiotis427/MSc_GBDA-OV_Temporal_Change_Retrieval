@@ -5,8 +5,9 @@ retrieval).
 A natural-language query is scored against every bi-temporal pair's *change*
 representation (not single images), returning a ranked list of change events.
 Each result shows the actual T1/T2 tiles of the matched pair, a
-query-conditioned heatmap on T2, a confidence, and a seasonal-vs-permanent
-note grounded in the dataset's labels.
+query-conditioned change heatmap (per-patch Δ-similarity T1→T2) on the After
+tile, a confidence, and a seasonal-vs-permanent note grounded in the dataset's
+labels.
 
 Selectors: Dataset, Encoder (CLIP / GeoRSCLIP / RemoteCLIP), Approach
 (naive / zero_shot Δ-similarity / peft adapter).
@@ -31,7 +32,7 @@ from src.datasets.registry import get_dataset
 from src.embeddings import load_or_compute
 from src.encoders import get_encoder
 from src.retrieval import APPROACHES, ChangeRetriever
-from src.heatmap import generate_heatmap
+from src.heatmap import generate_change_heatmap, generate_heatmap
 from src.rerank import RERANK_STRATEGIES
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -41,16 +42,20 @@ _SNOW = "snow_and_ice"
 @dataclass
 class RunConfig:
     dataset: str = "dynamic_earthnet"
-    encoder: str = "clip_vitl14"
+    # Defaults match the REPORT headline config (GeoRSCLIP + NRG zero-shot on the
+    # held-out test split — the best generalising setup, §7.3). Earlier defaults
+    # (clip_vitl14 / rgb / split=train) diverged from every reported number and,
+    # worse, split=train is the corpus the PEFT adapter was fit on (memorisation).
+    encoder: str = "georsclip"
     approach: str = "zero_shot"
     root: str = str(_PROJECT_ROOT / "data" / "DynamicEarthNet")
     pairing: str = "bimonthly"
-    split: Optional[str] = "train"   # 605 DEN pairs; adapter was fit here
+    split: Optional[str] = "test"    # 110 held-out DEN pairs (not the PEFT-fit train corpus)
     cache_dir: str = str(_PROJECT_ROOT / "data" / "cache")
     feature_mode: str = "difference"
     top_k: int = 5
     # Spectral / encoder options (require Apply to reload embeddings)
-    color_mode: str = "rgb"         # rgb | nrg | ndvi
+    color_mode: str = "nrg"         # rgb | nrg | ndvi
     use_lora: bool = False          # load LoRA-adapted embeddings (must be pre-cached)
     # Extension toggles (take effect on next Search; no Apply needed)
     geo_filter: bool = False        # enable geographic region filtering
@@ -110,6 +115,7 @@ class SemanticChangeSearch:
         self.store = store
         self.retriever = ChangeRetriever(store, encoder,
                                          feature_mode=cfg.feature_mode)
+        self._adapter_feature_mode = cfg.feature_mode
         if adapter is not None:
             self.retriever.set_adapter(adapter, cfg.feature_mode)
         self._adapter = adapter
@@ -148,7 +154,7 @@ class SemanticChangeSearch:
                                          feature_mode=cfg.feature_mode)
         self._adapter = self._maybe_load_adapter(cfg)
         if self._adapter is not None:
-            self.retriever.set_adapter(self._adapter, cfg.feature_mode)
+            self.retriever.set_adapter(self._adapter, self._adapter_feature_mode)
         self._patch_t1 = self._patch_t2 = None  # invalidate lazy patch cache on (re)build
         self._init_extensions(cfg)
 
@@ -177,11 +183,16 @@ class SemanticChangeSearch:
         if path.exists():
             try:
                 from src.model import load_adapter
-                adapter, _ = load_adapter(str(path))
-                print(f"Loaded PEFT adapter: {path}")
+                adapter, meta = load_adapter(str(path))
+                # Use the feature mode the adapter was TRAINED with, not cfg's —
+                # a concatenate-trained head fed a difference (D-dim) vector, or
+                # vice-versa, would otherwise mismatch the head's input dim.
+                self._adapter_feature_mode = meta.get("feature_mode", cfg.feature_mode)
+                print(f"Loaded PEFT adapter: {path} (feature_mode={self._adapter_feature_mode})")
                 return adapter
             except Exception as exc:
                 print(f"Adapter load failed ({exc}); PEFT disabled.")
+        self._adapter_feature_mode = cfg.feature_mode
         return None
 
     # -- patch (localised) scoring --------------------------------------
@@ -253,13 +264,13 @@ class SemanticChangeSearch:
         lo = float(finite.min()) if len(finite) else 0.0
         hi = float(finite.max()) if len(finite) else 1.0
 
-        # Re-ranking or default argsort
+        # Re-ranking or default (stable) argsort
         if rerank_strategy is not None and self._reranker is not None:
             order = self._reranker.rerank(
                 scores, self.store.pairs, top_k, strategy=rerank_strategy
             )
         else:
-            order = np.argsort(-scores)[:top_k]
+            order = np.argsort(-scores, kind="stable")[:top_k]
 
         events: List[ChangeEvent] = []
         for rank, i in enumerate(order):
@@ -271,8 +282,13 @@ class SemanticChangeSearch:
                 print(f"image load failed for {pair}: {exc}")
             if t1 is not None and t2 is not None:
                 try:
-                    _, hm = generate_heatmap(np.array(t1), np.array(t2),
-                                             text, self.encoder, alpha=0.5)
+                    # Real query-conditioned CHANGE heatmap (per-patch Δ T1->T2);
+                    # fall back to query-vs-After match if no patch tokens.
+                    _, hm = generate_change_heatmap(np.array(t1), np.array(t2),
+                                                    text, self.encoder, alpha=0.5)
+                    if hm is None:
+                        _, hm = generate_heatmap(np.array(t1), np.array(t2),
+                                                 text, self.encoder, alpha=0.5)
                 except Exception as exc:
                     print(f"heatmap failed: {exc}")
             conf = (float(scores[i]) - lo) / (hi - lo) if hi > lo else 1.0
@@ -510,12 +526,14 @@ class SemanticChangeSearch:
                 with gr.Row():
                     t1i = gr.Image(label="Before", height=300, interactive=False)
                     t2i = gr.Image(label="After", height=300, interactive=False)
-                    hmi = gr.Image(label="Change heatmap (After)", height=300,
+                    hmi = gr.Image(label="Change heatmap (Δ T1→T2)", height=300,
                                    interactive=False)
                 gr.Markdown(
-                    "_Heatmap (jet colormap) overlays the **After** image — "
-                    "**warm red/yellow = strongest match** to your query, "
-                    "**cool blue = weakest**._"
+                    "_Heatmap (jet colormap) overlays the **After** image and shows the "
+                    "per-patch **change** in similarity to your query from Before→After — "
+                    "**warm red/yellow = query presence grew most**, **cool blue = little/no "
+                    "change**. (Falls back to a query-vs-After match map if the encoder "
+                    "exposes no patch tokens.)_"
                 )
                 summary = gr.Markdown("*Press Search to retrieve.*")
 
@@ -597,19 +615,20 @@ def parse_args():
     from src.encoders import list_encoders
     p.add_argument("--dataset", default="dynamic_earthnet",
                    choices=list_datasets())
-    p.add_argument("--encoder", default="clip_vitl14",
+    p.add_argument("--encoder", default="georsclip",
                    choices=list_encoders())
     p.add_argument("--approach", default="zero_shot",
                    choices=list(APPROACHES))
     p.add_argument("--root", default=str(_PROJECT_ROOT / "data" / "DynamicEarthNet"))
     p.add_argument("--pairing", default="bimonthly")
-    p.add_argument("--split", default="train",
-                   help="DEN preprocessed split: train|val|test|all "
-                        "(train = 605 pairs, the corpus the PEFT adapter was fit on)")
+    p.add_argument("--split", default="test",
+                   help="DEN preprocessed split: train|val|test|all. Default test "
+                        "(110 held-out pairs); train (605) is the corpus the PEFT "
+                        "adapter was fit on, so avoid it for an honest PEFT demo.")
     p.add_argument("--cache-dir", default=str(_PROJECT_ROOT / "data" / "cache"))
     p.add_argument("--port", type=int, default=7860)
-    # Spectral / encoder options
-    p.add_argument("--color-mode", default="rgb", choices=["rgb", "nrg", "ndvi"],
+    # Spectral / encoder options. Default nrg + georsclip = the REPORT headline config.
+    p.add_argument("--color-mode", default="nrg", choices=["rgb", "nrg", "ndvi"],
                    help="Image colour mode passed to dataset loader. "
                         "nrg = NIR-Red-Green (best zero-shot with GeoRSCLIP); "
                         "ndvi = vegetation index. Change in-app via Settings.")

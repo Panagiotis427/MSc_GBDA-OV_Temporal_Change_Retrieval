@@ -3,6 +3,10 @@
   "encoder": "clip_vitl14",
   "color_mode": "nrg",
   "approach": "zero_shot",
+  "relevance": "dominant",
+  "frac_thresh": 0.05,
+  "prompt_ensemble": false,
+  "n_evaluable_queries": 6,
   "n_pairs": 825,
   "n_aois": 75,
   "folds": 5,
@@ -18,7 +22,8 @@
           0.0159
         ],
         "rand_ap": 0.0091,
-        "perm_p": 0.1685
+        "perm_p": 0.1687,
+        "bh_fdr": 0.2807
       },
       {
         "query": "new water body or flooding",
@@ -29,7 +34,8 @@
           0.0312
         ],
         "rand_ap": 0.0137,
-        "perm_p": 0.2338
+        "perm_p": 0.2339,
+        "bh_fdr": 0.2807
       },
       {
         "query": "bare soil or land cleared",
@@ -40,7 +46,8 @@
           0.0303
         ],
         "rand_ap": 0.0127,
-        "perm_p": 0.2258
+        "perm_p": 0.2259,
+        "bh_fdr": 0.2807
       },
       {
         "query": "agricultural land converted to wetland or marsh",
@@ -51,7 +58,8 @@
           0.1055
         ],
         "rand_ap": 0.0339,
-        "perm_p": 0.0503
+        "perm_p": 0.0505,
+        "bh_fdr": 0.2807
       },
       {
         "query": "wetland drained and turned into farmland",
@@ -62,7 +70,8 @@
           0.08
         ],
         "rand_ap": 0.0341,
-        "perm_p": 0.3425
+        "perm_p": 0.3427,
+        "bh_fdr": 0.3427
       },
       {
         "query": "land turning into wetland",
@@ -73,49 +82,50 @@
           0.0852
         ],
         "rand_ap": 0.0426,
-        "perm_p": 0.1425
+        "perm_p": 0.1427,
+        "bh_fdr": 0.2807
       }
     ]
   },
   "kfold_zero_shot": {
-    "macro_mAP_mean": 0.0721,
-    "macro_mAP_std": 0.0204,
+    "macro_mAP_mean": 0.076,
+    "macro_mAP_std": 0.023,
     "fold_macro": [
-      0.1017,
-      0.0862,
-      0.0426,
-      0.069,
-      0.0608
+      0.1018,
+      0.0994,
+      0.0641,
+      0.0514,
+      0.0632
     ],
     "per_query": {
       "forest loss": {
-        "mean": 0.0357,
+        "mean": 0.0312,
         "std": 0.0,
         "n_folds": 1
       },
       "new water body or flooding": {
-        "mean": 0.0577,
-        "std": 0.0,
-        "n_folds": 1
+        "mean": 0.0376,
+        "std": 0.0225,
+        "n_folds": 2
       },
       "bare soil or land cleared": {
-        "mean": 0.0355,
-        "std": 0.0231,
-        "n_folds": 3
+        "mean": 0.0421,
+        "std": 0.0065,
+        "n_folds": 2
       },
       "agricultural land converted to wetland or marsh": {
-        "mean": 0.081,
-        "std": 0.0482,
+        "mean": 0.1071,
+        "std": 0.1017,
         "n_folds": 5
       },
       "wetland drained and turned into farmland": {
-        "mean": 0.0811,
-        "std": 0.0784,
+        "mean": 0.076,
+        "std": 0.0695,
         "n_folds": 5
       },
       "land turning into wetland": {
-        "mean": 0.0709,
-        "std": 0.0255,
+        "mean": 0.0854,
+        "std": 0.0372,
         "n_folds": 5
       }
     }

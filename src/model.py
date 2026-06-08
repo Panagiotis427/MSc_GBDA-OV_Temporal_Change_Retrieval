@@ -323,11 +323,16 @@ class InfoNCELoss(nn.Module):
         # Apply softmax and compute InfoNCE loss
         log_probs = nn.functional.log_softmax(total_logits, dim=-1)
 
-        # Matched pairs: anchor i matches positive i for each i in [0..batch_size-1]
-        # Since we have 2*batch_size anchors but only batch_size positives,
-        # we take the first pair from each (anchor 0->pos 0, anchor 1->pos 1, etc.)
-        matched_indices = torch.arange(batch_size)  # [0, 1, 2, ..., batch_size-1]
-        loss = -torch.mean(log_probs[matched_indices, matched_indices])
+        # Each of the 2*batch_size anchors (two views per sample) matches its own
+        # positive: view i -> positive (i % batch_size), so BOTH views are
+        # supervised. When negatives are present they occupy columns
+        # [0:batch_size] and positives [batch_size:2*batch_size], so the positive
+        # column is offset by batch_size. (The previous version targeted columns
+        # [0:batch_size] — the NEGATIVE block — and supervised only the first view.)
+        rows = torch.arange(total_logits.shape[0], device=total_logits.device)
+        pos_col = rows % batch_size
+        target = (batch_size + pos_col) if negative is not None else pos_col
+        loss = -torch.mean(log_probs[rows, target])
 
         return loss, total_logits
 

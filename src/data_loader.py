@@ -11,14 +11,15 @@ datasets of paired (embedding_T1, embedding_T2) vectors for change detection tas
         from src.datasets import get_dataset
         ds = get_dataset("qfabric", parquet_paths=[...], cache_path=...)
 
-    The functions in this module are kept as a backwards-compatibility facade
-    so the existing tests and Gradio app keep working without changes.
+    Only the QFabric parquet→embedding helpers (``load_parquet_as_embeddings``,
+    ``parse_date_from_filename``) remain here as a backwards-compatibility facade
+    used by ``src.datasets.qfabric``. The old ``TemporalEmbeddingDataset`` /
+    ``load_qfabric_features`` (which were non-functional) have been removed in
+    favour of ``src.datasets.QFabricDataset``.
 """
 import os
 from pathlib import Path
 from typing import Optional, Tuple, Union
-import torch
-from torch.utils.data import Dataset
 import pandas as pd
 import numpy as np
 
@@ -51,139 +52,6 @@ def migrate_legacy_cache(data_dir: Union[str, Path]) -> Optional[Path]:
     legacy.rename(new)
     print(f"Migrated legacy cache: {legacy} -> {new}")
     return new
-
-
-class TemporalEmbeddingDataset(Dataset):
-    """PyTorch dataset for paired temporal embeddings.
-
-    .. deprecated::
-        ``__getitem__`` references an undefined ``n`` and will raise; do not use
-        in new code. Prefer ``src.datasets.QFabricDataset`` (or any other
-        ``TemporalDataset`` implementation) combined with
-        ``src.temporal_pairing.pair_temporally_from_dataset``.
-    """
-
-    def __init__(
-        self,
-        embedding_file: str,
-        metadata_file: Optional[str] = None,
-        transform=None
-    ):
-        """
-        Initialize the temporal embedding dataset.
-
-        Args:
-            embedding_file (str): Path to numpy file containing embeddings.
-                Shape should be (N, embedding_dim) where N is total number of observations.
-            metadata_file (str, optional): Path to CSV with metadata columns including
-                'location', 'timestamp'. If None, assumes filenames encode location info.
-            transform: Optional spatial transforms to apply to images.
-
-        Attributes:
-            embeddings (np.ndarray): Loaded embeddings array.
-            metadata (pd.DataFrame or dict): Parsed metadata mapping locations -> timestamps.
-            embedding_dim (int): Dimensionality of each embedding vector.
-        """
-        self.embedding_file = embedding_file
-        self.metadata_file = metadata_file
-        self.transform = transform
-
-        # Load embeddings
-        if embedding_file.endswith('.npz'):
-            data = np.load(embedding_file)
-            self.embeddings = data['embeddings']
-        else:
-            self.embeddings = np.load(embedding_file)
-
-        assert len(self.embeddings.shape) == 2, "Embeddings must be 2D: (N, dim)"
-        self.embedding_dim = self.embeddings.shape[1]
-
-        # Parse metadata
-        if self.metadata_file is not None:
-            df = pd.read_csv(metadata_file)
-            required_cols = ['location', 'timestamp']
-            missing = set(required_cols) - set(df.columns)
-            if missing:
-                raise ValueError(f"Metadata missing columns: {missing}")
-            self.metadata = df
-        else:
-            # Fallback: extract location from filename pattern like "tile_123.npz"
-            self._extract_location_from_filename()
-
-    def _extract_location_from_filename(self):
-        """Extract location identifier from embedding filename."""
-        base = os.path.basename(self.embedding_file)
-        # Assumes format: tile_<location_id>.npz or <location_id>_embeddings.npz
-        self.location_id = base.replace('.npz', '').split('_')[-1] if '_' in base else base
-
-    def __len__(self):
-        return len(self.embeddings)
-
-    def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
-        """
-        Get a paired temporal embedding sample.
-
-        Args:
-            idx (int): Index of the location in self.metadata. Assumes metadata is sorted
-                by timestamp and contains consecutive pairs.
-
-        Returns:
-            tuple: (embedding_T1, embedding_T2) as PyTorch tensors.
-                Each tensor has shape (embedding_dim,).
-        """
-        assert idx < len(self), f"Index {idx} out of range [0, {len(self)})"
-
-        # Get embeddings for this location pair
-        loc = self.metadata.iloc[idx]['location']
-        t1_mask = self.metadata['location'] == loc & (self.metadata['timestamp'].rank() == 2*n)
-        t2_mask = self.metadata['location'] == loc & (self.metadata['timestamp'].rank() == 2*n + 1)
-
-        if not t1_mask.any() or not t2_mask.any():
-            raise IndexError(f"Cannot find consecutive time pairs for location {loc}")
-
-        emb_t1 = self.embeddings[t1_mask]
-        emb_t2 = self.embeddings[t2_mask]
-
-        assert len(emb_t1) == 1 and len(emb_t2) == 1, "Expected exactly one observation per timestamp"
-
-        return torch.from_numpy(emb_t1).float(), torch.from_numpy(emb_t2).float()
-
-
-def load_qfabric_features(
-    base_path: str,
-    metadata_file: Optional[str] = None
-) -> TemporalEmbeddingDataset:
-    """
-    Load pre-computed QFabric foundation model embeddings.
-
-    Args:
-        base_path (str): Base directory containing tile-specific .npz files.
-        metadata_file (str, optional): CSV with columns ['location', 'timestamp']. Defaults to None.
-
-    Returns:
-        TemporalEmbeddingDataset: Dataset ready for training loop.
-    """
-    # QFabric stores embeddings per tile in format: base_path/tile_<id>.npz
-    all_embeddings = {}
-    npz_files = sorted([f for f in os.listdir(base_path) if f.endswith('.npz')])
-
-    for fname in npz_files:
-        path = os.path.join(base_path, fname)
-        data = np.load(path)
-        loc_id = fname.replace('.npz', '')
-        all_embeddings[loc_id] = data['embeddings'] if 'embeddings' in data else data[0]
-
-    # Build metadata mapping
-    location_to_timestamps = {}
-    for loc, emb in all_embeddings.items():
-        if not isinstance(emb, np.ndarray):
-            continue
-        timestamps = []
-        for i in range(len(emb)):
-            timestamp = pd.Timestamp('2023-01-01') + pd.Timedelta(days=i)  # Placeholder - replace with actual
-            location_to_timestamps[loc] = timestamps
-
-    return TemporalEmbeddingDataset(embedding_file=None, metadata_file=metadata_file)
 
 
 def parse_date_from_filename(filename: str) -> pd.Timestamp:
@@ -233,16 +101,20 @@ def load_parquet_as_embeddings(
         shard_id = os.path.splitext(os.path.basename(parquet_path))[0]  # e.g. 'train-00000-of-00597'
         df = pd.read_parquet(parquet_path)
         img_cols = [c for c in df.columns if c.endswith('_image') and not c.endswith('_name')]
-        name_cols = [c for c in df.columns if c.endswith('_image_name')]
 
         print(f"Reading images from {os.path.basename(parquet_path)} ({len(df)} locations)...")
         for row_idx, row in df.iterrows():
             loc_id = f"{shard_id}_r{row_idx:04d}"
             images = []
-            for t_idx, (img_col, name_col) in enumerate(zip(img_cols, name_cols)):
+            for t_idx, img_col in enumerate(img_cols):
+                # Match the name column to its image column by name
+                # (``t1_image`` -> ``t1_image_name``) instead of zipping two
+                # independently-filtered lists (order-fragile).
+                name_col = img_col + "_name"
                 img = PILImage.open(io.BytesIO(row[img_col]['bytes'])).convert('RGB')
                 images.append(img)
-                timestamp = parse_date_from_filename(row[name_col])
+                timestamp = (parse_date_from_filename(row[name_col])
+                             if name_col in df.columns else pd.Timestamp('2015-01-01'))
                 metadata_rows.append({'location': loc_id, 'timestamp': timestamp, 'timepoint_idx': t_idx})
             image_lookup[loc_id] = images
 

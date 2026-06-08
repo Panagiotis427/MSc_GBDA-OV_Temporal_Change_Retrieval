@@ -128,7 +128,8 @@ class ChangeRetriever:
         top_k: int = 5,
     ) -> List[RetrievalResult]:
         scores = self.score_all(query, approach)
-        order = np.argsort(-scores)[:top_k]
+        # stable sort → deterministic order when scores tie
+        order = np.argsort(-scores, kind="stable")[:top_k]
         return [
             RetrievalResult(self.store.pairs[i], float(scores[i]), r)
             for r, i in enumerate(order)

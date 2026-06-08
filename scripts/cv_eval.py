@@ -42,10 +42,17 @@ from src.embeddings import PairEmbeddingStore, cache_path, cache_tag_for
 from src.encoders import get_encoder
 from src.queries import get_queries
 from src.retrieval import ChangeRetriever
+from src.stats import aoi_folds, bh_fdr, perm_p_value, rank_order
 
 SPLITS = ("train", "val", "test")
 BOOTSTRAP = 1000
 PERM = 4000
+
+
+def _std(x) -> float:
+    """Sample standard deviation (ddof=1); 0.0 for fewer than two values."""
+    a = np.asarray(x, dtype=np.float64)
+    return float(np.std(a, ddof=1)) if a.size > 1 else 0.0
 
 
 def _merge_stores(dataset_name, encoder_name, color, cache_dir):
@@ -80,12 +87,12 @@ def _rel_vector(dataset, pairs, predicate):
 
 
 def _perm_p(rel_ranked_len, n_rel, obs_ap, rng, iters=PERM):
-    """P(random-ranking AP >= obs_ap) for a query with n_rel positives in N items.
+    """Unbiased one-sided permutation p-value P(random-ranking AP >= obs_ap) for a
+    query with ``n_rel`` positives in ``N`` items, plus the mean random AP.
 
-    Intentionally NOT replaced by ``src.stats.rand_ap`` (used by patch_eval /
-    significance_audit): this routine draws via ``rng.permutation`` whereas
-    ``rand_ap`` uses ``rng.shuffle``, so unifying them would change this script's
-    RNG draw sequence and perturb the already-committed ``cv_eval__*.json``.
+    The observed statistic is itself one realisation of the null, so the p-value is
+    ``(#{draws >= obs} + 1) / (iters + 1)`` (``src.stats.perm_p_value``) — never an
+    impossible 0.0.
     """
     N = rel_ranked_len
     draws = np.empty(iters)
@@ -96,7 +103,7 @@ def _perm_p(rel_ranked_len, n_rel, obs_ap, rng, iters=PERM):
         rel = base[perm]
         hits = np.cumsum(rel)
         draws[i] = (hits / np.arange(1, N + 1))[rel].sum() / n_rel
-    return float((draws >= obs_ap).mean()), float(draws.mean())
+    return perm_p_value(int(np.sum(draws >= obs_ap)), iters), float(draws.mean())
 
 
 def main() -> None:
@@ -149,8 +156,7 @@ def main() -> None:
     for q in evaluable:
         rel = rel_all[q.text]
         scores = retr.score_vec(tvec[q.text], approach=args.approach)
-        order = np.argsort(-scores)
-        ap_obs = _average_precision(rel[order])
+        ap_obs = _average_precision(rel[rank_order(scores, rel)])
         # bootstrap over pairs
         boot = np.empty(BOOTSTRAP)
         for b in range(BOOTSTRAP):
@@ -159,19 +165,24 @@ def main() -> None:
             if r.sum() == 0:
                 boot[b] = 0.0
                 continue
-            o = np.argsort(-scores[samp])
-            boot[b] = _average_precision(r[o])
+            boot[b] = _average_precision(r[rank_order(scores[samp], r)])
         p, randmean = _perm_p(N, int(rel.sum()), ap_obs, rng)
         full.append({"query": q.text, "n_relevant": int(rel.sum()), "ap": round(ap_obs, 4),
                      "ci95": [round(float(np.percentile(boot, 2.5)), 4),
                               round(float(np.percentile(boot, 97.5)), 4)],
                      "rand_ap": round(randmean, 4), "perm_p": round(p, 4)})
     macro_full = round(float(np.mean([r["ap"] for r in full])), 4) if full else 0.0
+    # Benjamini-Hochberg FDR q-values across this file's evaluable-query family,
+    # so downstream reporting can cite genuine q-values rather than raw perm_p.
+    if full:
+        for r, qv in zip(full, bh_fdr([r["perm_p"] for r in full])):
+            r["bh_fdr"] = round(float(qv), 4)
 
     # --- 2. K-fold AOI CV ----------------------------------------------------
-    perm_aois = list(rng.permutation(aois))
-    folds = [perm_aois[i::args.folds] for i in range(args.folds)]
-    aoi_fold = {a: k for k, fl in enumerate(folds) for a in fl}
+    # Shared, seed-only partition helper (src.stats.aoi_folds): independent of the
+    # bootstrap/permutation draws consumed above and IDENTICAL to patch_eval.py's,
+    # so the two scripts' CV numbers are directly comparable.
+    aoi_fold = aoi_folds(aois, args.folds, args.seed)
     fold_of_pair = np.array([aoi_fold[p.location_id] for p in pairs])
 
     def fold_idx(k):
@@ -190,15 +201,15 @@ def main() -> None:
             if rel.sum() == 0:
                 continue
             sc = rsub.score_vec(tvec[q.text], approach=args.approach)
-            ap_k = _average_precision(rel[np.argsort(-sc)])
+            ap_k = _average_precision(rel[rank_order(sc, rel)])
             cv_zs[q.text].append(ap_k)
             aps_this.append(ap_k)
         fold_macro.append(float(np.mean(aps_this)) if aps_this else 0.0)
     cv_zs_summary = {qt: {"mean": round(float(np.mean(v)), 4),
-                          "std": round(float(np.std(v)), 4),
+                          "std": round(_std(v), 4),
                           "n_folds": len(v)} for qt, v in cv_zs.items() if v}
     cv_macro_mean = round(float(np.mean(fold_macro)), 4)
-    cv_macro_std = round(float(np.std(fold_macro)), 4)
+    cv_macro_std = round(_std(fold_macro), 4)
 
     out = {
         "dataset": "dynamic_earthnet", "encoder": args.encoder,
@@ -238,17 +249,17 @@ def main() -> None:
                 if rel.sum() == 0:
                     continue
                 sc = rsub.score_vec(tvec[q.text], approach="peft")
-                ap_k = _average_precision(rel[np.argsort(-sc)])
+                ap_k = _average_precision(rel[rank_order(sc, rel)])
                 peft_pq[q.text].append(ap_k)
                 aps_this.append(ap_k)
             peft_macro.append(float(np.mean(aps_this)) if aps_this else 0.0)
             print(f"  [peft fold {k}] macro mAP={peft_macro[-1]:.4f} (train {len(tr_pairs)} pairs)")
         out["kfold_peft"] = {
             "macro_mAP_mean": round(float(np.mean(peft_macro)), 4),
-            "macro_mAP_std": round(float(np.std(peft_macro)), 4),
+            "macro_mAP_std": round(_std(peft_macro), 4),
             "fold_macro": [round(x, 4) for x in peft_macro],
             "per_query": {qt: {"mean": round(float(np.mean(v)), 4),
-                               "std": round(float(np.std(v)), 4), "n_folds": len(v)}
+                               "std": round(_std(v), 4), "n_folds": len(v)}
                           for qt, v in peft_pq.items() if v},
         }
 
@@ -265,7 +276,8 @@ def main() -> None:
               f"± {out['kfold_peft']['macro_mAP_std']}")
     print(f"wrote {op}")
     for r in full:
-        print(f"  {r['ap']:.3f}  CI{r['ci95']}  p={r['perm_p']:.3f}  n={r['n_relevant']:3d}  {r['query'][:46]}")
+        print(f"  {r['ap']:.3f}  CI{r['ci95']}  p={r['perm_p']:.3f}  q={r.get('bh_fdr', float('nan')):.3f}"
+              f"  n={r['n_relevant']:3d}  {r['query'][:46]}")
 
 
 if __name__ == "__main__":

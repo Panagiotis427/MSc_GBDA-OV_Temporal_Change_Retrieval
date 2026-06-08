@@ -177,10 +177,14 @@ def main() -> None:
         # Merge LoRA into encoder and re-cache train embeddings
         merge_lora_into_encoder(enc, visual_lora)
         lora_cache_tag = cache_tag_for(args.train_split, args.color_mode, lora=True)
+        # force=True: a freshly-trained adapter changes the embeddings even though
+        # the pair-set is unchanged, so the LoRA cache MUST be recomputed — a stale
+        # cache from a previous adapter would otherwise be silently reused.
         lora_store_train = load_or_compute(
             ds_train, enc,
             cache_dir=args.cache_dir,
             cache_tag=lora_cache_tag,
+            force=True,
         )
         retr_lora_train = ChangeRetriever(lora_store_train, enc, feature_mode=args.mode)
         rep = run_benchmark(ds_train, retr_lora_train, approach="zero_shot")
@@ -222,10 +226,12 @@ def main() -> None:
 
         if args.lora:
             lora_eval_tag = cache_tag_for(esplit, args.color_mode, lora=True)
+            # force=True: recompute with the freshly-merged adapter (see above).
             lora_store_eval = load_or_compute(
                 ds_eval, enc,
                 cache_dir=args.cache_dir,
                 cache_tag=lora_eval_tag,
+                force=True,
             )
             retr_lora_eval = ChangeRetriever(lora_store_eval, enc, feature_mode=args.mode)
             rep = run_benchmark(ds_eval, retr_lora_eval, approach="zero_shot")

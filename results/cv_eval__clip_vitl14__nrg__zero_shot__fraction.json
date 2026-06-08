@@ -5,6 +5,7 @@
   "approach": "zero_shot",
   "relevance": "fraction",
   "frac_thresh": 0.05,
+  "prompt_ensemble": false,
   "n_evaluable_queries": 9,
   "n_pairs": 825,
   "n_aois": 75,
@@ -21,7 +22,8 @@
           0.2814
         ],
         "rand_ap": 0.0245,
-        "perm_p": 0.01
+        "perm_p": 0.0102,
+        "bh_fdr": 0.0918
       },
       {
         "query": "urban expansion replacing vegetation",
@@ -32,7 +34,8 @@
           0.0493
         ],
         "rand_ap": 0.0242,
-        "perm_p": 0.5593
+        "perm_p": 0.5594,
+        "bh_fdr": 0.5594
       },
       {
         "query": "deforestation, forest cleared to bare soil",
@@ -43,7 +46,8 @@
           0.0442
         ],
         "rand_ap": 0.0232,
-        "perm_p": 0.3515
+        "perm_p": 0.3517,
+        "bh_fdr": 0.4457
       },
       {
         "query": "forest loss",
@@ -54,7 +58,8 @@
           0.0414
         ],
         "rand_ap": 0.0232,
-        "perm_p": 0.3545
+        "perm_p": 0.3547,
+        "bh_fdr": 0.4457
       },
       {
         "query": "new water body or flooding",
@@ -65,7 +70,8 @@
           0.0397
         ],
         "rand_ap": 0.0182,
-        "perm_p": 0.2903
+        "perm_p": 0.2904,
+        "bh_fdr": 0.4457
       },
       {
         "query": "bare soil or land cleared",
@@ -76,7 +82,8 @@
           0.0656
         ],
         "rand_ap": 0.0378,
-        "perm_p": 0.3655
+        "perm_p": 0.3657,
+        "bh_fdr": 0.4457
       },
       {
         "query": "agricultural land converted to wetland or marsh",
@@ -87,7 +94,8 @@
           0.2623
         ],
         "rand_ap": 0.1831,
-        "perm_p": 0.0673
+        "perm_p": 0.0675,
+        "bh_fdr": 0.2025
       },
       {
         "query": "wetland drained and turned into farmland",
@@ -98,7 +106,8 @@
           0.2487
         ],
         "rand_ap": 0.2026,
-        "perm_p": 0.396
+        "perm_p": 0.3962,
+        "bh_fdr": 0.4457
       },
       {
         "query": "land turning into wetland",
@@ -109,64 +118,65 @@
           0.2602
         ],
         "rand_ap": 0.183,
-        "perm_p": 0.0377
+        "perm_p": 0.038,
+        "bh_fdr": 0.171
       }
     ]
   },
   "kfold_zero_shot": {
-    "macro_mAP_mean": 0.1389,
-    "macro_mAP_std": 0.0306,
+    "macro_mAP_mean": 0.1226,
+    "macro_mAP_std": 0.0286,
     "fold_macro": [
-      0.1544,
-      0.1144,
-      0.1862,
-      0.0987,
-      0.1406
+      0.1292,
+      0.1156,
+      0.1307,
+      0.0794,
+      0.1581
     ],
     "per_query": {
       "new buildings constructed on former agricultural land": {
-        "mean": 0.0738,
-        "std": 0.0827,
-        "n_folds": 3
+        "mean": 0.0727,
+        "std": 0.0873,
+        "n_folds": 4
       },
       "urban expansion replacing vegetation": {
-        "mean": 0.0418,
-        "std": 0.0365,
-        "n_folds": 3
+        "mean": 0.0417,
+        "std": 0.0506,
+        "n_folds": 4
       },
       "deforestation, forest cleared to bare soil": {
-        "mean": 0.0792,
-        "std": 0.0659,
-        "n_folds": 3
+        "mean": 0.0648,
+        "std": 0.0481,
+        "n_folds": 4
       },
       "forest loss": {
-        "mean": 0.06,
-        "std": 0.0175,
-        "n_folds": 3
+        "mean": 0.041,
+        "std": 0.0157,
+        "n_folds": 4
       },
       "new water body or flooding": {
-        "mean": 0.0614,
-        "std": 0.0089,
+        "mean": 0.0485,
+        "std": 0.0025,
         "n_folds": 2
       },
       "bare soil or land cleared": {
-        "mean": 0.0705,
-        "std": 0.0348,
+        "mean": 0.0502,
+        "std": 0.0416,
         "n_folds": 5
       },
       "agricultural land converted to wetland or marsh": {
-        "mean": 0.233,
-        "std": 0.0767,
+        "mean": 0.2243,
+        "std": 0.1175,
         "n_folds": 5
       },
       "wetland drained and turned into farmland": {
-        "mean": 0.2167,
-        "std": 0.0685,
+        "mean": 0.2253,
+        "std": 0.0366,
         "n_folds": 5
       },
       "land turning into wetland": {
-        "mean": 0.2405,
-        "std": 0.0667,
+        "mean": 0.2274,
+        "std": 0.0942,
         "n_folds": 5
       }
     }

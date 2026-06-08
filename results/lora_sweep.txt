@@ -1,11 +1,33 @@
-LoRA rank/epoch sweep — GeoRSCLIP + NRG, zero_shot mAP (REPORT §7.4)
-Reproduce: python -m scripts.lora_sweep --configs 4:20 8:20 16:20 8:40   (seed=42, in-memory)
 
-rank  alpha  epochs    train     test
-   4      8     20     0.0214   0.1587
-   8     16     20     0.0215   0.2458   <- sweet spot
-  16     32     20     0.0233   0.1129
-   8     16     40     0.0205   0.2050
+=== LoRA rank=4 alpha=8 epochs=20 ===
+Loading georsclip: Zilun/GeoRSCLIP/ckpt/RS5M_ViT-B-32.pt (arch ViT-B-32)
+Encoding 605 pairs (1210 images) with 'georsclip' on cuda ...
+Encoding 110 pairs (220 images) with 'georsclip' on cuda ...
+  train mAP=0.1530  test mAP=0.0708
+
+=== LoRA rank=8 alpha=16 epochs=20 ===
+Loading georsclip: Zilun/GeoRSCLIP/ckpt/RS5M_ViT-B-32.pt (arch ViT-B-32)
+Encoding 605 pairs (1210 images) with 'georsclip' on cuda ...
+Encoding 110 pairs (220 images) with 'georsclip' on cuda ...
+  train mAP=0.1676  test mAP=0.0701
+
+=== LoRA rank=16 alpha=32 epochs=20 ===
+Loading georsclip: Zilun/GeoRSCLIP/ckpt/RS5M_ViT-B-32.pt (arch ViT-B-32)
+Encoding 605 pairs (1210 images) with 'georsclip' on cuda ...
+Encoding 110 pairs (220 images) with 'georsclip' on cuda ...
+  train mAP=0.1352  test mAP=0.0577
+
+=== LoRA rank=8 alpha=16 epochs=40 ===
+Loading georsclip: Zilun/GeoRSCLIP/ckpt/RS5M_ViT-B-32.pt (arch ViT-B-32)
+Encoding 605 pairs (1210 images) with 'georsclip' on cuda ...
+Encoding 110 pairs (220 images) with 'georsclip' on cuda ...
+  train mAP=0.1462  test mAP=0.0589
+
+============= LoRA SWEEP (georsclip + nrg, zero_shot mAP) =============
+rank alpha epochs    train     test
+   4     8     20   0.1530   0.0708
+   8    16     20   0.1676   0.0701
+  16    32     20   0.1352   0.0577
+   8    16     40   0.1462   0.0589
 frozen zero-shot reference: train 0.025  test 0.426
-
-Finding: rank-8 best (test 0.246); more rank/epochs overfit; all LoRA < frozen 0.426.
+===============================================================

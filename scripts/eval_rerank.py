@@ -36,6 +36,7 @@ from src.encoders import get_encoder  # noqa: E402
 from src.queries import get_queries  # noqa: E402
 from src.rerank import RERANK_STRATEGIES, Reranker  # noqa: E402
 from src.retrieval import ChangeRetriever  # noqa: E402
+from src.stats import rank_order  # noqa: E402
 
 
 def _metrics(order: np.ndarray, rel: np.ndarray, k_values) -> dict:
@@ -84,7 +85,7 @@ def evaluate(encoder: str, color_mode: str, split: str, approach: str,
         scores = retriever.score_all(q.text, approach=approach)
 
         orders = {
-            "baseline": np.argsort(-scores),
+            "baseline": rank_order(scores, rel),
             "diversity": reranker.rerank(scores, pairs, top_k=n, strategy="diversity"),
             "coherence": reranker.rerank(scores, pairs, top_k=n, strategy="coherence",
                                          geo_weight=geo_weight),

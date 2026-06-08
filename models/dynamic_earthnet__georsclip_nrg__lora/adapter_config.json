@@ -33,7 +33,6 @@
   "revision": null,
   "target_modules": [
     "c_fc",
-    "out_proj",
     "c_proj"
   ],
   "target_parameters": null,

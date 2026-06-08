@@ -39,17 +39,21 @@ import os
 
 import numpy as np
 
-from src.stats import rand_ap
+from src.stats import perm_p_value, rand_ap
 
 ITERS = 4000
 SEED = 0
 
 
 def _perm(rels, N, obs_map, rng, iters=ITERS):
-    """Monte-Carlo null for the *macro* mAP (mean of per-query random APs)."""
+    """Monte-Carlo null for the *macro* mAP (mean of per-query random APs).
+
+    Unbiased one-sided p-value ``(#{draws >= obs} + 1) / (iters + 1)`` — the
+    observed statistic counts as a null draw, so 0.0 is never returned.
+    """
     draws = np.array([np.mean([rand_ap(R, N, rng) for R in rels])
                       for _ in range(iters)])
-    return float((draws >= obs_map).mean()), float(draws.mean())
+    return perm_p_value(int(np.sum(draws >= obs_map)), iters), float(draws.mean())
 
 
 def collect(results_dir="results"):

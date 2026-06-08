@@ -19,6 +19,43 @@ from src.datasets.base import PairKey
 REGION_ALL = "All"
 
 
+def region_from_centroid(lat: float, lon: float) -> str:
+    """Coarse continent for a WGS84 centroid.
+
+    The stored ``region`` field in ``aoi_metadata.json`` has historically drifted
+    (AOIs in Sri Lanka / Indonesia tagged "Oceania", Central America tagged
+    "South America", Levant/Arabia tagged "Africa"). ``GeoFilter`` therefore
+    derives the region from ``(lat_c, lon_c)`` via this function rather than
+    trusting the field, so the partition is always geographically correct.
+
+    Boundaries are deliberately coarse but chosen to classify all DEN AOIs
+    correctly (incl. the Africa/Asia split through Suez and the Central/South
+    America split through the Panama isthmus).
+    """
+    if lat <= -60:
+        return "Antarctica"
+    # Western hemisphere → the Americas.
+    if -170 <= lon < -25:
+        if lat >= 9:           # North + Central America + Caribbean
+            return "North America"
+        if lat <= -1.9:        # clearly continental South America
+            return "South America"
+        # Panama isthmus band: west of ~77°W is Central America (North).
+        return "North America" if lon <= -77 else "South America"
+    # Oceania: Australia / NZ / SW-Pacific.
+    if lon >= 110 and lat <= -10:
+        return "Oceania"
+    # Europe: north of the Mediterranean, west of the Urals/Caucasus.
+    if lat >= 36 and -25 <= lon <= 40:
+        return "Europe"
+    # Africa + the Levant/Arabia exclusion (those are Asia).
+    if -25 <= lon <= 52 and -35 <= lat <= 37:
+        if lon >= 34 and lat >= 13:    # Levant / Arabian peninsula
+            return "Asia"
+        return "Africa"
+    return "Asia"
+
+
 def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     R = 6371.0
     dlat = radians(lat2 - lat1)
@@ -40,12 +77,26 @@ class GeoFilter:
     def __init__(self, metadata_path: str | Path) -> None:
         with open(metadata_path) as fh:
             self._meta: Dict[str, dict] = json.load(fh)
+        # Region is derived from the centroid (authoritative) rather than the
+        # stored "region" field, which has been unreliable. Falls back to the
+        # stored field only if the centroid is missing.
+        self._region_of: Dict[str, str] = {}
+        for loc, m in self._meta.items():
+            lat, lon = m.get("lat_c"), m.get("lon_c")
+            if lat is not None and lon is not None:
+                self._region_of[loc] = region_from_centroid(float(lat), float(lon))
+            elif "region" in m:
+                self._region_of[loc] = m["region"]
+
+    def region_of(self, location_id: str) -> Optional[str]:
+        """Centroid-derived region for an AOI (``None`` if unknown)."""
+        return self._region_of.get(location_id)
 
     # ------------------------------------------------------------------
     @property
     def regions(self) -> List[str]:
-        """Sorted list of unique region strings, prepended with ``"All"``."""
-        unique = sorted({v["region"] for v in self._meta.values() if "region" in v})
+        """Sorted list of unique (centroid-derived) regions, prepended with ``"All"``."""
+        unique = sorted(set(self._region_of.values()))
         return [REGION_ALL] + unique
 
     def centroid(self, location_id: str) -> Optional[Tuple[float, float]]:
@@ -69,7 +120,7 @@ class GeoFilter:
         if region in (REGION_ALL, "", None):
             return pairs
         allowed: Set[str] = {
-            loc for loc, m in self._meta.items() if m.get("region") == region
+            loc for loc, r in self._region_of.items() if r == region
         }
         return [p for p in pairs if p.location_id in allowed]
 

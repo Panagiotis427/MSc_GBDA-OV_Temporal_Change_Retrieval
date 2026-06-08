@@ -107,7 +107,7 @@ class Reranker:
         Iterates pairs in descending score order.  Each new unique location is
         preferred over a repeat; repeats are deferred to fill remaining slots.
         """
-        order = list(np.argsort(-scores))
+        order = list(np.argsort(-scores, kind="stable"))
         seen_locs: set = set()
         result: List[int] = []
         deferred: List[int] = []
@@ -155,7 +155,7 @@ class Reranker:
 
         if anchor is None:
             # No metadata for top-1 → fall back to default ordering
-            return np.argsort(-scores)[:top_k]
+            return np.argsort(-scores, kind="stable")[:top_k]
 
         a_lat, a_lon = anchor
         max_dist_km = 5_000.0  # normalise proximity over half the globe
@@ -181,4 +181,4 @@ class Reranker:
         # Mask out -inf pairs so they never appear
         combined = np.where(finite_mask, combined, -np.inf)
 
-        return np.argsort(-combined)[:top_k]
+        return np.argsort(-combined, kind="stable")[:top_k]

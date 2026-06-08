@@ -242,7 +242,7 @@ convenience entry points — pass the same `--split` / `--color-mode` to every s
 share the split-tagged embedding cache.
 
 ```bash
-pytest -q                              # full suite: 218 passed, 1 skipped (incl. real-CLIP test_text_encoder, needs weights, ~45 s)
+pytest -q                              # full suite: 235 passed, 1 skipped (incl. real-CLIP test_text_encoder, needs weights, ~45 s)
 pytest -q --ignore=tests/test_text_encoder.py   # skip the real-CLIP-weights test (~45 s) for the fast CPU loop
 ```
 

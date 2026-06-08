@@ -26,6 +26,7 @@ from src.datasets.registry import get_dataset
 from src.embeddings import load_or_compute
 from src.encoders import get_encoder
 from src.retrieval import APPROACHES, ChangeRetriever
+from src.stats import rank_order
 
 # Used by ``_is_seasonal`` to flag snow-involving transitions in the
 # seasonal-drift report. Datasets without snow labels are unaffected (no
@@ -297,7 +298,7 @@ def run_benchmark(
         if rel.sum() == 0:
             continue  # query has no positives in this corpus — not evaluable
         scores = retriever.score_all(q.text, approach=approach)
-        order = np.argsort(-scores)
+        order = rank_order(scores, rel)
         rel_ranked = rel[order]
         seas_ranked = seasonal_mask[order]
 

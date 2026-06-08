@@ -7,14 +7,19 @@ loading images on-the-fly during training and re-caching embeddings afterwards.
 
 Architecture
 ------------
-- LoRA applied to: ``out_proj``, ``c_fc``, ``c_proj`` in each ViT ResBlock
-  (attention output + FFN). QKV ``in_proj_weight`` is skipped because
-  open_clip stores it as a combined parameter, not a sub-module.
-- Trainable params: ~442K for ViT-B-32 (0.5% of visual encoder).
+- LoRA applied to: ``c_fc``, ``c_proj`` in each ViT ResBlock (the MLP / FFN).
+  The attention projections are NOT adapted: open_clip's attention is an
+  ``nn.MultiheadAttention`` whose forward calls ``F.multi_head_attention_forward``
+  and reads ``out_proj.weight`` / ``in_proj_weight`` as raw tensors — it never
+  invokes ``out_proj.forward``, so a PEFT LoRA wrapper on ``out_proj`` would
+  receive no gradient and be a silent no-op. Adapting attention would require a
+  custom MHA wrapper; here we adapt the FFN only.
+- Trainable params: ~369K for ViT-B-32 (~0.42% of the visual encoder).
 - Text encoder stays fully frozen throughout.
-- Loss: masked symmetric InfoNCE, same family as the ProjectionHead trainer,
-  but differing in positive handling (cross-entropy to a single diagonal
-  positive here, vs ProjectionHead's mean over all same-caption positives).
+- Loss: masked symmetric InfoNCE, identical to the ProjectionHead trainer
+  (``src.train._masked_infonce``): every same-caption pair is a mutual positive
+  (mean log-prob over the positive set), so DEN's heavily-repeated captions do
+  not fight each other as negatives.
 - After training: LoRA weights are merged into the base model via
   ``merge_and_unload()``, then embeddings are re-computed and cached.
 
@@ -51,8 +56,11 @@ class LoRAConfig:
     rank: int = 4
     alpha: int = 8
     dropout: float = 0.1
+    # FFN only: out_proj is an nn.MultiheadAttention sub-module whose forward is
+    # never called (F.multi_head_attention_forward reads its weight directly), so
+    # a LoRA wrapper there is a no-op. See module docstring.
     target_modules: List[str] = field(
-        default_factory=lambda: ["out_proj", "c_fc", "c_proj"]
+        default_factory=lambda: ["c_fc", "c_proj"]
     )
     epochs: int = 20
     lr: float = 1e-4
@@ -97,18 +105,27 @@ def _infonce_loss(
     pos_mask: torch.Tensor,
     temperature: float = 0.07,
 ) -> torch.Tensor:
-    """Masked symmetric InfoNCE (same captions = positives, stable pairs masked)."""
-    logits = (delta @ text.t()) / temperature           # [B, B]
-    logits_t = logits.t()
-    neg_mask = ~pos_mask
-    if neg_mask.any():
-        logits = logits.masked_fill(~(pos_mask | torch.eye(
-            logits.shape[0], dtype=torch.bool, device=logits.device)), -1e9)
-        logits_t = logits_t.masked_fill(~(pos_mask | torch.eye(
-            logits.shape[0], dtype=torch.bool, device=logits.device)), -1e9)
-    targets = torch.arange(delta.shape[0], device=delta.device)
-    loss = (F.cross_entropy(logits, targets) + F.cross_entropy(logits_t, targets)) / 2
-    return loss
+    """Masked symmetric InfoNCE — identical formulation to
+    ``src.train._masked_infonce``.
+
+    Every same-caption pair is a *mutual positive*: the loss is the mean log-prob
+    over each row's positive set (``pos_mask``), averaged over both directions
+    (delta->text and text->delta). All columns stay in the softmax denominator, so
+    same-caption rows are NOT treated as negatives of one another — the bug the
+    previous single-diagonal-target version had (it left same-caption positives in
+    the denominator while targeting only the diagonal, making repeated DEN captions
+    fight each other).
+    """
+    a = F.normalize(delta, dim=-1)
+    t = F.normalize(text, dim=-1)
+    logits = a @ t.t() / temperature           # [B, B]
+
+    def _dir(lg: torch.Tensor) -> torch.Tensor:
+        log_prob = F.log_softmax(lg, dim=-1)
+        pos = (log_prob * pos_mask).sum(-1) / pos_mask.sum(-1).clamp_min(1)
+        return -pos.mean()
+
+    return 0.5 * (_dir(logits) + _dir(logits.t()))
 
 
 # ---------------------------------------------------------------------------
@@ -142,6 +159,10 @@ def train_lora(
     random.seed(cfg.seed)
 
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    # Keep the encoder's own device attribute in sync: _encode_image_tensor places
+    # input tensors on encoder.device, so an explicit `device` arg that differs from
+    # the encoder's construction-time device would otherwise cause a device mismatch.
+    encoder.device = device
 
     # ---- Apply LoRA to visual encoder ----
     visual_base = encoder._model.visual
@@ -316,8 +337,10 @@ def _main() -> None:
     print("Merging LoRA into encoder and re-computing embeddings ...")
     merge_lora_into_encoder(enc, visual_lora)
     cache_tag = f"{args.split}{color_tag}_lora"
-    store = load_or_compute(ds, enc, cache_dir=args.cache_dir, cache_tag=cache_tag)
-    print(f"Re-cached {len(store.pair_ids)} pairs with LoRA-adapted encoder.")
+    # force=True: the just-merged adapter changes embeddings without changing the
+    # pair-set, so a stale LoRA cache must not be reused.
+    store = load_or_compute(ds, enc, cache_dir=args.cache_dir, cache_tag=cache_tag, force=True)
+    print(f"Re-cached {len(store.pairs)} pairs with LoRA-adapted encoder.")
     print(f"Cache tag: {cache_tag}")
     print(f"Final loss: {history['loss'][-1]:.4f}")
 

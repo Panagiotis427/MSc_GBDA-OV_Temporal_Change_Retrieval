@@ -38,6 +38,9 @@ def cache_path(cache_dir: str | Path, dataset_name: str, encoder_name: str,
     return Path(cache_dir) / f"{dataset_name}__{encoder_name}{suffix}__pair_embeddings.npz"
 
 
+_KNOWN_COLORS = ("rgb", "nrg", "ndvi")
+
+
 def cache_tag_for(split: str, color_mode: str = "rgb", lora: bool = False) -> str:
     """Canonical embedding-cache tag: ``<split>[_<color>][_lora]``.
 
@@ -48,7 +51,21 @@ def cache_tag_for(split: str, color_mode: str = "rgb", lora: bool = False) -> st
     ``embeddings`` CLI, ``app``, ``export_results`` (grep ``cache_tag_for`` for
     the authoritative list). Keeping this in one place avoids the historical
     ``test``+``rgb``->empty-tag drift.
+
+    The tag is positional (no delimiter between fields), so a ``split`` whose name
+    ended in ``_<color>`` or ``_lora`` could alias another (split, color, lora)
+    combination — e.g. ``("test_nrg", "rgb")`` and ``("test", "nrg")`` both →
+    ``"test_nrg"``. Splits are a closed set ({train,val,test,all}) so this never
+    happens in practice; we assert it to keep the collision impossible rather than
+    merely improbable.
     """
+    if color_mode not in _KNOWN_COLORS:
+        raise ValueError(f"unknown color_mode {color_mode!r}; expected one of {_KNOWN_COLORS}")
+    if any(split.endswith(f"_{c}") for c in _KNOWN_COLORS) or split.endswith("_lora"):
+        raise ValueError(
+            f"split {split!r} ends with a colour/lora suffix and would alias another "
+            "cache tag; rename the split."
+        )
     color_tag = f"_{color_mode}" if color_mode != "rgb" else ""
     lora_tag = "_lora" if lora else ""
     return f"{split}{color_tag}{lora_tag}"
