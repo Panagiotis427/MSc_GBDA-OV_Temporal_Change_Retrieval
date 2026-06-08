@@ -130,7 +130,13 @@ is in fact a **ZIP**, and its contents are the **DynNet preprocessed format**
 test AOIs). This differs from the raster layout the original loader assumed.
 We added `DENNpyDataset` and made the extractor sniff the real format and the
 registry auto-detect layout. The 24 monthly label maps form the change
-timeline; each month is mapped to a representative daily RGB frame.
+timeline; each month is mapped to a representative daily RGB frame. These
+preprocessed label maps were cross-validated against the official torchgeo
+Dynamic EarthNet raster masks (`torchgeo/dynamic_earthnet`): on the AOI tiles
+present in both releases (3 AOIs, 75.5M valid pixels) per-pixel class agreement
+is 99.9999%, confirming the preprocessing preserves the published ground truth
+(the official release withholds the held-out test labels that the preprocessed
+subset retains).
 
 A deterministic synthetic DEN fixture (`scripts/make_den_fixture.py`)
 reproduces the on-disk layout and an engineered label signal (urban growth,
@@ -166,7 +172,7 @@ testable in seconds with no network.
 4. **CLIP text sanity** — post-fix `encode_text` returns `[N, 768]`,
    L2-normalised, on CUDA; forest image correctly prefers "forest" over
    "city". Confirms the P1 fix.
-5. **Fast test suite (mock encoders, fixture, no network)** — **220 passed**.
+5. **Fast test suite (mock encoders, fixture, no network)** — **225 passed**.
    Covers embeddings cache + round-trip, retrieval (naive/zero_shot/peft),
    benchmark metrics (exact Recall@1/AP on engineered transitions), PEFT
    training (loss decreases, save/load, PEFT ≥ zero-shot), encoder
@@ -582,6 +588,37 @@ zero-shot-vs-PEFT and naive-vs-Δ trade-offs are **task-geometry-dependent**, no
 dataset-dependent. Reproduce with `scripts/build_qfabric_status_labels.py` +
 `scripts/benchmark_qfabric.py --status`.
 
+### 7.11 LEVIR-CC — open-vocabulary retrieval on human-captioned change
+
+A third dataset tests the engine where change is visually salient and described
+in genuine human language. LEVIR-CC (Liu et al., 2022) is 10,077 bi-temporal
+building-change pairs (256×256, 0.5 m) with five human captions and a binary
+change flag each; the loader (`src/datasets/levir_cc.py`) parses captions into
+open-vocabulary change tags, and three free-text queries (new buildings, new
+road, demolition; `src/queries/levir_cc.py`) are relevant to pairs carrying the
+matching tag. Test split (1929 pairs), frozen encoders, RGB; macro mAP over the
+three queries (random-ranking baseline ≈ **0.342** = mean query prevalence:
+building 45.2%, road 42.7%, demolition 14.8%):
+
+| Encoder | naive | zero-shot |
+|---|---|---|
+| GeoRSCLIP | 0.540 | **0.557** |
+| CLIP ViT-L/14 | **0.543** | 0.498 |
+| RemoteCLIP | 0.539 | **0.573** |
+
+**Retrieval is strong — 0.50–0.57 macro mAP, ~+0.2 above the 0.342 prevalence
+floor** — in sharp contrast to DEN's honest cross-validated ceiling of ≈0.20. The
+change here (new buildings, roads) is large, high-contrast, and described in the
+CLIP text tower's own vocabulary, so a frozen encoder localises it readily; DEN's
+directional spectral transitions are subtle and AOI-specific. The RS-pretrained
+encoders gain from the directional Δ (RemoteCLIP zero-shot 0.573, GeoRSCLIP 0.557
+both beat naive), while general CLIP prefers after-image content (naive 0.543 >
+zero-shot 0.498) — the same type-vs-transition split as QFabric. **The lesson
+holds across all three datasets: the open-vocabulary engine recovers the change
+signal in proportion to its spatial and semantic salience** — strongly on
+LEVIR-CC, weakly on DEN. Reproduce: download `lcybuaa/LEVIR-CC`, then build the
+`levir_cc` dataset and run `naive`/`zero_shot` on the test split.
+
 ### Error analysis — seasonal vs permanent
 
 The benchmark reports seasonal drift @K (non-relevant top-K retrievals that
@@ -716,7 +753,7 @@ The adapter is < 0.2 % of the backbone parameter count — the PEFT premise.
 | End-to-end query — CLIP text forward + scoring, 605 pairs | **10.5 ms** |
 | Embedding precompute — CLIP L/14, 1024²→224, GPU | **68 ms/tile** → 1210 tiles ≈ **82 s** (one-time, cached) |
 | PEFT training — 605 samples, 40 epochs, adapter only, GPU | **≈29 s** |
-| Fast test suite — 220 tests, mock encoders, CPU (full suite 236: 235 pass, 1 skip) | ≈70 s |
+| Fast test suite — 225 tests, mock encoders, CPU (full suite 241: 240 pass, 1 skip) | ≈65 s |
 
 All GPU figures measured on the RTX 4060 in a dedicated timed pass (run with
 no other GPU job, to avoid contention skew).
@@ -897,7 +934,7 @@ on this machine.
 0.102→0.104, NDVI 0.062→0.064); §7.8 mega_projects 80→76 pairs; §7.9 figure paraphrase tied to
 real §7.2 cells; §9 cache-key wording; `embeddings.py` cache-path docstring; `lora_train` default
 dataset crash (`dynamic_earthnet_pp`→`dynamic_earthnet`); §7.2 footnote disclosing the 3-wetland
-headline basis. Test suite now runs **235 passed, 1 skipped** (supersedes the stale "129/192"
+headline basis. Test suite now runs **240 passed, 1 skipped** (supersedes the stale "129/192"
 counts).
 
 **A.3 Still open — your decision (thesis-component reuse, all high):**

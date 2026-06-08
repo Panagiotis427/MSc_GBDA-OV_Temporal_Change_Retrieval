@@ -58,7 +58,10 @@ class RunConfig:
     # (clip_vitl14 / rgb / split=train) diverged from every reported number and,
     # worse, split=train is the corpus the PEFT adapter was fit on (memorisation).
     encoder: str = "georsclip"
-    approach: str = "zero_shot"
+    # patch = localised per-patch Delta scoring, the best DEN configuration
+    # (REPORT Appendix B.10, CV mAP 0.193 vs ~0.10 for global zero-shot). The
+    # first query lazily encodes per-patch embeddings for the loaded corpus.
+    approach: str = "patch"
     root: str = str(_PROJECT_ROOT / "data" / "DynamicEarthNet")
     pairing: str = "bimonthly"
     split: Optional[str] = "test"    # 110 held-out DEN pairs (not the PEFT-fit train corpus)
@@ -626,8 +629,8 @@ def parse_args():
                    choices=_app_datasets())
     p.add_argument("--encoder", default="georsclip",
                    choices=list_encoders())
-    p.add_argument("--approach", default="zero_shot",
-                   choices=list(APPROACHES))
+    p.add_argument("--approach", default="patch",
+                   choices=list(APPROACHES) + ["patch"])
     p.add_argument("--root", default=str(_PROJECT_ROOT / "data" / "DynamicEarthNet"))
     p.add_argument("--pairing", default="bimonthly")
     p.add_argument("--split", default="test",

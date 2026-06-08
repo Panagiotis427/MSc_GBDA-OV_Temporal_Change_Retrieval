@@ -156,6 +156,24 @@ def _qfabric_status_opts(*, root=None, pairing=None, split=None, **extra) -> Dic
     return out
 
 
+def _levir_cc_factory(**kwargs: Any) -> TemporalDataset:
+    from .levir_cc import LevirCCDataset
+    return LevirCCDataset(**kwargs)
+
+
+def _levir_cc_opts(*, root=None, pairing=None, split=None, **extra) -> Dict[str, Any]:
+    """LEVIR-CC: ``root`` is the dataset dir (LevirCCcaptions.json + images/);
+    ``split`` selects train|val|test. Colour mode and pairing do not apply (the
+    pairs are fixed bi-temporal A/B image pairs)."""
+    extra.pop("color_mode", None)
+    out: Dict[str, Any] = dict(extra)
+    if root is not None:
+        out["root"] = root
+    if split is not None:
+        out["split"] = split
+    return out
+
+
 def _dynamic_earthnet_factory(**kwargs: Any) -> TemporalDataset:
     """Auto-detect on-disk layout: the preprocessed DynNet gdown subset
     (``labels/*.npy`` + ``split.json``) vs the raster ``planet/<aoi>/*.tif``
@@ -185,4 +203,5 @@ def _dynamic_earthnet_opts(*, root=None, pairing=None, split=None, **extra) -> D
 register_dataset("qfabric", _qfabric_factory, _qfabric_opts)
 register_dataset("qfabric_teo", _qfabric_teo_factory, _qfabric_teo_opts)
 register_dataset("qfabric_status", _qfabric_status_factory, _qfabric_status_opts)
+register_dataset("levir_cc", _levir_cc_factory, _levir_cc_opts)
 register_dataset("dynamic_earthnet", _dynamic_earthnet_factory, _dynamic_earthnet_opts)
