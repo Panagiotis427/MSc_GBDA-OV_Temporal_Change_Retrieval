@@ -39,6 +39,17 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _SNOW = "snow_and_ice"
 
 
+def _app_datasets() -> list:
+    """Datasets offered in the app UI: those with a registered query set, so
+    label-grounded retrieval, relevance and the seasonal note all work. This
+    excludes images-only loaders such as the EVER-Z ``qfabric`` (no queries, no
+    labels, no benchmarked data on disk), which would otherwise error if picked.
+    """
+    from src.queries import get_queries  # importing the package registers the sets
+    from src.datasets.registry import list_datasets
+    return [d for d in list_datasets() if get_queries(d)]
+
+
 @dataclass
 class RunConfig:
     dataset: str = "dynamic_earthnet"
@@ -368,7 +379,6 @@ class SemanticChangeSearch:
     def build_interface(self):
         import gradio as gr
         engine = self
-        from src.datasets.registry import list_datasets
         from src.encoders import list_encoders
 
         APPROACH_HELP = (
@@ -449,7 +459,7 @@ class SemanticChangeSearch:
             with gr.Accordion("Settings", open=False):
                 stats_md = gr.Markdown(engine.stats_markdown())
                 with gr.Row():
-                    d_dd = gr.Dropdown(list_datasets(), value=engine.cfg.dataset,
+                    d_dd = gr.Dropdown(_app_datasets(), value=engine.cfg.dataset,
                                        label="Dataset", info=DATASET_HELP)
                     e_dd = gr.Dropdown(list_encoders(), value=engine.cfg.encoder,
                                        label="Encoder", info=ENCODER_HELP)
@@ -611,10 +621,9 @@ class SemanticChangeSearch:
 
 def parse_args():
     p = argparse.ArgumentParser(description="Semantic Change Search Engine")
-    from src.datasets.registry import list_datasets
     from src.encoders import list_encoders
     p.add_argument("--dataset", default="dynamic_earthnet",
-                   choices=list_datasets())
+                   choices=_app_datasets())
     p.add_argument("--encoder", default="georsclip",
                    choices=list_encoders())
     p.add_argument("--approach", default="zero_shot",

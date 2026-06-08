@@ -91,9 +91,12 @@ For each bi-temporal pair `(T1, T2)`:
 **Dataset-agnostic core.** A structural `TemporalDataset` protocol
 (`src/datasets/base.py`) defines the only contract downstream code depends on.
 A registry maps a name to a factory; the DEN factory auto-detects on-disk
-layout. Three concrete loaders already span different formats and temporal
-axes: `DENDataset` (raster .tif, monthly), `DENNpyDataset` (DynNet
-preprocessed .npy, 24-month), `QFabricDataset` (parquet, fixed-5 timepoints).
+layout. Concrete loaders span both datasets and their formats and temporal
+axes: `DENDataset` (raster .tif, monthly) and `DENNpyDataset` (DynNet
+preprocessed .npy, 24-month) for DEN; and for QFabric `TEOChatlasQFabricDataset`
+(polygon-centred .tif crops with the real RQA2 change-type labels — the
+benchmarked variant, §7.8–7.9), a RQA5 status-transition sibling, and an EVER-Z
+parquet images-only loader for qualitative use.
 
 **Encoders.** An `ImageTextEncoder` protocol with three implementations:
 `clip_vitl14` (HF CLIP, 768-d), `georsclip` (open_clip ViT-B/32 + RS5M
