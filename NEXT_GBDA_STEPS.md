@@ -63,13 +63,3 @@ none is likely to move the headline materially.
 > **Ruled-out approaches** (already tested — do not re-propose) are documented with results in
 > [`REPORT.md`](REPORT.md) Appendix B: equal-weight hybrid + prompt-ensemble (B.11), change-attention
 > + learned attention head (B.12), and "more data is the lever" (B.9, refuted).
-
----
-
-## Relationship to the thesis (pointer only)
-
-GBDA serves the thesis (`MSc_Thesis-OV_…`) two ways: as the patch-level **CLIP-diff baseline** for
-Q2, and as the **Mode-A pair-retriever** for the Q4 stretch agent. Q4 is **gated on an all-green M3
-gate, which was not met (Yellow → Q2-only)** — so Q4 integration is currently out of scope per the
-thesis plan, and is *not* a GBDA next step today. The thesis pins GBDA at tag `v1.0` for its ARIS
-clone; cut a new tag if the B.13 work lands.
