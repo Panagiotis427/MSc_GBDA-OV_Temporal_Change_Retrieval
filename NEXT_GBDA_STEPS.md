@@ -83,3 +83,25 @@ All optional; none is expected to change the ~0.20 frozen-VLM ceiling. No data d
 > **Ruled-out approaches** (already tested — do not re-propose) are documented with results in
 > [`REPORT.md`](REPORT.md) Appendix B: equal-weight hybrid + prompt-ensemble (B.11), change-attention
 > + learned attention head (B.12), and "more data is the lever" (B.9, refuted).
+
+---
+
+## UX / UI — toward a sharp public app
+
+Full design + phasing in [`docs/UX_DESIGN.md`](docs/UX_DESIGN.md). **Done offline:** friendly
+dropdown labels; honest "match score" relabel (+ tooltip); sharper first-query progress message.
+**Pending — need a render session (and data/GPU where noted), so not built blind:**
+
+- [ ] **Precompute-embeddings backend** — biggest leverage: makes search **instant** (no
+  runtime corpus encode) **and** unlocks the search-all feature. Encode pair embeddings offline,
+  ship `.npz` + thumbnails; runtime encodes only the query text. *Needs encoding (GPU) once.*
+- [ ] **Progressive disclosure layout** — default view = query + results only; verbose text →
+  "About"/tooltips/per-result expanders. *Render session (layout/spacing must be seen).*
+- [ ] **Search all (available) datasets at once + source/timestep badges** — availability-driven
+  default; **mandatory per-dataset score normalization + rank-fusion** (raw cross-dataset scores
+  aren't comparable, §7.8 vs §7.10); explicit selection to narrow. *Render + data; build on the
+  precomputed store.*
+- [ ] **Curated "try these" examples that actually retrieve well** (wetland→DEN, road/residential→
+  QFabric, new-buildings→LEVIR-CC) — avoids a noisy first impression given the ~0.20 ceiling.
+- [ ] **Before/after swipe slider, heatmap opacity/toggle, mobile-responsive layout, shareable
+  permalinks** — visual polish. *Render session.*

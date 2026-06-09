@@ -6,7 +6,7 @@ A natural-language query is scored against every bi-temporal pair's *change*
 representation (not single images), returning a ranked list of change events.
 Each result shows the actual T1/T2 tiles of the matched pair, a
 query-conditioned change heatmap (per-patch Δ-similarity T1→T2) on the After
-tile, a confidence, and a seasonal-vs-permanent note grounded in the dataset's
+tile, a relative match score, and a seasonal-vs-permanent note grounded in the dataset's
 labels.
 
 Selectors: Dataset, Encoder (CLIP / GeoRSCLIP / RemoteCLIP), Approach
@@ -584,19 +584,22 @@ class SemanticChangeSearch:
             with gr.Accordion("Results table", open=True):
                 table = gr.Dataframe(
                     headers=["rank", "location", "Before", "After", "score",
-                             "confidence", "caption", "land cover change"],
+                             "match (0–1)", "caption", "land cover change"],
                     interactive=False, wrap=True,
                 )
 
             def _pill(c: float) -> str:
                 cls = "low" if c < 0.4 else ("mid" if c < 0.7 else "")
-                return f"<span class='conf-pill {cls}'>confidence {c:.2f}</span>"
+                return (f"<span class='conf-pill {cls}' title='relative match score "
+                        f"(min–max normalized over the candidate set), not a calibrated "
+                        f"probability'>match {c:.2f}</span>")
 
             def handle(text, approach, top_k,
                        geo_enabled, geo_region, rerank_enabled, rerank_strategy,
                        progress=gr.Progress()):
                 try:
-                    progress(0.05, desc="Scoring corpus against your query…")
+                    progress(0.05, desc="Scoring corpus against your query… "
+                             "(first query on a dataset/approach encodes it — a few seconds)")
                     active_geo = geo_region if geo_enabled else "All"
                     active_rerank = rerank_strategy if rerank_enabled else None
                     evs = engine.query(
@@ -617,7 +620,7 @@ class SemanticChangeSearch:
                 # tile when a heatmap could not be generated for that pair.
                 gallery_items = [
                     (img, f"#{e.rank} · {e.location} · "
-                          f"{e.t1_key}→{e.t2_key} · conf {e.confidence:.2f}")
+                          f"{e.t1_key}→{e.t2_key} · match {e.confidence:.2f}")
                     for e in evs
                     for img in (e.heatmap or e.t2_img,)
                     if img is not None
