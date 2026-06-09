@@ -50,6 +50,27 @@ def _app_datasets() -> list:
     return [d for d in list_datasets() if get_queries(d)]
 
 
+# Friendly display labels for the dataset / encoder dropdowns. The value sent to
+# the callbacks stays the registry key; only the shown label changes. Unknown
+# keys fall back to the raw key so a newly-registered dataset/encoder still appears.
+DATASET_LABELS = {
+    "dynamic_earthnet": "Dynamic EarthNet",
+    "levir_cc": "LEVIR-CC",
+    "qfabric_teo": "QFabric — change type",
+    "qfabric_status": "QFabric — construction status",
+}
+ENCODER_LABELS = {
+    "clip_vitl14": "CLIP ViT-L/14",
+    "georsclip": "GeoRSCLIP",
+    "remoteclip": "RemoteCLIP",
+}
+
+
+def _labeled(choices, labels):
+    """``[(display_label, value)]`` for a Dropdown; value stays the registry key."""
+    return [(labels.get(c, c), c) for c in choices]
+
+
 @dataclass
 class RunConfig:
     dataset: str = "dynamic_earthnet"
@@ -462,9 +483,11 @@ class SemanticChangeSearch:
             with gr.Accordion("Settings", open=False):
                 stats_md = gr.Markdown(engine.stats_markdown())
                 with gr.Row():
-                    d_dd = gr.Dropdown(_app_datasets(), value=engine.cfg.dataset,
+                    d_dd = gr.Dropdown(_labeled(_app_datasets(), DATASET_LABELS),
+                                       value=engine.cfg.dataset,
                                        label="Dataset", info=DATASET_HELP)
-                    e_dd = gr.Dropdown(list_encoders(), value=engine.cfg.encoder,
+                    e_dd = gr.Dropdown(_labeled(list_encoders(), ENCODER_LABELS),
+                                       value=engine.cfg.encoder,
                                        label="Encoder", info=ENCODER_HELP)
                 with gr.Row():
                     color_dd = gr.Dropdown(
