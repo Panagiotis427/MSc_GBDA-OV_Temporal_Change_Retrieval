@@ -95,8 +95,7 @@ layout. Concrete loaders span both datasets and their formats and temporal
 axes: `DENDataset` (raster .tif, monthly) and `DENNpyDataset` (DynNet
 preprocessed .npy, 24-month) for DEN; and for QFabric `TEOChatlasQFabricDataset`
 (polygon-centred .tif crops with the real RQA2 change-type labels — the
-benchmarked variant, §7.8–7.9), a RQA5 status-transition sibling, and an EVER-Z
-parquet images-only loader for qualitative use.
+benchmarked variant, §7.8–7.9) plus a RQA5 status-transition sibling.
 
 **Encoders.** An `ImageTextEncoder` protocol with three implementations:
 `clip_vitl14` (HF CLIP, 768-d), `georsclip` (open_clip ViT-B/32 + RS5M
@@ -845,10 +844,8 @@ regenerated automatically by the test suite.
 - **`concatenate` change mode** now evaluated (§7.7 — generalises better than
   `difference`); **LoRA rank/epoch sweep** done (§7.4 — every config overfits,
   best test ≈0.07, far below frozen 0.426).
-- **QFabric** is wired as a second dataset two ways. (a) The EVER-Z image subset
-  (`EVER-Z/QFabric_mt_images_1024`) runs the same encoder/retrieval path for
-  qualitative zero-shot retrieval in the app (images-only). (b) A **label-grounded
-  pipeline** is fully implemented and unit-tested: `src/datasets/qfabric_teo.py`
+- **QFabric** is wired as a second dataset via a **label-grounded
+  pipeline**, fully implemented and unit-tested: `src/datasets/qfabric_teo.py`
   (`TEOChatlasQFabricDataset`) reads the QFabric crops from `jirvin16/TEOChatlas`
   with **real change-type labels** (the RQA2 questions; 27,879 labelled crops via
   `scripts/build_qfabric_labels.py`), `src/queries/qfabric.py` provides the 6

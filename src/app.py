@@ -41,9 +41,9 @@ _SNOW = "snow_and_ice"
 
 def _app_datasets() -> list:
     """Datasets offered in the app UI: those with a registered query set, so
-    label-grounded retrieval, relevance and the seasonal note all work. This
-    excludes images-only loaders such as the EVER-Z ``qfabric`` (no queries, no
-    labels, no benchmarked data on disk), which would otherwise error if picked.
+    label-grounded retrieval, relevance and the seasonal note all work. Any
+    loader without a query set (no labels / no benchmarked data) is excluded,
+    since it would otherwise error if picked.
     """
     from src.queries import get_queries  # importing the package registers the sets
     from src.datasets.registry import list_datasets

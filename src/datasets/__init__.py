@@ -7,8 +7,8 @@ Public API:
 
 Concrete dataset classes:
 
-    from src.datasets.qfabric import QFabricDataset
-    from src.datasets.dynamic_earthnet import DENDataset   # session 2
+    from src.datasets.qfabric_teo import TEOChatlasQFabricDataset
+    from src.datasets.dynamic_earthnet import DENDataset
 """
 from .base import (
     PairKey,

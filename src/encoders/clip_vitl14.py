@@ -2,9 +2,7 @@
 OpenAI CLIP ViT-L/14 wrapped as an `ImageTextEncoder`.
 
 Composes the existing `FrozenTextEncoder` for text and loads a `CLIPModel` /
-`CLIPProcessor` pair for the image side. Exposes `_clip_model` and `_processor`
-attributes so the legacy `load_parquet_as_embeddings` function in
-`src/data_loader.py` can keep using this encoder unchanged.
+`CLIPProcessor` pair for the image side, exposing `_clip_model` and `_processor`.
 """
 from __future__ import annotations
 

@@ -65,12 +65,7 @@ Replace template captions (`"agriculture replaced by impervious surface"`) with 
 Demonstrates the dataset-agnostic abstraction on a second dataset with a
 different taxonomy (6 construction change-types) and temporal axis.
 
-- **Qualitative (EVER-Z, done):** `scripts/download_qfabric.py` pulls an image
-  subset from `EVER-Z/QFabric_mt_images_1024`; `QFabricDataset(images_only=True)`
-  runs the same path as DEN (`load_or_compute` → `ChangeRetriever` → Gradio app).
-  `_qfabric_opts` drops generic kwargs. Verified: `--dataset qfabric` zero-shot
-  returns ranked pairs. (`get_pair_label` → None; EVER-Z is images-only.)
-- **Label-grounded (TEOChatlas, coded + unit-tested; encode pending):** the real
+- **Label-grounded (TEOChatlas):** the real
   QFabric change-type labels are public in `jirvin16/TEOChatlas` (RQA2 questions),
   joinable to the crop images by the shared filename scheme — **no manual rating,
   no spatial join**. Implemented:

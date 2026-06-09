@@ -77,7 +77,7 @@ class TemporalDataset(Protocol):
     Gradio app, the training loop) only depends on this interface.
 
     Required attributes:
-        name: Short identifier, e.g. ``"qfabric"``, ``"dynamic_earthnet"``.
+        name: Short identifier, e.g. ``"dynamic_earthnet"``, ``"levir_cc"``.
         temporal_axis_type: One of ``"fixed-5"`` | ``"daily"`` | ``"snapshot"`` | ``"pair"``.
             Hint for the pairing strategy; not enforced.
     """

@@ -88,37 +88,6 @@ def _default_opts(*, root=None, pairing=None, split=None, **extra) -> Dict[str, 
 # Built-in dataset registrations
 # ----------------------------------------------------------------------
 
-def _qfabric_factory(**kwargs: Any) -> TemporalDataset:
-    from .qfabric import QFabricDataset
-    return QFabricDataset(**kwargs)
-
-
-def _qfabric_opts(*, root=None, pairing=None, split=None, **extra) -> Dict[str, Any]:
-    """QFabric needs ``parquet_paths`` or a precomputed embedding store. By
-    default, treat ``root`` as a directory holding ``*.parquet`` shards; any
-    explicit kwarg in ``extra`` (``parquet_paths``, ``cache_path``,
-    ``embedding_lookup`` ...) wins.
-
-    Generic pipeline options the QFabric loader doesn't accept are dropped:
-    ``color_mode`` (parquet is RGB-only), ``pairing``/``split`` (fixed-5 axis,
-    no splits). Defaults to ``images_only`` so the project encoder does the
-    encoding via ``load_or_compute`` (same path as DEN), not the legacy
-    CLIP-in-loader path.
-    """
-    extra.pop("color_mode", None)  # QFabric parquet is RGB-only
-    out: Dict[str, Any] = dict(extra)
-    if root and "parquet_paths" not in out and not any(
-        k in out for k in ("embedding_lookup", "cache_path")
-    ):
-        import glob
-        import os
-        shards = sorted(glob.glob(os.path.join(root, "*.parquet")))
-        if shards:
-            out["parquet_paths"] = shards
-            out.setdefault("images_only", True)
-    return out
-
-
 def _qfabric_teo_factory(**kwargs: Any) -> TemporalDataset:
     from .qfabric_teo import TEOChatlasQFabricDataset
     return TEOChatlasQFabricDataset(**kwargs)
@@ -200,7 +169,6 @@ def _dynamic_earthnet_opts(*, root=None, pairing=None, split=None, **extra) -> D
     return out
 
 
-register_dataset("qfabric", _qfabric_factory, _qfabric_opts)
 register_dataset("qfabric_teo", _qfabric_teo_factory, _qfabric_teo_opts)
 register_dataset("qfabric_status", _qfabric_status_factory, _qfabric_status_opts)
 register_dataset("levir_cc", _levir_cc_factory, _levir_cc_opts)

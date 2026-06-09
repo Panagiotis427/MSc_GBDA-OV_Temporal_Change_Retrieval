@@ -138,7 +138,6 @@ derived `PairLabel`s → Recall@K, mAP, plus a seasonal-vs-permanent
 | `src/app.py` | Gradio engine + UI (Dataset / Encoder / Approach selectors) |
 | `app.py` | HuggingFace Spaces entry point (uses tiny fixture by default; override via env vars) |
 | `scripts/download_den.py` | fetch + extract DEN subset, build label index |
-| `scripts/download_qfabric.py` | fetch a QFabric image subset from HuggingFace (images-only; qualitative demo) |
 | `scripts/build_qfabric_labels.py` | TEOChatlas RQA2 → `qfabric_teo_labels.json` (27,879 real crop→change-type labels) |
 | `scripts/benchmark_qfabric.py` | extract QFabric crops + encode + label-grounded change-type mAP (`qfabric_teo`) |
 | `scripts/make_den_fixture.py` | tiny synthetic DEN tree for fast tests |

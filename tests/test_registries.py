@@ -15,7 +15,7 @@ FIXTURE = Path("tests/fixtures/den_tiny")
 
 
 def test_dataset_registry_has_builtins():
-    assert {"dynamic_earthnet", "qfabric"}.issubset(set(list_datasets()))
+    assert {"dynamic_earthnet", "qfabric_teo"}.issubset(set(list_datasets()))
 
 
 def test_encoder_registry_has_three():

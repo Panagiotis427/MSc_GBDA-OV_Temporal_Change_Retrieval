@@ -34,15 +34,15 @@ an existing extension point already covers it.
 
 ## Quick recipe — adding QFabric (worked example)
 
-1. Implement `QFabricDataset(TemporalDataset)` in `src/datasets/qfabric.py`
+1. Implement `TEOChatlasQFabricDataset(TemporalDataset)` in `src/datasets/qfabric_teo.py`
    (already present). `get_pair_label` must return a `PairLabel` for the
    quantitative benchmark to work; without it only qualitative retrieval runs.
-2. Register: `register_dataset("qfabric", _qfabric_factory, _qfabric_opts)`
+2. Register: `register_dataset("qfabric_teo", _qfabric_teo_factory, _qfabric_teo_opts)`
    (already done in `src/datasets/registry.py`; opts adapter maps `root` to
-   a glob of `*.parquet` shards).
-3. Add `src/queries/qfabric.py` with `register_queries("qfabric", QUERIES)`;
+   the crop directory).
+3. Add `src/queries/qfabric.py` with `register_queries("qfabric_teo", QUERIES)`;
    one-line import in `src/queries/__init__.py`.
-4. Run: `python -m scripts.run_pipeline --dataset qfabric --root <dir> --encoder clip_vitl14`
+4. Run: `python -m scripts.benchmark_qfabric --root <dir> --encoder clip_vitl14`
 
 ## Cache and artefact paths
 
