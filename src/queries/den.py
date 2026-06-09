@@ -50,6 +50,31 @@ QUERIES = [
 register_queries("dynamic_earthnet", QUERIES)
 
 
+# ---------------------------------------------------------------------------
+# A-priori change *geometry* per query — for the query-type-gated global/patch
+# hybrid (REPORT Appendix B.13). Tagged from the change's spatial extent ALONE,
+# never fit to the results (no peeking): compact / point-like features whose
+# signal lives in a few patches -> "localised" (patch_top3 wins, B.10); broad /
+# areal cover change that moves the whole-tile embedding -> "diffuse" (global
+# Delta wins, B.8). Borderline footprints (deforestation, bare soil) are tagged
+# by their typical extent and called out in B.13. Consumed by
+# ``scripts/patch_eval.py --approach gated``; keyed by the shared query text
+# (identical across QUERIES and frac_queries).
+# ---------------------------------------------------------------------------
+DEN_QUERY_GEOMETRY = {
+    "new buildings constructed on former agricultural land": "localised",
+    "urban expansion replacing vegetation": "localised",
+    "deforestation, forest cleared to bare soil": "localised",
+    "new water body or flooding": "localised",
+    "forest loss": "diffuse",
+    "bare soil or land cleared": "diffuse",
+    "seasonal snow melting away": "diffuse",
+    "agricultural land converted to wetland or marsh": "diffuse",
+    "wetland drained and turned into farmland": "diffuse",
+    "land turning into wetland": "diffuse",
+}
+
+
 def frac_queries(thresh: float = 0.05) -> List[Query]:
     """Fraction-based relevance variant of :data:`QUERIES` (same 10 texts).
 

@@ -1269,3 +1269,46 @@ trained head on this data memorises train AOIs with no held-out gain, and B.12 s
 spatial-structure headroom is small (and grid-dependent) — so the likely outcome is a memorising
 head for a marginal, fold-noise-sized gain. Recorded as future work, not built. Reproduce:
 `python -m scripts.patch_eval --encoder <e> --color-mode nrg --approach patch_spatial|patch_softattn`.
+
+## B.13 Query-type-gated global/patch hybrid — routing instead of blending
+
+B.11 found the equal-weight `hybrid` (z-sum of global Δ and patch top-3) *hurts*
+(0.165 < 0.193): blending the mostly-noise global signal into the stronger patch signal
+dilutes it. But B.10 established that the two scorers are **complementary per query** —
+diffuse large-area change (wetland formation) prefers the global Δ, while localised change
+(buildings, urban, new water) prefers patch. The fusion B.11 left as future work is therefore
+not a *blend* but a **gate**: route each query to one scorer by its change geometry.
+
+**A-priori geometry tags (no peeking).** Each query is tagged *localised* or *diffuse* from the
+spatial extent of the change it describes — fixed before scoring, never tuned to the result
+(`src.queries.den.DEN_QUERY_GEOMETRY`):
+
+| geometry | queries | rationale |
+|---|---|---|
+| **localised** → `patch_top3` | new buildings · urban expansion · deforestation→bare-soil · new water body | compact / point-like; signal lives in a few patches |
+| **diffuse** → global Δ | forest loss · bare soil/land cleared · ag→wetland · wetland→farmland · land→wetland | broad / areal; moves the whole-tile embedding |
+
+(*seasonal snow* is tagged diffuse for completeness but has 0 positives, so it is not evaluable.)
+Borderline footprints — deforestation (compact clearcut → localised) and bare-soil (broad fallow
+→ diffuse) — are tagged by typical extent; the gate is a deliberately simple a-priori split, not a
+per-query fit. The point of fixing tags up front is that any gain is attributable to the geometry
+prior, not to having peeked at which scorer wins each query.
+
+`scripts/patch_eval.py --approach gated` scores diffuse queries with the global Δ-cosine and
+localised queries with `patch_top3`, reusing the cached patch and global embeddings (no re-encode).
+GeoRSCLIP NRG, fraction relevance, 5-fold CV — directly comparable to B.9/B.10/B.11:
+
+| approach | CV mAP | FDR-significant queries (of 9) |
+|---|---|---|
+| global zero-shot (B.9) | 0.139 ± 0.024 | 2 |
+| equal-weight hybrid (B.11) | 0.165 ± 0.050 | — |
+| `patch_top3` (B.10 best) | 0.193 ± 0.051 | 4 |
+| **gated (this section)** | _[PENDING — RTX 4060 run]_ | _[PENDING]_ |
+
+_Results, the per-query FDR table, and the verdict are to be filled from
+`results/patch_eval__georsclip__nrg__gated.json` after the run. **Expected (pre-registered):** the
+gate recovers the diffuse wetland-formation queries `patch_top3` loses while keeping the localised
+ones, so ~5/9 significant and CV mAP in the 0.19–0.22 band — but plausibly within the ±0.05 fold
+variance, in which case the honest conclusion is that the ~0.20 frozen-VLM ceiling holds and query
+geometry is not a usable routing signal. Either way the result closes B.11's open future-work item._
+Reproduce: `python -m scripts.patch_eval --encoder georsclip --color-mode nrg --approach gated`.

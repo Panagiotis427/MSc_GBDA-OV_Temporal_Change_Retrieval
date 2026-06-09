@@ -37,7 +37,7 @@ import numpy as np
 from src.benchmark import _average_precision, encode_query
 from src.datasets.dynamic_earthnet_pp import DENNpyDataset
 from src.encoders import get_encoder
-from src.queries.den import frac_queries
+from src.queries.den import DEN_QUERY_GEOMETRY, frac_queries
 from src.stats import aoi_folds, bh_fdr, perm_p_value, rand_ap, rank_order
 from scripts.cv_eval import _merge_stores
 
@@ -119,14 +119,24 @@ def _patch_score(P1, P2, t, approach, tau: float = 0.03):
     raise ValueError(f"unknown approach {approach!r}")
 
 
-def _scores(P1, P2, t, approach, G1=None, G2=None, tau: float = 0.03):
+def _scores(P1, P2, t, approach, G1=None, G2=None, tau: float = 0.03, geom=None):
     """Per-pair score. For ``hybrid``, fuse the global Δ-cosine and the
     patch top-3 Δ by z-scoring each over the candidate set and summing
-    (rank-comparable; diffuse change favours global, localised favours patch)."""
+    (rank-comparable; diffuse change favours global, localised favours patch).
+
+    For ``gated`` (REPORT B.13), route the whole query to one scorer by its
+    a-priori geometry tag ``geom`` (``src.queries.den.DEN_QUERY_GEOMETRY``):
+    ``"diffuse"`` -> global Δ-cosine, anything else -> patch top-3. Unlike the
+    flat z-sum ``hybrid`` (which dilutes the patch signal, B.11), this picks the
+    scorer per query rather than blending — no peeking, the tag is fixed up front."""
     if approach == "hybrid":
         patch = _patch_score(P1, P2, t, "patch_top3")
         glob = (G2 @ t) - (G1 @ t)
         return _z(glob) + _z(patch)
+    if approach == "gated":
+        if geom == "diffuse":
+            return (G2 @ t) - (G1 @ t)
+        return _patch_score(P1, P2, t, "patch_top3")
     return _patch_score(P1, P2, t, approach, tau=tau)
 
 
@@ -144,7 +154,9 @@ def main() -> None:
     ap.add_argument("--results-dir", default="results")
     ap.add_argument("--approach", default="patch_zeroshot",
                     choices=["patch_zeroshot", "patch_naive", "patch_top3", "hybrid",
-                             "patch_softattn", "patch_spatial"])
+                             "patch_softattn", "patch_spatial", "gated"],
+                    help="'gated' routes each query to global Δ (diffuse) or "
+                         "patch_top3 (localised) by its a-priori geometry tag (B.13)")
     ap.add_argument("--tau", type=float, default=0.03,
                     help="softmax temperature for --approach patch_softattn")
     ap.add_argument("--prompt-ensemble", action="store_true",
@@ -162,9 +174,9 @@ def main() -> None:
     print(f"corpus {N} pairs, patch grid {P1.shape[1]}, D={P1.shape[2]}"
           + (" | prompt-ensemble ON" if args.prompt_ensemble else ""))
 
-    # Global embeddings (for the hybrid approach), aligned to `pairs` order.
+    # Global embeddings (for the hybrid + gated approaches), aligned to `pairs` order.
     G1 = G2 = None
-    if args.approach == "hybrid":
+    if args.approach in ("hybrid", "gated"):
         gstore = _merge_stores("dynamic_earthnet", args.encoder, args.color_mode, args.cache_dir)
         row = {(p.location_id, p.t1_key, p.t2_key): i for i, p in enumerate(gstore.pairs)}
         idx = np.array([row[(p.location_id, p.t1_key, p.t2_key)] for p in pairs])
@@ -182,7 +194,8 @@ def main() -> None:
     full = []
     for q in evaluable:
         rel = rel_all[q.text]
-        sc = _scores(P1, P2, tvecs[q.text], args.approach, G1, G2, tau=args.tau)
+        sc = _scores(P1, P2, tvecs[q.text], args.approach, G1, G2, tau=args.tau,
+                     geom=DEN_QUERY_GEOMETRY.get(q.text))
         ap_obs = _average_precision(rel[rank_order(sc, rel)])
         boot = np.empty(BOOTSTRAP)
         for b in range(BOOTSTRAP):
@@ -214,7 +227,7 @@ def main() -> None:
                 continue
             sc = _scores(P1[idx], P2[idx], tvecs[q.text], args.approach,
                          None if G1 is None else G1[idx], None if G2 is None else G2[idx],
-                         tau=args.tau)
+                         tau=args.tau, geom=DEN_QUERY_GEOMETRY.get(q.text))
             aps.append(_average_precision(rel[rank_order(sc, rel)]))
         fold_macro.append(float(np.mean(aps)) if aps else 0.0)
 
