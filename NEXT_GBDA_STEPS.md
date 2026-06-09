@@ -21,19 +21,17 @@ point — everything below is *optional* beyond the one active item.
 
 ## Active — the one open item from this session
 
-- [ ] **B.13 query-type-gated global/patch hybrid — run + finalize.** Code + tests + the B.13
-  write-up (with a `[PENDING]` results row) are committed-ready; only the run remains.
-  - **Run (RTX 4060):** `python -m scripts.patch_eval --encoder georsclip --color-mode nrg --approach gated`
-    → `results/patch_eval__georsclip__nrg__gated.json`. Reuses the patch + global caches (no
-    re-encode if `data/cache/patch__georsclip__nrg.npz` and the `georsclip…nrg…pair_embeddings`
-    split caches exist; else encodes ~1650 images once).
-  - **Optional:** repeat `--encoder clip_vitl14` / `remoteclip` for the three-encoder picture.
-  - **Then:** fill the B.13 table + per-query FDR verdict from the JSON; commit all four files
-    (`src/queries/den.py`, `scripts/patch_eval.py`, `tests/test_patch_gated.py`, `REPORT.md`).
-  - **Pre-registered expectation:** recovers the diffuse wetland queries `patch_top3` loses while
-    keeping the localised ones → ~5/9 significant, CV mAP 0.19–0.22 — but plausibly within the
-    ±0.05 fold variance. Either way it **closes B.11's last open future-work item** (a within-noise
-    result is just as reportable as a gain).
+- [x] **B.13 query-type-gated global/patch hybrid — run + finalized (RTX 4060, 2026-06-09).**
+  GeoRSCLIP NRG: CV mAP **0.186 ± 0.051**, **4/9** FDR-significant, full-corpus macro 0.116
+  (`results/patch_eval__georsclip__nrg__gated.json`). **Within-noise as pre-registered** — gated is
+  statistically indistinguishable from `patch_top3` (0.193 ± 0.051), same 4-query headline cluster;
+  `new water body` recovers to raw p=0.030 but fails BH-FDR (q=0.053). The ~0.20 frozen-VLM ceiling
+  holds; query geometry is not a usable routing signal. **REPORT.md B.13 table + per-query FDR +
+  verdict filled.** This **closes B.11's last open future-work item**.
+  - **Commit:** `src/queries/den.py`, `scripts/patch_eval.py`, `tests/test_patch_gated.py`,
+    `REPORT.md` (verdict + table now real).
+  - **Optional (not run):** repeat `--encoder clip_vitl14` / `remoteclip` for the three-encoder
+    picture — a within-noise GeoRSCLIP result makes this low-value; skip unless reviewer asks.
 
 ---
 

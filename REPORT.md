@@ -1300,12 +1300,30 @@ GeoRSCLIP NRG, fraction relevance, 5-fold CV — directly comparable to B.9/B.10
 | global zero-shot (B.9) | 0.139 ± 0.024 | 2 |
 | equal-weight hybrid (B.11) | 0.165 ± 0.050 | — |
 | `patch_top3` (B.10 best) | 0.193 ± 0.051 | 4 |
-| **gated (this section)** | _[PENDING — RTX 4060 run]_ | _[PENDING]_ |
+| **gated (this section)** | 0.186 ± 0.051 | 4 |
 
-_Results, the per-query FDR table, and the verdict are to be filled from
-`results/patch_eval__georsclip__nrg__gated.json` after the run. **Expected (pre-registered):** the
-gate recovers the diffuse wetland-formation queries `patch_top3` loses while keeping the localised
-ones, so ~5/9 significant and CV mAP in the 0.19–0.22 band — but plausibly within the ±0.05 fold
-variance, in which case the honest conclusion is that the ~0.20 frozen-VLM ceiling holds and query
-geometry is not a usable routing signal. Either way the result closes B.11's open future-work item._
+Per-query (full corpus, BH-FDR over the 9 queries; `*` = q < 0.05):
+
+| query | AP | rand | perm p | BH q | |
+|---|---|---|---|---|---|
+| land turning into wetland | 0.244 | 0.183 | 0.0005 | 0.003 | `*` |
+| agricultural land converted to wetland or marsh | 0.241 | 0.183 | 0.0010 | 0.003 | `*` |
+| new buildings constructed on former agricultural land | 0.126 | 0.025 | 0.0010 | 0.003 | `*` |
+| urban expansion replacing vegetation | 0.107 | 0.024 | 0.0027 | 0.006 | `*` |
+| new water body or flooding | 0.054 | 0.018 | 0.0295 | 0.053 | |
+| bare soil or land cleared | 0.037 | 0.038 | 0.3842 | 0.432 | |
+| deforestation, forest cleared to bare soil | 0.026 | 0.023 | 0.2197 | 0.329 | |
+| forest loss | 0.025 | 0.023 | 0.2557 | 0.329 | |
+| wetland drained and turned into farmland | 0.179 | 0.203 | 0.9623 | 0.962 | |
+
+**Verdict (within-noise, as pre-registered).** Gated CV mAP **0.186 ± 0.051** is statistically
+indistinguishable from `patch_top3` (0.193 ± 0.051) — the a-priori geometry gate neither helps nor
+hurts beyond fold variance, and the **4/9** FDR-significant set is the same headline cluster (both
+wetland-formation queries, plus the two building/urban localised queries). The gate does recover
+`new water body or flooding` to a raw p = 0.030, but it does not survive BH-FDR (q = 0.053). The
+reverse direction `wetland drained → farmland` stays below random (AP 0.179 < rand 0.203, q = 0.962)
+— a wrong-direction signal the gate cannot fix. **Conclusion:** the ~0.20 frozen-VLM ceiling holds
+and query geometry is not a usable routing signal at this encoder scale; this closes B.11's open
+future-work item (a within-noise result, reported as such). Full corpus macro mAP 0.116 (825 pairs,
+49-patch grid). Artifact: `results/patch_eval__georsclip__nrg__gated.json`.
 Reproduce: `python -m scripts.patch_eval --encoder georsclip --color-mode nrg --approach gated`.
