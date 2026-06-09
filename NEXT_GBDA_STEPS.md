@@ -44,7 +44,8 @@ none is likely to move the headline materially.
 
 - [ ] **fMoW as a third dataset** (REPORT §10) — wired only at the protocol level today. Adds
   breadth (functional land-use change over years, global), not DEN performance. File-additive via
-  the `TemporalDataset` registry. *Cloud/4060; moderate effort (download + label mapping).*
+  the `TemporalDataset` registry. Labels available **same-source via TEOChatlas** (see *Newer
+  dataset options* below) — lower-friction than a fresh download.
 - [ ] **QFabric crop-precise (polygon) grounding** (REPORT §10, §7.8–7.10) — the QFabric pipeline
   is label-grounded at crop level; polygon-precise relevance is the remaining QFabric headroom.
 - [ ] **Sentinel-1/2 SAR Δ-features** (REPORT §10) — 51/75 AOIs have full S1 coverage; a direct
@@ -59,6 +60,25 @@ none is likely to move the headline materially.
 - [ ] **Learned global/patch weighting** — only if B.13's a-priori gate shows real signal; a
   trainable per-query weighting is the natural follow-on. **Deferred** by the same memorisation
   risk as the learned attention head (B.12). *4060/cloud.*
+
+### Newer dataset options (online sweep, 2026-06 — from search summaries, not yet verified)
+
+All optional; none is expected to change the ~0.20 frozen-VLM ceiling. No data downloaded.
+
+- [ ] **LEVIR-MCI** — the official LEVIR-CC successor (Change-Agent, IEEE TGRS 2024): the *same*
+  10,077 pairs, plus pixel-level change **masks** alongside the 5 captions. Drop-in richer than the
+  current `levir_cc` use — adds a localization (mask-IoU) eval on top of caption retrieval, no new
+  imagery. arXiv 2403.19646.
+- [ ] **Same-source TEOChatlas datasets** — `jirvin16/TEOChatlas` (already parsed for
+  `qfabric_teo`/`qfabric_status`) also ships **fMoW** (multi-temporal) and **xBD** + **S2Looking**
+  (bi-temporal disaster / general change) in the same RQA instruction format → **same loader
+  pattern**, low-friction. Cheapest route to the fMoW item above and to disaster-change. arXiv 2410.06234.
+- [ ] **SECOND-CC** (2025) — another human-caption RS change dataset; a 4th open-vocab option for
+  the human-relevance angle alongside LEVIR-CC.
+- *Related work to cite (not a dataset task):* a 2024 **multimodal RS image change retrieval +
+  captioning** framework (arXiv 2406.13424) is the closest published work to this engine; the
+  2025–26 open-vocab change-*detection* wave (DynamicEarth, OpenDPR, UniVCD, AdaptOVCD, WHU-GCD) is
+  the adjacent frontier. DynamicEarthNet itself has **no successor** — the primary dataset is current.
 
 > **Ruled-out approaches** (already tested — do not re-propose) are documented with results in
 > [`REPORT.md`](REPORT.md) Appendix B: equal-weight hybrid + prompt-ensemble (B.11), change-attention
