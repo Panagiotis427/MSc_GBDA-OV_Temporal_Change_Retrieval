@@ -11,6 +11,9 @@ pinned: false
 
 # Open Vocabulary Temporal Change Retrieval (GBDA Lab Project)
 
+> **Live status → [`STATUS.md`](STATUS.md)** · what exists per machine → [`INVENTORY.md`](INVENTORY.md) ·
+> canonical results → [`REPORT.md`](REPORT.md) (best: GeoRSCLIP+NRG `patch_top3`, CV mAP 0.193 ± 0.051, 4/9 FDR-significant).
+
 A *Semantic Change Search Engine*: given a natural-language query
 (e.g. *"new buildings on former agricultural land"*, *"forest cleared to bare
 soil"*), retrieve the satellite image **pairs and the timestep** where that
