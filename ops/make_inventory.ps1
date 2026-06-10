@@ -2,7 +2,7 @@
 # Writes inventory/<MachineId>.md describing THIS machine's view of the repo:
 # git state + gitignored payloads (the part other machines can't see) + env.
 # Sanitized: home paths -> "~". Run from anywhere inside the repo:
-#     powershell -ExecutionPolicy Bypass -File .\make_inventory.ps1 [-MachineId laptop-4060]
+#     powershell -ExecutionPolicy Bypass -File .\ops\make_inventory.ps1 [-MachineId laptop-4060]
 param([string]$MachineId = "laptop-4060")
 
 $ErrorActionPreference = "SilentlyContinue"
