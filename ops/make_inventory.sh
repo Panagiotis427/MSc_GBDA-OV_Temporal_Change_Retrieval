@@ -3,9 +3,9 @@
 # Writes inventory/<machine-id>.md: git state + gitignored payloads + env.
 # Sanitized: $HOME -> "~", $ARIS_WORK_ROOT -> literal '$ARIS_WORK_ROOT'.
 # Usage (from anywhere inside the repo):
-#     bash make_inventory.sh <machine-id>     # e.g. macbook | aris
+#     bash ops/make_inventory.sh <machine-id>     # e.g. macbook | aris
 set -uo pipefail
-MID="${1:?usage: bash make_inventory.sh <machine-id>}"
+MID="${1:?usage: bash ops/make_inventory.sh <machine-id>}"
 ROOT="$(git rev-parse --show-toplevel)" || { echo "not a git repo" >&2; exit 1; }
 REPO="$(basename "$ROOT")"
 OUT_DIR="$ROOT/inventory"; mkdir -p "$OUT_DIR"

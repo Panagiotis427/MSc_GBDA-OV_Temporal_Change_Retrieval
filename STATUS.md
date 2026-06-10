@@ -61,6 +61,9 @@ Ordered:
 2. ~~README presentation-grade pass~~ **DONE 2026-06-10** ("Results at a glance" + figures; screenshot already present).
 3. ~~Zero-shot-vs-PEFT comparison figure~~ **DONE — verified existing + embedded** (main.tex §6.1, README).
 4. Teammate onboarding once joining mode decided (`STATUS.md` + README are the onboarding).
+
+*Repo restructure 2026-06-10: inventory tooling moved to `ops/` (`make_inventory.ps1/.sh`);
+all written references repointed.*
 5. `[optional]` UX items (instant search via precomputed embeddings is the highest-leverage one) — [`docs/UX_DESIGN.md`](docs/UX_DESIGN.md).
 
 ## 5. Future path (optional research extensions — honest priors; none required, ~0.20 ceiling unlikely to move)

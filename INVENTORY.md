@@ -23,7 +23,7 @@ scan date. Repo status → [`STATUS.md`](STATUS.md).*
 | manifest | last scan | notes |
 |---|---|---|
 | [`inventory/laptop-4060.md`](inventory/laptop-4060.md) | 2026-06-10 | `data/` 32.7 GB / 271,860 files; `.model_cache/` 3.8 GB (RemoteCLIP etc.); **`main.tex` = gitignored single copy** |
-| `inventory/macbook.md` | — pending | `bash make_inventory.sh macbook`, commit |
+| `inventory/macbook.md` | — pending | `bash ops/make_inventory.sh macbook`, commit |
 | [`inventory/cloud.md`](inventory/cloud.md) | 2026-06-10 | remotes, HF Space, dataset pointers |
 
 No `aris` manifest by design — see fleet rules.
@@ -31,8 +31,8 @@ No `aris` manifest by design — see fleet rules.
 ## How to add / refresh a machine
 
 1. `git pull`, then from inside the repo:
-   - Windows: `powershell -ExecutionPolicy Bypass -File .\make_inventory.ps1 -MachineId laptop-4060`
-   - macOS / Linux: `bash make_inventory.sh macbook`
+   - Windows: `powershell -ExecutionPolicy Bypass -File .\ops\make_inventory.ps1 -MachineId laptop-4060`
+   - macOS / Linux: `bash ops/make_inventory.sh macbook` (ops tooling lives under `ops/`)
 2. Eyeball the output for anything sensitive (script sanitizes `~`, but check).
 3. `git add inventory/<id>.md` → commit `inventory(<id>): refresh manifest` → push.
 4. Refresh when untracked payloads change meaningfully — not every commit.
