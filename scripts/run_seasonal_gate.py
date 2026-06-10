@@ -54,7 +54,7 @@ def main() -> None:
     ap.add_argument("--prompt-ensemble", action="store_true",
                     help="ensemble the query text embedding over prompt templates")
     ap.add_argument("--results-dir", default="results")
-    # Idempotency contract (GUIDELINES.md §5)
+    # Idempotency contract: results are skip-if-done; --force recomputes
     ap.add_argument("--force", action="store_true",
                     help="recompute and overwrite an existing result")
     ap.add_argument("--skip-if-done", action="store_true", default=True,
