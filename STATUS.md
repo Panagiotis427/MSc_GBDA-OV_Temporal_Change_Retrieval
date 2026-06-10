@@ -49,17 +49,17 @@ Mapping the assignment + professors' 2026-05-06 comments to repo reality:
 | subset of datasets | ✅ DEN (primary) + QFabric + LEVIR-CC |
 | CLIP-variant embeddings | ✅ CLIP ViT-L/14, GeoRSCLIP, RemoteCLIP (3-encoder comparison) |
 | zero-shot & light PEFT | ✅ both run; honest leakage-free comparison (PEFT memorises) |
-| visual comparisons zero-shot vs PEFT | ⚠ verify a dedicated figure exists; make one if not (CV/S1/S3 progression figure exists; ZS-vs-PEFT side-by-side TBC) |
+| visual comparisons zero-shot vs PEFT | ✅ `assets/figures/zeroshot_vs_peft__clip_vitl14__train.png` — embedded in `main.tex` (§6.1) and README; generator `scripts/make_comparison_figure.py` |
 | retrieval metrics (mAP/R@K) + temporal pinpointing | ✅ REPORT §7 + B (R@K ceiling-bounded caveat documented) |
 | seasonal-drift error analysis | ✅ seasonal gate + stable-pair FPR analysis |
 | Gradio semantic change search engine | ✅ deployed (HF Space): ranked list, T1/T2 side-by-side, heatmap, score |
-| **written report** | 🔄 `main.tex` **now tracked** (user decision 2026-06-10; un-ignored) — next: align it to REPORT.md canon numbers |
-| **README as presentation** | ⚠ upgrade to presentation-grade: results table, screenshots/GIF of the app, quickstart, module map, honest-headline framing |
+| **written report** | ✅ `main.tex` tracked + **aligned to REPORT canon (2026-06-10)**: abstract carries 0.100 ± 0.139 and 0.193 ± 0.051 exactly; B.13 gated-routing null result added to the honest-negatives paragraph; pure formal prose (zero list blocks / Q&A patterns), zero style violations |
+| **README as presentation** | ✅ presentation-grade (2026-06-10): demo screenshot + "Results at a glance" (audited canon table + cv_progression + zero-shot-vs-PEFT figures) + quickstart + module map + honest-headline framing |
 
 Ordered:
-1. Align the now-tracked `main.tex` to REPORT.md canon numbers (home decided 2026-06-10: tracked in repo).
-2. README presentation-grade pass (app screenshots need one render session).
-3. Verify/make the zero-shot-vs-PEFT visual comparison figure.
+1. ~~Align `main.tex` to REPORT canon~~ **DONE 2026-06-10** (exact CV intervals in abstract; B.13 null result added).
+2. ~~README presentation-grade pass~~ **DONE 2026-06-10** ("Results at a glance" + figures; screenshot already present).
+3. ~~Zero-shot-vs-PEFT comparison figure~~ **DONE — verified existing + embedded** (main.tex §6.1, README).
 4. Teammate onboarding once joining mode decided (`STATUS.md` + README are the onboarding).
 5. `[optional]` UX items (instant search via precomputed embeddings is the highest-leverage one) — [`docs/UX_DESIGN.md`](docs/UX_DESIGN.md).
 

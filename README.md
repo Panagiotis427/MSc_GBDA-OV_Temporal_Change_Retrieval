@@ -119,6 +119,32 @@ registering — the entire flow above re-uses the new dataset unchanged
 derived `PairLabel`s → Recall@K, mAP, plus a seasonal-vs-permanent
 ("semantic drift") error report.
 
+## Results at a glance
+
+Everything below is audited (random-ranking baselines, permutation tests, BH-FDR,
+leakage-free 5-fold leave-AOI-out cross-validation); full tables and the audit trail are in
+[`REPORT.md`](REPORT.md), the written report in [`main.tex`](main.tex).
+
+| Finding | Number |
+|---|---|
+| Best configuration: GeoRSCLIP + NRG, patch-level top-3 Δ-scoring | **CV mAP 0.193 ± 0.051**, 4/9 queries FDR-significant (buildings, urban, wetland transitions) |
+| Global zero-shot Δ-similarity (same encoder, fraction relevance) | CV mAP 0.139 ± 0.024 (2/9) |
+| The often-quoted single-split 0.426 | a lucky 110-pair fold — CV says 0.100 ± 0.139; never a headline |
+| PEFT / LoRA adapters | memorise training AOIs (train mAP 0.42–0.998); no held-out gain over zero-shot |
+| Seasonal false-positive gate | stable-pair FPR → 0 at threshold ≥ 0.05 |
+| LEVIR-CC (salient building/road change, human captions) | ≈ 0.55 mAP with the same frozen engine |
+| Frozen-VLM ceiling on DEN | ≈ 0.20 CV mAP — robust across hybrids, prompt ensembles, attention variants, query-gated routing |
+
+![From the lucky single split to the audited recovery](assets/figures/cv_progression.png)
+
+*The honest arc: single-split 0.426 collapses under cross-validation to ≈0.10; fixing the
+relevance rule and scoring locally (patch top-3) recovers 0.193 ± 0.051.*
+
+![Zero-shot vs PEFT, top-K retrievals side by side](assets/figures/zeroshot_vs_peft__clip_vitl14__train.png)
+
+*Zero-shot vs PEFT visual comparison (CLIP ViT-L/14, train split): the adapter's
+in-distribution wins are memorisation; held-out, frozen zero-shot is the stronger ranking.*
+
 ## Module map
 
 | File | Role |
