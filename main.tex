@@ -62,11 +62,11 @@ held-out data: the adapters' high in-distribution scores
 (memorisation), and collapse to or below chance out-of-distribution. The often-quoted
 0.426 mAP for GeoRSCLIP+NRG is a single lucky 110-pair test
 split: under 5-fold AOI cross-validation the same configuration scores
-$\approx$0.10. We trace the weak absolute signal to two fixable causes:
+$0.100 \pm 0.139$. We trace the weak absolute signal to two fixable causes:
 a benchmark relevance rule that discarded localised change (only 8.6\% of pairs
 flip the tile's dominant class), and global-embedding dilution. Fixing the
 evaluation (pixel-fraction relevance) and the method (patch-level localised
-$\Delta$-scoring) recovers cross-validated mAP to $\approx$0.20 and makes
+$\Delta$-scoring) recovers cross-validated mAP to $0.193 \pm 0.051$ and makes
 localised change-types --- new buildings and urban expansion, with new water
 borderline --- retrievable above chance for the first time. On LEVIR-CC, where building and road changes are
 salient and described in human language, the same frozen engine reaches
@@ -642,7 +642,12 @@ global $\Delta$-cosine with the patch score by z-scoring and summing hurts
 two training-free change-attention variants --- query-conditioned soft-attention
 over the per-patch $\Delta$ (0.137) and $3\times3$ spatial smoothing of the
 $\Delta$-map (0.168) --- refine the aggregation without breaking the
-$\approx$0.20 ceiling. A learned query-to-patch attention head was deliberately
+$\approx$0.20 ceiling. Routing each query by its a-priori spatial geometry ---
+diffuse phrasings to the global score, localised ones to patch top-3 --- scores
+$0.186 \pm 0.051$ under the same cross-validation, statistically
+indistinguishable from ungated patch top-3 and recovering the same four
+FDR-significant queries, so query geometry is not a usable routing signal at
+this encoder scale. A learned query-to-patch attention head was deliberately
 not pursued, since every trained head on this data memorises the training AOIs
 with no held-out gain (Section~\ref{sec:crosssplit}).
 
