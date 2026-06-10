@@ -4,15 +4,15 @@
 
 | field | value |
 |---|---|
-| scanned | 2026-06-10 14:16 |
+| scanned | 2026-06-10 19:07 |
 | repo | MSc_GBDA-OV_Temporal_Change_Retrieval |
 | os | Microsoft Windows NT 10.0.26200.0 (Windows) |
 | ram | 32 GB |
 | gpu | NVIDIA GeForce RTX 4060 Laptop GPU, 8188 MiB |
 | disk free (repo drive) | 57 GB |
 | repo path | D:\Code Projects\MSc_GBDA-OV_Temporal_Change_Retrieval |
-| branch @ scan | main @ 3b8d243 |
-| dirty files @ scan | 3 |
+| branch @ scan | main @ 6c90b13 |
+| dirty files @ scan | 1 |
 
 ## Gitignored payloads present on this machine
 
@@ -27,7 +27,6 @@ What git cannot show other machines. Dir-level only.
 | src/__pycache__ | 0.2 | 19 |
 | scripts/__pycache__ | 0.2 | 18 |
 | src/datasets/__pycache__ | 0.1 | 10 |
-| main.tex | 0.1 | 1 |
 | src/queries/__pycache__ | 0 | 5 |
 | .pytest_cache | 0 | 5 |
 | src/project.egg-info | 0 | 5 |
