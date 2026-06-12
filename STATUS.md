@@ -49,8 +49,12 @@ the same 1929 test pairs), added `levir_mci` loader + `scripts/eval_localization
 negative: the query-conditioned change heatmap is a weak localizer — only road localizes above
 chance and only for RS-pretrained encoders (RemoteCLIP +0.10 / GeoRSCLIP +0.08 pointing lift);
 building at/below floor for all; generic CLIP anti-localizes (REPORT §7.12, main.tex §localization).
-**Next:** remaining Track 2 (SECOND-CC, QFabric localization slice, DEN monthly), then their masks
-feed the rest of Track 3.
+**DEN-monthly DONE** — `patch_eval.py --pairing monthly` (additive; bimonthly cache untouched):
+GeoRSCLIP NRG patch_top3 CV mAP 0.138 ± 0.046 (1725 pairs) vs bimonthly 0.193 — honest granularity
+tradeoff (finer pairs, less per-pair change, 2× temporal resolution; wetland signal stable). REPORT
+B.10. **Next (BLOCKED on external data access):** SECOND-CC — not on HF Hub; base SECOND images via
+captain-whu (Google Drive/Baidu) + captions from the paper's GitHub, needs a manual download path.
+QFabric pentatemporal — needs Granular login or a capped extraction. Both deferred pending access.
 
 > **⚠ On `laptop-4060`, before ANY dataset download:** disk-gated. Track 0 cleared the gate
 > (56.6 GB free after reclaiming `labels.tar.gz` + `Levir-CC-dataset.zip` redundant archives to

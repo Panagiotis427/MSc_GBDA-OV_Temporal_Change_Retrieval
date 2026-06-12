@@ -45,9 +45,14 @@ BOOTSTRAP = 1000
 PERM = 4000
 
 
-def _encode_patches(ds, enc, cache_dir, enc_name, color):
-    """Encode (or load) per-pair patch embeddings → P1, P2 arrays [N, n_patch, D]."""
-    cache = Path(cache_dir) / f"patch__{enc_name}__{color}.npz"
+def _encode_patches(ds, enc, cache_dir, enc_name, color, pairing="bimonthly"):
+    """Encode (or load) per-pair patch embeddings → P1, P2 arrays [N, n_patch, D].
+
+    The cache key gains a ``__{pairing}`` suffix only for non-default pairings, so
+    the committed bimonthly cache filename (and its reproducible numbers) is
+    unchanged while monthly etc. get their own cache."""
+    tag = "" if pairing == "bimonthly" else f"__{pairing}"
+    cache = Path(cache_dir) / f"patch__{enc_name}__{color}{tag}.npz"
     pairs = ds.list_pairs()
     if cache.exists():
         d = np.load(cache)
@@ -164,12 +169,18 @@ def main() -> None:
     ap.add_argument("--frac-thresh", type=float, default=0.05)
     ap.add_argument("--folds", type=int, default=5)
     ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--pairing", default="bimonthly",
+                    choices=["bimonthly", "monthly", "seasonal-quartet"],
+                    help="DEN temporal pairing; 'monthly' = all 24 frames (finer "
+                         "temporal pinpointing, more but smaller-change pairs)")
     args = ap.parse_args()
     rng = np.random.default_rng(args.seed)
 
     enc = get_encoder(args.encoder)
-    ds = DENNpyDataset(root=args.root, split=None, color_mode=args.color_mode)
-    P1, P2, pairs = _encode_patches(ds, enc, args.cache_dir, args.encoder, args.color_mode)
+    ds = DENNpyDataset(root=args.root, split=None, color_mode=args.color_mode,
+                       pairing_strategy=args.pairing)
+    P1, P2, pairs = _encode_patches(ds, enc, args.cache_dir, args.encoder,
+                                    args.color_mode, pairing=args.pairing)
     N = len(pairs)
     print(f"corpus {N} pairs, patch grid {P1.shape[1]}, D={P1.shape[2]}"
           + (" | prompt-ensemble ON" if args.prompt_ensemble else ""))
@@ -233,6 +244,7 @@ def main() -> None:
 
     out = {"dataset": "dynamic_earthnet", "encoder": args.encoder, "color_mode": args.color_mode,
            "approach": args.approach, "relevance": "fraction", "frac_thresh": args.frac_thresh,
+           "pairing": args.pairing,
            "prompt_ensemble": args.prompt_ensemble, "tau": args.tau,
            "n_pairs": N, "patch_grid": int(P1.shape[1]), "n_evaluable_queries": len(evaluable),
            "full_corpus": {"macro_mAP": macro_full, "per_query": full},
@@ -241,8 +253,9 @@ def main() -> None:
                                             if len(fold_macro) > 1 else 0.0, 4),
                      "fold_macro": [round(x, 4) for x in fold_macro]}}
     ens = "__ens" if args.prompt_ensemble else ""
+    pair_tag = "" if args.pairing == "bimonthly" else f"__{args.pairing}"
     op = (Path(args.results_dir) /
-          f"patch_eval__{args.encoder}__{args.color_mode}__{args.approach}{ens}.json")
+          f"patch_eval__{args.encoder}__{args.color_mode}__{args.approach}{ens}{pair_tag}.json")
     Path(args.results_dir).mkdir(parents=True, exist_ok=True)
     op.write_text(json.dumps(out, indent=2), encoding="utf-8")
     print(f"\n[{args.approach}] full-corpus macro mAP = {macro_full}  "
