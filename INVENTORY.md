@@ -28,6 +28,17 @@ scan date. Repo status → [`STATUS.md`](STATUS.md).*
 
 No `aris` manifest by design — see fleet rules.
 
+## Planned-expansion disk constraint (2026-06-12)
+
+The data-expansion plan ([`docs/DATA_EXPANSION_PLAN.md`](docs/DATA_EXPANSION_PLAN.md) §3) is
+**disk-gated**: `laptop-4060` reports **57 GB free** with **32.7 GB already in `data/`**, and the
+committed datasets add ~20–27 GB (LEVIR-MCI 2.77 GB · SECOND-CC ~5 GB · QFabric localization slice
+~10–15 GB capped · embedding caches ~2–4 GB) — projecting to **~53–60 GB, at/over the ceiling**.
+**Prerequisite:** run a per-dataset `du -sh data/*` on the 4060 (manifests are dir-level only, so
+the current 32.7 GB breakdown is unknown) and reclaim stale caches/duplicates before downloading.
+Never pull the 298 GB EVER-Z QFabric parquet; cap the QFabric slice. No dataset imagery on the
+MacBook.
+
 ## How to add / refresh a machine
 
 1. `git pull`, then from inside the repo:

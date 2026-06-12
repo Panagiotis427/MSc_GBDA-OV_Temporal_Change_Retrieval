@@ -38,7 +38,9 @@ Honest, audited numbers (random baseline + permutation p + BH-FDR + leakage-free
 
 ## 3. Running now
 
-Nothing. Repo at a natural resting point; science complete for the deliverable.
+Nothing executing. **Active direction (2026-06-12):** a data-expansion + honest-reframe plan is
+written and pending implementation — see [`docs/DATA_EXPANSION_PLAN.md`](docs/DATA_EXPANSION_PLAN.md).
+The prior deliverable gap-pass (§4) is complete; the new direction supersedes it as next work.
 
 ## 4. Next steps — course-deliverable gap pass (deliverable = written report + repo with presentation-grade README)
 
@@ -66,10 +68,21 @@ Ordered:
 all written references repointed.*
 5. `[optional]` UX items (instant search via precomputed embeddings is the highest-leverage one) — [`docs/UX_DESIGN.md`](docs/UX_DESIGN.md).
 
-## 5. Future path (optional research extensions — honest priors; none required, ~0.20 ceiling unlikely to move)
+## 5. Future path (priors honest — see [`docs/DATA_EXPANSION_PLAN.md`](docs/DATA_EXPANSION_PLAN.md) for the committed set)
 
-fMoW via same-source TEOChatlas (lowest friction) · QFabric polygon-precise grounding · S1 SAR
-Δ-features (high-risk: optical-pretrained encoders) · PEFT anti-memorisation via augmentation
-(last untested lever) · human relevance judgements (annotation, no compute) · LEVIR-MCI masks
-(adds localization eval) · SECOND-CC. Related-work cite: arXiv 2406.13424 + the 2025–26 open-vocab
-change-detection wave. DEN has no successor — primary dataset is current.
+**Reassessed 2026-06-12.** Root cause of the weak numbers is **purpose-mismatch + method ceiling**,
+not subset size: DEN was used in full (75 AOIs, dense labels) and is source-maxed; QFabric was used
+in a reduced TEOChatlas form (no masks, 2/5 dates); LEVIR-CC (the ~0.50–0.57 success case) was
+under-utilized.
+
+- **Committed (in the plan):** LEVIR-MCI (same images + building/road masks → localization eval),
+  SECOND-CC (30 change categories → open-vocab breadth), QFabric pentatemporal + polygon masks
+  (disk-gated localization upgrade — never the 298 GB EVER-Z parquet), DEN finer (monthly) temporal
+  pairing. Localization/heatmap eval is now a first-class pillar.
+- **Rejected with reasons:** **fMoW** — functional-classification dataset with **no change labels**;
+  repurposing reintroduces the weak-label noise that sank DEN PEFT (rationale in the plan §2). DEN
+  alternative sources (TUM raw / HEVC / torchgeo) — same labels, no gain.
+- **Still future-work:** S1 SAR Δ-features (off-brief, optical-encoder mismatch) · PEFT
+  anti-memorisation via augmentation · human relevance judgements (annotation, no compute).
+
+Related-work cite: arXiv 2406.13424 + the 2025–26 open-vocab change-detection wave.
