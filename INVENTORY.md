@@ -10,7 +10,6 @@ scan date. Repo status → [`STATUS.md`](STATUS.md).*
 | Machine | Role for THIS repo | Hard rules |
 |---|---|---|
 | `laptop-4060` (Win 11, RTX 4060 8 GB) | **primary compute**: experiments, data, app dev | — |
-| `aris` (HPC) | **FORBIDDEN for course work** | ARIS access = thesis-only; the GBDA clone there is a thesis *library checkout* (pinned v1.0), never a course workbench |
 | `macbook` (work) | docs, light dev, report writing | **no heavy runs** |
 | `pc-1050ti` | dormant — excluded | — |
 | GitHub `origin` | source of truth: code, docs, results JSONs | no secrets/identifiers, ever |
@@ -25,8 +24,6 @@ scan date. Repo status → [`STATUS.md`](STATUS.md).*
 | [`inventory/laptop-4060.md`](inventory/laptop-4060.md) | 2026-06-10 | `data/` 32.7 GB / 271,860 files; `.model_cache/` 3.8 GB (RemoteCLIP etc.); **`main.tex` = gitignored single copy** |
 | `inventory/macbook.md` | — pending | `bash ops/make_inventory.sh macbook`, commit |
 | [`inventory/cloud.md`](inventory/cloud.md) | 2026-06-10 | remotes, HF Space, dataset pointers |
-
-No `aris` manifest by design — see fleet rules.
 
 ## Planned-expansion disk constraint (2026-06-12)
 

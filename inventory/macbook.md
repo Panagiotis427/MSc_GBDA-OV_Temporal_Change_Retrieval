@@ -42,5 +42,4 @@ What git cannot show other machines. Dir-level only.
 
 ## Config presence (never contents)
 
-- aris.env: no
 - .env: no

@@ -18,11 +18,8 @@ Frozen CLIP-variant backbones, zero-shot + light PEFT, retrieval metrics + seaso
 analysis, Gradio deliverable. **2-month course project, 2 students** (second teammate's joining
 mode TBD — onboarding docs written to work either way).
 
-**Runtime policy (hard):** RTX 4060 laptop = primary compute. **NO ARIS** (ARIS access is granted
-for the thesis, not this course; the GBDA clone on ARIS exists solely as a thesis *library* —
-no course jobs there). **No MacBook hardware runs** (docs/light dev only). Colab/Kaggle = legal
-burst capacity if 8 GB VRAM short. Thesis ↔ GBDA: thesis pins GBDA `v1.0` as a library; ideas may
-flow back, thesis workload does not.
+**Runtime policy (hard):** RTX 4060 laptop = primary compute. **No MacBook hardware runs**
+(docs/light dev only). Colab/Kaggle = legal burst capacity if 8 GB VRAM short.
 
 ## 2. Results state (canonical — REPORT.md @ HEAD)
 
@@ -52,9 +49,15 @@ building at/below floor for all; generic CLIP anti-localizes (REPORT §7.12, mai
 **DEN-monthly DONE** — `patch_eval.py --pairing monthly` (additive; bimonthly cache untouched):
 GeoRSCLIP NRG patch_top3 CV mAP 0.138 ± 0.046 (1725 pairs) vs bimonthly 0.193 — honest granularity
 tradeoff (finer pairs, less per-pair change, 2× temporal resolution; wetland signal stable). REPORT
-B.10. **Next (BLOCKED on external data access):** SECOND-CC — not on HF Hub; base SECOND images via
-captain-whu (Google Drive/Baidu) + captions from the paper's GitHub, needs a manual download path.
-QFabric pentatemporal — needs Granular login or a capped extraction. Both deferred pending access.
+B.10. **SECOND-CC DONE** — downloaded the real SECOND-CC (Zenodo `10.5281/zenodo.16937571`, 2.5 GB,
+public, CC-BY-4.0; the captioned superset, **not** the captionless SECOND base): 6,041 pairs +
+30,205 human captions + six-class semantic maps. Added `second_cc` loader + 7 class queries +
+`benchmark_second_cc.py`; localization via the generalized `eval_localization.py --dataset`. The
+open-vocab **breadth** test: across 7 change types every query clears its prevalence floor (unlike
+DEN) but modestly — zero-shot macro ~0.33 / naive ~0.45 vs floor 0.30; buildings ~0.70 dominate,
+water/playground weak; naive > zero-shot (end-state > Δ). Localization weak (lifts ±0.04, matches
+LEVIR-MCI). REPORT §7.13. **Next (BLOCKED on external access):** QFabric pentatemporal — needs
+Granular login or a capped extraction; deferred pending access.
 
 > **⚠ On `laptop-4060`, before ANY dataset download:** disk-gated. Track 0 cleared the gate
 > (56.6 GB free after reclaiming `labels.tar.gz` + `Levir-CC-dataset.zip` redundant archives to
@@ -68,7 +71,7 @@ Mapping the assignment + professors' 2026-05-06 comments to repo reality:
 
 | requirement | state |
 |---|---|
-| subset of datasets | ✅ DEN (primary) + QFabric + LEVIR-CC |
+| subset of datasets | ✅ DEN (primary) + QFabric + LEVIR-CC + LEVIR-MCI (masks) + SECOND-CC (breadth, masks) |
 | CLIP-variant embeddings | ✅ CLIP ViT-L/14, GeoRSCLIP, RemoteCLIP (3-encoder comparison) |
 | zero-shot & light PEFT | ✅ both run; honest leakage-free comparison (PEFT memorises) |
 | visual comparisons zero-shot vs PEFT | ✅ `assets/figures/zeroshot_vs_peft__clip_vitl14__train.png` — embedded in `main.tex` (§6.1) and README; generator `scripts/make_comparison_figure.py` |

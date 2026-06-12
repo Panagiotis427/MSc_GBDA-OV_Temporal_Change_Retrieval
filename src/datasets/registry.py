@@ -148,6 +148,11 @@ def _levir_mci_factory(**kwargs: Any) -> TemporalDataset:
     return LevirMCIDataset(**kwargs)
 
 
+def _second_cc_factory(**kwargs: Any) -> TemporalDataset:
+    from .second_cc import SecondCCDataset
+    return SecondCCDataset(**kwargs)
+
+
 def _dynamic_earthnet_factory(**kwargs: Any) -> TemporalDataset:
     """Auto-detect on-disk layout: the preprocessed DynNet gdown subset
     (``labels/*.npy`` + ``split.json``) vs the raster ``planet/<aoi>/*.tif``
@@ -178,4 +183,5 @@ register_dataset("qfabric_teo", _qfabric_teo_factory, _qfabric_teo_opts)
 register_dataset("qfabric_status", _qfabric_status_factory, _qfabric_status_opts)
 register_dataset("levir_cc", _levir_cc_factory, _levir_cc_opts)
 register_dataset("levir_mci", _levir_mci_factory, _levir_cc_opts)  # MCI = CC + masks; same opts
+register_dataset("second_cc", _second_cc_factory, _levir_cc_opts)  # captions + sem masks; same opts (root+split)
 register_dataset("dynamic_earthnet", _dynamic_earthnet_factory, _dynamic_earthnet_opts)

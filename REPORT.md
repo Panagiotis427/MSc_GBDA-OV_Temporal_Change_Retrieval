@@ -683,6 +683,66 @@ floor but not rescue the negative lifts. DEN carries no instance masks, so this
 metric is LEVIR-MCI-specific by design.) Reproduce: download `lcybuaa/LEVIR-MCI`,
 then `python -m scripts.eval_localization`.
 
+### 7.13 SECOND-CC — open-vocabulary breadth + localization
+
+LEVIR-CC's change is almost entirely building/road. SECOND-CC (Robust Change
+Captioning in Remote Sensing, arXiv:2501.10075; Zenodo `10.5281/zenodo.16937571`,
+public) is the breadth counterpart: 6,041 bi-temporal pairs with 30,205 human
+captions **and** six-class semantic maps for both phases (ground, tree,
+low-vegetation, water, building, playground). The loader
+(`src/datasets/second_cc.py`) parses captions into change tags exactly as
+`levir_cc` does, and decodes the semantic maps for localization. Seven free-text
+queries cover the six classes plus road (heavily captioned but not a semantic
+class — so road has retrieval relevance but no localization mask, stated
+honestly). Test split, 1,227 pairs, frozen encoders, RGB.
+
+**Retrieval** (zero-shot per-query AP; macro random-ranking floor = mean query
+prevalence 0.297):
+
+| query (test positives) | GeoRSCLIP | CLIP ViT-L/14 | RemoteCLIP |
+|---|---|---|---|
+| new buildings/structures (809) | **0.698** | 0.652 | **0.702** |
+| a new road or street (460) | 0.418 | 0.377 | 0.372 |
+| bare ground or land cleared (401) | 0.355 | 0.372 | 0.362 |
+| trees appeared/cleared (370) | 0.341 | 0.313 | 0.334 |
+| low vegetation/grassland (311) | 0.275 | 0.280 | 0.273 |
+| a water body (167) | 0.168 | 0.152 | 0.159 |
+| a playground/sports field (33) | 0.085 | 0.035 | 0.164 |
+| **macro mAP (zero-shot)** | **0.334** | 0.312 | 0.338 |
+| **macro mAP (naive)** | 0.453 | 0.430 | 0.441 |
+
+Across **seven** change types every query clears its prevalence floor — broader
+recovery than DEN, where most queries sat at random — but only **modestly**: the
+zero-shot macro (~0.33) is ~+0.04 over the 0.297 floor, and buildings (~0.70,
+high-contrast, high-prevalence) dominate while water (0.17) and playground (sparse,
+33 positives) are weak. As on QFabric, **naive > zero-shot** (macro 0.45 vs 0.33):
+end-state appearance carries more of these land-cover categories than the temporal
+Δ does. SECOND-CC thus extends the project's central law to a wide open vocabulary —
+*recovery scales with the visual salience and prevalence of the change type, and is
+weak in absolute terms with frozen CLIP-variant encoders.*
+
+**Localization** (semantic-map masks; pointing-game lift over each grid's
+random-patch floor, the same protocol as §7.12):
+
+| class (test pairs) | GeoRSCLIP 7×7 | CLIP-L 16×16 | RemoteCLIP 16×16 |
+|---|---|---|---|
+| ground (675) | +0.039 | +0.030 | +0.012 |
+| low-vegetation (452) | +0.038 | +0.003 | +0.025 |
+| water (81) | +0.034 | +0.003 | +0.015 |
+| building (592) | −0.020 | −0.015 | −0.067 |
+| tree (377) | −0.018 | −0.009 | −0.030 |
+| playground (22) | +0.304 | −0.059 | +0.032 |
+
+The verdict matches LEVIR-MCI: **the change heatmap is a weak localizer.** Every
+reliably-sampled class sits within ±0.04 of its random-patch floor — diffuse
+large-area classes (ground, low-vegetation) edge slightly positive, compact
+building change is at or below chance, and the one large number (playground +0.30
+on GeoRSCLIP) rests on 22 pairs and does not replicate on the other encoders, so it
+is noise, not signal. Localizing change remains harder than retrieving it across
+both mask datasets. Reproduce: download SECOND-CC (Zenodo above), then
+`python -m scripts.benchmark_second_cc` and
+`python -m scripts.eval_localization --dataset second_cc`.
+
 ### Error analysis — seasonal vs permanent
 
 The benchmark reports seasonal drift @K (non-relevant top-K retrievals that
@@ -999,25 +1059,11 @@ dataset crash (`dynamic_earthnet_pp`→`dynamic_earthnet`); §7.2 footnote discl
 headline basis. Test suite now runs **240 passed, 1 skipped** (supersedes the stale "129/192"
 counts).
 
-**A.3 Still open — your decision (thesis-component reuse, all high):**
-- Package installs under the generic top-level name **`src`** (no `src/__init__.py`) — collides
-  with the thesis repo's own `src`; thesis READMEs import a name
-  (`open_vocabulary_temporal_change_retrieval`) that doesn't exist → rename to a unique package.
-- **`requires-python = ">=3.12"`** blocks `pip install -e .` in the thesis envs (3.9/3.10) → lower.
-- **`compute_patch_text_similarity` min-max normalises per image to [0,1]** — breaks the
-  patch-level CLIP-difference baseline the Q2 plan builds on → *resolved:* a raw-cosine patch
-  path already exists — `encode_image_patches` returns per-patch features whose cosines are
-  directly comparable across T1/T2 (no per-image min-max), as used by `scripts.patch_eval`;
-  `compute_patch_text_similarity` retains min-max for the heatmap UI only.
-- **`retrieve_changes(query, top_k=5)`** (Q4 Mode-A tool named in the plan) doesn't exist (real
-  entry is `ChangeRetriever.search`) → add a thin wrapper or correct the thesis docs.
-- GeoRSCLIP (ViT-B/32) gives only a 7×7 patch grid — coarse for a segmentation baseline.
-
-**A.4 Behaviour changes deferred (need a re-run to assess):** `change_type` forced to `"stable"`
+**A.3 Behaviour changes deferred (need a re-run to assess):** `change_type` forced to `"stable"`
 on large sub-dominant change (+ degenerate `"X replaced by X"` caption); DEN `.tif` loader
 min/max-stretches each tile independently → T1/T2 radiometrically incomparable for change scoring.
 
-**A.5 Unverified, flagged:** `lora_train._infonce_loss` masks with
+**A.4 Unverified, flagged:** `lora_train._infonce_loss` masks with
 `masked_fill(~(pos_mask | eye), -1e9)`, which appears to zero the **true negatives** and keep
 only positives+diagonal in the softmax denominator — looks inverted. LoRA is a secondary ablation
 (§7.4), but verify before trusting LoRA numbers.

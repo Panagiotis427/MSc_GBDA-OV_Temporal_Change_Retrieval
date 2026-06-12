@@ -133,6 +133,8 @@ leakage-free 5-fold leave-AOI-out cross-validation); full tables and the audit t
 | PEFT / LoRA adapters | memorise training AOIs (train mAP 0.42–0.998); no held-out gain over zero-shot |
 | Seasonal false-positive gate | stable-pair FPR → 0 at threshold ≥ 0.05 |
 | LEVIR-CC (5 open-vocab queries, human captions) | salient construction strong (buildings AP ≈ 0.8, roads ≈ 0.6); subtle/sparse weak (demolition, vegetation, water ≈ 0.15–0.30); 5-query macro ≈ 0.40 |
+| SECOND-CC (7 change types, human captions + semantic masks) | open-vocab breadth: every type clears its prevalence floor but modestly — buildings ≈ 0.70, road/ground/trees ≈ 0.34–0.42, water 0.17; zero-shot macro ≈ 0.33 vs floor 0.30; localization weak (lifts ±0.04) |
+| Change localization (LEVIR-MCI + SECOND-CC masks) | heatmap is a weak localizer — pointing-game lift within ±0.04–0.10 of the random-patch floor; only road on RS-pretrained encoders is clearly positive |
 | Frozen-VLM ceiling on DEN | ≈ 0.20 CV mAP — robust across hybrids, prompt ensembles, attention variants, query-gated routing |
 
 ![From the lucky single split to the audited recovery](assets/figures/cv_progression.png)
@@ -149,7 +151,7 @@ in-distribution wins are memorisation; held-out, frozen zero-shot is the stronge
 
 | File | Role |
 |------|------|
-| `src/datasets/` | `TemporalDataset` protocol, `DENDataset` (raster), `DENNpyDataset` (DynNet `.npy` + `color_mode` rgb/nrg/ndvi via NIR infrared frames), `QFabricDataset` (`images_only` parquet), `TEOChatlasQFabricDataset` (`qfabric_teo` — QFabric crops + RQA2 change-type labels), `StatusQFabricDataset` (`qfabric_status` — RQA5 status transitions), `LevirCCDataset` (`levir_cc` — building-change pairs + human captions), layout-detecting registry + opts adapters |
+| `src/datasets/` | `TemporalDataset` protocol, `DENDataset` (raster), `DENNpyDataset` (DynNet `.npy` + `color_mode` rgb/nrg/ndvi via NIR infrared frames), `QFabricDataset` (`images_only` parquet), `TEOChatlasQFabricDataset` (`qfabric_teo` — QFabric crops + RQA2 change-type labels), `StatusQFabricDataset` (`qfabric_status` — RQA5 status transitions), `LevirCCDataset` (`levir_cc` — building-change pairs + human captions), `LevirMCIDataset` (`levir_mci` — LEVIR-CC + building/road change masks), `SecondCCDataset` (`second_cc` — captioned six-class land-cover change + per-phase semantic masks), layout-detecting registry + opts adapters |
 | `src/queries/` | Per-dataset query sets (`den.py`, `qfabric.py`, `qfabric_status.py`, `levir_cc.py`); registry resolved by `dataset.name` |
 | `src/results_io.py` | serialize `BenchmarkReport` to JSON/CSV (torch-free); consumed by the figure scripts |
 | `src/error_analysis.py` | per-query confusion matrix + precision/recall (seasonal-vs-permanent error analysis) |

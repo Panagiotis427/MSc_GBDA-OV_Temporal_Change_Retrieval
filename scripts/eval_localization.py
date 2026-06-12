@@ -46,14 +46,26 @@ except Exception:  # pragma: no cover - tqdm is a dep, but stay graceful
         return x
 
 from src.benchmark import encode_query
-from src.datasets.levir_mci import QUERY_TO_MASK_CLASS
 from src.datasets.registry import build_dataset
 from src.encoders import get_encoder
 
+# Per-dataset config: default extracted root + the module exposing QUERY_TO_MASK_CLASS.
+# Both loaders share the same mask interface (has_mask, load_change_mask(pair, cls)).
+_DATASETS = {
+    "levir_mci": {
+        "root": "data/_levir_mci/extracted/LEVIR-MCI-dataset",
+        "mask_map": "src.datasets.levir_mci",
+    },
+    "second_cc": {
+        "root": "data/_second_cc/extracted/SECOND-CC-AUG",
+        "mask_map": "src.datasets.second_cc",
+    },
+}
 
-def _patch_embeddings(ds, enc, enc_name, split, cache_dir):
+
+def _patch_embeddings(ds, enc, enc_name, split, cache_dir, dataset):
     """Encode (or load) per-pair T1/T2 patch embeddings → P1, P2 [N, n_patch, D]."""
-    cache = Path(cache_dir) / f"locpatch__levir_mci__{enc_name}__{split}.npz"
+    cache = Path(cache_dir) / f"locpatch__{dataset}__{enc_name}__{split}.npz"
     pairs = ds.list_pairs()
     if cache.exists():
         d = np.load(cache)
@@ -94,9 +106,12 @@ def _average_precision(scores: np.ndarray, labels: np.ndarray) -> float:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="LEVIR-MCI change localization eval")
-    ap.add_argument("--root", default="data/_levir_mci/extracted/LEVIR-MCI-dataset",
-                    help="LEVIR-MCI dir (LevirCCcaptions.json + images/.../label/)")
+    ap = argparse.ArgumentParser(description="Change-localization eval (heatmap vs mask)")
+    ap.add_argument("--dataset", default="levir_mci", choices=sorted(_DATASETS),
+                    help="masked dataset to score (levir_mci building/road, "
+                         "second_cc six land-cover classes)")
+    ap.add_argument("--root", default=None,
+                    help="dataset dir (defaults to the dataset's standard extracted root)")
     ap.add_argument("--split", default="test")
     ap.add_argument("--encoders", nargs="+",
                     default=["georsclip", "clip_vitl14", "remoteclip"])
@@ -106,18 +121,24 @@ def main() -> None:
                     help="patch is GT-positive if changed-pixel fraction > this")
     args = ap.parse_args()
 
-    ds = build_dataset("levir_mci", root=args.root, split=args.split)
+    cfg = _DATASETS[args.dataset]
+    root = args.root or cfg["root"]
+    import importlib
+    query_to_mask_class = importlib.import_module(cfg["mask_map"]).QUERY_TO_MASK_CLASS
+
+    ds = build_dataset(args.dataset, root=root, split=args.split)
     Path(args.results_dir).mkdir(parents=True, exist_ok=True)
 
     for enc_name in args.encoders:
         enc = get_encoder(enc_name)
-        P1, P2, pairs = _patch_embeddings(ds, enc, enc_name, args.split, args.cache_dir)
+        P1, P2, pairs = _patch_embeddings(ds, enc, enc_name, args.split,
+                                          args.cache_dir, args.dataset)
         n_patch = P1.shape[1]
         side = int(round(n_patch ** 0.5))
-        out = {"dataset": "levir_mci", "encoder": enc_name, "split": args.split,
+        out = {"dataset": args.dataset, "encoder": enc_name, "split": args.split,
                "grid": f"{side}x{side}", "pos_thresh": args.pos_thresh, "classes": {}}
 
-        for change_class, query_text in [(c, q) for q, c in QUERY_TO_MASK_CLASS.items()]:
+        for change_class, query_text in [(c, q) for q, c in query_to_mask_class.items()]:
             t = encode_query(enc, query_text)
             hits, aps, rands, n_used = [], [], [], 0
             for i, pk in enumerate(pairs):
@@ -147,7 +168,7 @@ def main() -> None:
                   f"pointing={res['pointing_game']} (rand {res['random_pointing']})  "
                   f"patch_AP={res['patch_AP']}")
 
-        op = Path(args.results_dir) / f"localization_levir_mci__{enc_name}__{args.split}.json"
+        op = Path(args.results_dir) / f"localization_{args.dataset}__{enc_name}__{args.split}.json"
         op.write_text(json.dumps(out, indent=2), encoding="utf-8")
         print(f"  wrote {op}")
 

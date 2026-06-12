@@ -19,8 +19,5 @@
 - **Dynamic EarthNet**: official source (earthnet.tech) — local copy in `data/` (laptop manifest)
 - **QFabric**: via `jirvin16/TEOChatlas` parsed subsets (`qfabric_teo`, `qfabric_status`)
 - **LEVIR-CC**: official release; loader + benchmark in-repo
+- **SECOND-CC**: Zenodo `10.5281/zenodo.16937571` (`SECOND-CC-AUG.zip`, CC-BY-4.0, public); loader + benchmark in-repo
 - fMoW (optional future): same-source via TEOChatlas
-
-## Related
-
-- Thesis sibling repo consumes THIS repo at tag `v1.0` (library)
