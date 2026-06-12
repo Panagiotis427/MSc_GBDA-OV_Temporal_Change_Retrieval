@@ -460,7 +460,7 @@ below even RGB on test, 0.216 vs 0.299): NDVI provides some NIR signal but
 collapses all spectral texture into a single channel replicated across R/G/B, so
 the RS-pretrained encoders cannot exploit the inter-channel colour contrasts that
 NRG preserves. RemoteCLIP NRG
-(test 0.129) improves over RGB (0.050) but lags GeoRSCLIP NRG (0.426):
+(test 0.129) improves over RGB (0.050) but lags GeoRSCLIP NRG (single-split 0.426):
 GeoRSCLIP's RS5M pre-training gives it a stronger prior for the NIR-Green
 spectral contrast characteristic of vegetation transitions.
 
@@ -1164,7 +1164,7 @@ benchmark, while pixel-fraction relevance restores 9/10 change-types and a
 localised patch-level scorer lifts cross-validated mAP to $0.193$, making
 construction change (new buildings, urban expansion) retrievable for the first
 time (Section~\ref{sec:audit}); only snow is genuinely absent from the data. Fourth,
-LoRA does not close the gap either (every rank/epoch overfits to test $\approx$0.07, far below frozen 0.426),
+LoRA does not close the gap either (every rank/epoch overfits to test $\approx$0.07, far below frozen single-split 0.426),
 consistent with the adapters-only-memorise finding.
 
 The deliverable's value is the motivated, honestly-audited comparison, not
