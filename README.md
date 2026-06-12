@@ -132,7 +132,7 @@ leakage-free 5-fold leave-AOI-out cross-validation); full tables and the audit t
 | The often-quoted single-split 0.426 | a lucky 110-pair fold — CV says 0.100 ± 0.139; never a headline |
 | PEFT / LoRA adapters | memorise training AOIs (train mAP 0.42–0.998); no held-out gain over zero-shot |
 | Seasonal false-positive gate | stable-pair FPR → 0 at threshold ≥ 0.05 |
-| LEVIR-CC (salient building/road change, human captions) | ≈ 0.55 mAP with the same frozen engine |
+| LEVIR-CC (5 open-vocab queries, human captions) | salient construction strong (buildings AP ≈ 0.8, roads ≈ 0.6); subtle/sparse weak (demolition, vegetation, water ≈ 0.15–0.30); 5-query macro ≈ 0.40 |
 | Frozen-VLM ceiling on DEN | ≈ 0.20 CV mAP — robust across hybrids, prompt ensembles, attention variants, query-gated routing |
 
 ![From the lucky single split to the audited recovery](assets/figures/cv_progression.png)

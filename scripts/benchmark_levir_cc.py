@@ -59,8 +59,14 @@ def main() -> None:
                "query_prevalence": prevalence, "approaches": {}}
         for approach in ("naive", "zero_shot"):
             rep = run_benchmark(ds, retr, approach=approach)
-            out["approaches"][approach] = {"macro_mAP": round(float(rep.mAP), 4)}
+            out["approaches"][approach] = {
+                "macro_mAP": round(float(rep.mAP), 4),
+                "per_query_ap": {q.text: round(float(q.ap), 4) for q in rep.per_query},
+                "per_query_n_relevant": {q.text: int(q.n_relevant) for q in rep.per_query},
+            }
             print(f"{enc_name:11} {approach:9} macro_mAP={rep.mAP:.4f}")
+            for q in rep.per_query:
+                print(f"    AP={q.ap:5.3f}  nrel={q.n_relevant:4d}  {q.text}")
         op = Path(args.results_dir) / f"levir_cc__{enc_name}__{args.split}.json"
         op.write_text(json.dumps(out, indent=2), encoding="utf-8")
         print(f"  wrote {op}")
