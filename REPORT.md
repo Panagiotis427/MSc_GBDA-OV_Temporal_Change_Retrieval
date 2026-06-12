@@ -365,10 +365,12 @@ Results (GeoRSCLIP + NRG, rank=4, α=8, 20 epochs; zero-shot with LoRA-adapted e
 
 **LoRA now fits train but collapses out-of-distribution.** With the corrected
 masked-InfoNCE loss (and FFN-only target), LoRA lifts train mAP 0.025 → 0.153 yet
-test falls to 0.071 — a textbook overfit, and on test it is *below* ProjectionHead
-PEFT (0.041 → 0.071 is still ≪ frozen 0.426). The visual encoder adapts to the
-specific NIR-channel patterns of the 55 training AOIs, which do not generalise to
-the 10 test AOIs.
+test falls to 0.071 — a textbook overfit. That 0.071 is numerically just above
+ProjectionHead PEFT's RGB test (0.041), but the comparison is cross-colour-mode
+and **both sit at or below the DEN-test random floor (≈0.083, Appendix B.2)** —
+neither learned adapter beats chance on held-out AOIs, and both are ≪ frozen NRG
+zero-shot. The visual encoder adapts to the specific NIR-channel patterns of the
+55 training AOIs, which do not generalise to the 10 test AOIs.
 
 **Rank / epoch sweep.** To check whether a different capacity changes this, we
 swept LoRA rank and epochs (GeoRSCLIP + NRG, zero_shot mAP;
@@ -384,7 +386,7 @@ swept LoRA rank and epochs (GeoRSCLIP + NRG, zero_shot mAP;
 There is **no capacity sweet spot**: every rank/epoch fits train (0.13–0.17, well
 above the frozen 0.025) yet overfits to test 0.06–0.07. More rank or more epochs
 only memorise harder; the best test (0.071) stays well **below frozen NRG
-zero-shot (0.426)**. (The earlier "rank-8 sweet spot 0.246" reading was an
+zero-shot (single-split 0.426)**. (The earlier "rank-8 sweet spot 0.246" reading was an
 artifact of a since-fixed LoRA loss bug plus a stale-cache reuse in the pipeline.)
 
 This reinforces the project's core finding: **spectral physics (NRG

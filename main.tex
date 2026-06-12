@@ -514,8 +514,11 @@ zero-shot against LoRA-adapted zero-shot (GeoRSCLIP + NRG, rank=4, $\alpha$=8,
 \end{table}
 
 LoRA now fits the train split ($0.025 \rightarrow 0.153$) but collapses
-out-of-distribution ($0.426 \rightarrow 0.071$ on test) --- a textbook overfit,
-and on test it is worse than ProjectionHead PEFT ($0.041$). To check whether a
+out-of-distribution ($0.426 \rightarrow 0.071$ on test) --- a textbook overfit.
+That test $0.071$ is numerically just above ProjectionHead PEFT's RGB test
+($0.041$), but the comparison is cross-colour-mode and both sit at or below the
+DEN-test random floor ($\approx 0.083$) --- neither learned adapter beats chance
+on held-out AOIs. To check whether a
 different capacity changes this, we swept rank and epochs
 (Table~\ref{tab:lorasweep}; \texttt{scripts/lora\_sweep.py}, in-memory, no
 cache/model clobber).
@@ -540,7 +543,7 @@ cache/model clobber).
 There is no capacity sweet spot: every rank/epoch setting fits the train split
 (0.13--0.17, well above the frozen 0.025) yet overfits to test 0.06--0.07. More
 rank or more epochs only memorise harder; the best test (0.071) still sits far
-below frozen NRG zero-shot (0.426). This reinforces the project's core finding
+below frozen NRG zero-shot (single-split 0.426). This reinforces the project's core finding
 that spectral physics (NRG false-colour) generalises while learned visual priors
 only memorise --- and is sharper than the earlier reading, which was distorted by
 a since-fixed LoRA loss bug and a stale-cache reuse.
@@ -715,7 +718,7 @@ mAP (CLIP $-0.050$, GeoRSCLIP $-0.060$) but raises held-out val for all three
 encoders and test for two of three. Keeping both endpoints (rather than
 collapsing to their difference) preserves absolute land-cover context the
 adapter can use to generalise, at the cost of some training-set fit. The effect
-is modest and PEFT still trails frozen NRG zero-shot (0.426), consistent with the
+is modest and PEFT still trails frozen NRG zero-shot (single-split 0.426), consistent with the
 project's core finding --- but \texttt{concatenate} is the better-generalising
 change feature.
 
