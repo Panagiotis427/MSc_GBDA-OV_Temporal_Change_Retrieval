@@ -1266,6 +1266,20 @@ but now-better-understood* open-vocabulary signal, strongest on localised constr
 large-area wetland change. Reproduce: `python -m scripts.patch_eval --encoder georsclip
 --color-mode nrg --approach patch_top3`.
 
+**Temporal granularity — monthly vs bimonthly pairing (honest tradeoff).** The committed numbers
+use *bimonthly* pairing (12 of DEN's 24 monthly frames, 825 pairs). Re-running the same GeoRSCLIP
+NRG `patch_top3` pipeline at *monthly* resolution (all 24 frames, 1725 pairs;
+`--pairing monthly`) gives **CV mAP 0.138 ± 0.046** (full-corpus 0.092) — *below* the bimonthly
+0.193. This is expected, not a regression: adjacent-month pairs span a smaller change interval, so
+per-pair change magnitude (and construction-query positives, e.g. "new buildings" n=21) shrinks and
+the signal is harder to retrieve. The payoff is **temporal resolution** — monthly pairing localises a
+change to a single month rather than a two-month window, at the cost of per-pair SNR. The
+large-area wetland transitions stay the dominant, FDR-significant signal at both resolutions
+(monthly ag↔wetland / land→wetland AP 0.15–0.19), confirming the salience finding is
+resolution-stable. So bimonthly remains the headline (best mAP); monthly is the finer-grained view
+for temporal pinpointing. Reproduce: append `--pairing monthly` (writes a `__monthly` results file
+and its own patch cache; the bimonthly cache and committed numbers are untouched).
+
 ## B.11 Two cheap in-scope tweaks tested — neither beats patch_top3 (honest negatives)
 
 Both stay within the brief (frozen backbone, cosine scoring, no fine-tuning) and reuse the cached

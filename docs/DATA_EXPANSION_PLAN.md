@@ -157,8 +157,12 @@ edited** (`embeddings.py`, `retrieval.py`, `benchmark.py`, `train.py`, `app.py`,
   (queries spanning its 30 change categories); register.
 - **QFabric localization:** new loader serving the capped pentatemporal slice + polygon masks
   (extends, does not replace, `qfabric_teo`); reuse `max_per_class` capping.
-- **DEN finer temporal:** add a monthly pairing run (loader already supports `monthly`); no new
-  data.
+- **DEN finer temporal — DONE 2026-06-12:** added `--pairing` to `scripts/patch_eval.py`
+  (additive; bimonthly cache/numbers untouched — non-default pairings get their own cache/results
+  suffix). Monthly (all 24 frames, 1725 pairs) GeoRSCLIP NRG `patch_top3` = **CV mAP 0.138 ± 0.046**
+  vs bimonthly 0.193 — an honest granularity tradeoff: finer pairs span less change (lower per-pair
+  SNR, sparser construction positives) but double temporal resolution; wetland transitions stay the
+  dominant FDR-significant signal at both. Bimonthly stays the headline. REPORT B.10 updated. No new data.
 - **Verify:** `pytest` fast suite green; each new dataset benchmarks end-to-end with **no edits**
   to shared pipeline files; embeddings cached and reused on rerun.
 

@@ -5,6 +5,7 @@
   "approach": "patch_top3",
   "relevance": "fraction",
   "frac_thresh": 0.05,
+  "pairing": "bimonthly",
   "prompt_ensemble": false,
   "tau": 0.03,
   "n_pairs": 825,
