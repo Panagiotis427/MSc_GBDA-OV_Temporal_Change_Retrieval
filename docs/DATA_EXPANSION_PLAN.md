@@ -162,7 +162,7 @@ edited** (`embeddings.py`, `retrieval.py`, `benchmark.py`, `train.py`, `app.py`,
 - **Verify:** `pytest` fast suite green; each new dataset benchmarks end-to-end with **no edits**
   to shared pipeline files; embeddings cached and reused on rerun.
 
-### Track 3 — Localization / heatmap evaluation (PILLAR)
+### Track 3 — Localization / heatmap evaluation (PILLAR) — **DONE 2026-06-12 (LEVIR-MCI)**
 - Use the new mask labels (LEVIR-MCI, SECOND, QFabric polygons) to make the heatmap deliverable
   **quantitative**: pointing-game accuracy and/or mask-IoU of the patch-similarity heatmap vs the
   ground-truth change mask. This directly completes the brief's required *"heatmap highlighting
@@ -170,6 +170,14 @@ edited** (`embeddings.py`, `retrieval.py`, `benchmark.py`, `train.py`, `app.py`,
 - New `src/localization_eval.py` (or `scripts/eval_localization.py`); never edits shared files.
 - **Verify:** localization metric reproduces from cache; reported per-dataset with the random
   floor; honest about which datasets lack masks (DEN: no instance masks → patch-IoU only).
+- **DONE (LEVIR-MCI):** downloaded `lcybuaa/LEVIR-MCI` (2.77 GB; building/road change masks on the
+  same 1929 test pairs), added `src/datasets/levir_mci.py` (CC subclass + `load_change_mask`) and
+  `scripts/eval_localization.py` (pointing-game + patch-AP of the query-conditioned Δ-heatmap vs
+  mask, each vs its grid's random-patch floor). **Result — honest negative:** the heatmap is a
+  weak localizer. Only **road** localizes above chance, only with the RS-pretrained encoders
+  (RemoteCLIP +0.10, GeoRSCLIP +0.08 pointing lift); **building** is at/below floor for all; generic
+  CLIP ViT-L anti-localizes (−0.14). Written up in REPORT §7.12 + main.tex §sec:localization. 17
+  tests green. **Remaining Track 3:** SECOND-CC + QFabric-polygon masks once those loaders land.
 
 ### Track 4 — Bounded method check (optional, low priority)
 - One capped learned change-attention + augmentation run to confirm/deny the memorization prior

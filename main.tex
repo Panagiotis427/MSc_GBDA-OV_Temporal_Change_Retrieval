@@ -929,6 +929,53 @@ across all three datasets: the open-vocabulary engine recovers the change signal
 in proportion to its spatial and semantic salience --- strongly on salient
 construction, weakly on subtle or sparse change.
 
+\subsection{Quantitative change localization (LEVIR-MCI)}
+\label{sec:localization}
+
+The brief asks for a heatmap highlighting the spatial region of the change. So far
+that deliverable was qualitative. LEVIR-MCI (Liu et al., 2024) is a strict
+superset of LEVIR-CC --- the same 1929 test pairs and captions, plus a pixel-level
+change mask per pair (building, road) --- which makes the heatmap measurable. For
+the two masked queries, the query-conditioned change heatmap (per-patch
+$\Delta$-similarity $\cos(t,P2_p)-\cos(t,P1_p)$, the same signal as the
+patch scorer of Section~\ref{sec:audit}) is scored against the mask by two metrics,
+each over pairs that contain the change with at least one positive patch at grid
+resolution: \emph{pointing-game} (is the highest-$\Delta$ patch a true change
+patch?) and \emph{patch-AP}. Both are read against the random-patch floor (the mean
+positive-patch fraction); since the patch grid differs by encoder (GeoRSCLIP
+$7\times7$, the ViT-L encoders $16\times16$), each encoder is compared only to its
+own floor.
+
+\begin{table}[H]
+    \centering
+    \caption{LEVIR-MCI change localization (test split; pointing-game and patch-AP
+    against each encoder's random-patch floor). Lift is pointing minus floor.}
+    \label{tab:localization}
+    \begin{tabular}{llccc}
+        \toprule
+        \textbf{Encoder (grid)} & \textbf{Class} & \textbf{pointing} & \textbf{floor} & \textbf{lift} \\
+        \midrule
+        GeoRSCLIP ($7\times7$)     & road     & 0.416 & 0.334 & \textbf{+0.082} \\
+        GeoRSCLIP ($7\times7$)     & building & 0.351 & 0.378 & $-0.027$ \\
+        RemoteCLIP ($16\times16$)  & road     & 0.312 & 0.208 & \textbf{+0.104} \\
+        RemoteCLIP ($16\times16$)  & building & 0.257 & 0.238 & +0.019 \\
+        CLIP ViT-L/14 ($16\times16$) & road     & 0.151 & 0.208 & $-0.057$ \\
+        CLIP ViT-L/14 ($16\times16$) & building & 0.101 & 0.238 & $-0.137$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+The heatmap is a weak localizer. Only road change is localized above chance, and
+only by the RS-pre-trained encoders (RemoteCLIP $+0.10$, GeoRSCLIP $+0.08$
+pointing-game lift); building change is not localized above its floor by any
+encoder, and generic CLIP ViT-L \emph{anti-localizes} ($-0.14$ on building). This
+is the spatial counterpart of the retrieval result: frozen CLIP-variant embeddings
+recover change weakly, and localizing it --- a harder task than retrieving it ---
+is weaker still, with only RS pre-training buying a modest road signal. The overlay
+stays useful for a human in the loop, but it is not a quantitatively reliable
+detector. DEN carries no instance masks, so this metric is LEVIR-MCI-specific by
+design.
+
 \subsection{Error analysis --- seasonal vs permanent}
 \label{sec:erroranalysis}
 
