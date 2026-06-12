@@ -333,7 +333,7 @@ into a single channel replicated across R/G/B — the RS-pretrained encoders
 cannot exploit inter-channel colour contrasts that NRG preserves.
 
 RemoteCLIP NRG (test 0.129) improves over RGB (0.050) but lags GeoRSCLIP
-NRG (0.426); GeoRSCLIP's RS5M pre-training gives it a stronger prior for
+NRG (single-split 0.426); GeoRSCLIP's RS5M pre-training gives it a stronger prior for
 the NIR-Green spectral contrast characteristic of vegetation transitions.
 
 GeoRSCLIP + NRG zero-shot is the best configuration **on this 110-pair test split (0.426)** —
@@ -400,7 +400,7 @@ beats the structural prior embedded in RS-pretrained zero-shot GeoRSCLIP + NIR.
 
 Post-retrieval re-ranking was evaluated on the held-out test split (110 pairs,
 3 queries with positives) using the best-generalising configuration
-(GeoRSCLIP + NRG zero-shot, mAP 0.426).
+(GeoRSCLIP + NRG zero-shot, single-split mAP 0.426).
 
 | Strategy | R@1 | R@3 | R@5 | R@10 | mAP |
 |---|---|---|---|---|---|
@@ -464,7 +464,7 @@ encoders (CLIP +0.039, GeoRSCLIP ~flat, RemoteCLIP +0.081) and **test** for
 two of three. Keeping both endpoints (rather than collapsing to their
 difference) preserves absolute land-cover context the adapter can use to
 generalise, at the cost of some training-set fit. The effect is modest and PEFT
-still trails frozen NRG zero-shot (0.426) — consistent with the project's core
+still trails frozen NRG zero-shot (single-split 0.426) — consistent with the project's core
 finding — but `concatenate` is the better-generalising change feature.
 Adapters saved as `models/<dataset>__<encoder>_concatenate__adapter.pt`
 (mode-tagged so they never overwrite the difference adapters); reproduce with
@@ -548,7 +548,7 @@ directional spectral transitions are subtle and AOI-specific, so the head
 memorises training-AOI statistics that don't transfer. **PEFT's value is
 dataset-dependent — harmful on DEN, mildly helpful on QFabric** — and the
 RS-pretrained GeoRSCLIP backbone benefits most from the adapter on construction
-imagery. Even so, QFabric PEFT (0.334) and DEN frozen NRG zero-shot (0.426)
+imagery. Even so, QFabric PEFT (0.334) and DEN frozen NRG zero-shot (single-split 0.426)
 remain the respective per-dataset best; no single recipe dominates.
 
 ### 7.10 QFabric status-transition retrieval (RQA5) — the regime flips
@@ -847,7 +847,7 @@ regenerated automatically by the test suite.
   absent from the subset).
 - **`concatenate` change mode** now evaluated (§7.7 — generalises better than
   `difference`); **LoRA rank/epoch sweep** done (§7.4 — every config overfits,
-  best test ≈0.07, far below frozen 0.426).
+  best test ≈0.07, far below frozen single-split 0.426).
 - **QFabric** is wired as a second dataset via a **label-grounded
   pipeline**, fully implemented and unit-tested: `src/datasets/qfabric_teo.py`
   (`TEOChatlasQFabricDataset`) reads the QFabric crops from `jirvin16/TEOChatlas`
@@ -1057,7 +1057,7 @@ effect size.
 exactly k/n_relevant = perfect top-precision); DEN train PEFT 0.34–0.42 vs DEN-**test** 0.04.
 **On held-out data no adapter beats frozen zero-shot:** DEN PEFT-test 0.04–0.10 < zero-shot
 0.30–0.43 (on `clip_vitl14` PEFT-test 0.040 is *below* random 0.083); every LoRA config <
-frozen 0.426 (`lora_sweep.txt`); `difference` mode overfits hardest (train 0.42 → test 0.04,
+frozen single-split 0.426 (`lora_sweep.txt`); `difference` mode overfits hardest (train 0.42 → test 0.04,
 `concat_eval.txt`). Only TEO-test PEFT (0.27–0.33) modestly tops naive — fitting end-state
 appearance, not change. **Reporting rule: quote PEFT/LoRA from test/val only, never train.**
 
