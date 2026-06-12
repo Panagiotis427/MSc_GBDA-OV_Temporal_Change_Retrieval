@@ -1,0 +1,25 @@
+{
+  "dataset": "levir_mci",
+  "encoder": "remoteclip",
+  "split": "test",
+  "grid": "16x16",
+  "pos_thresh": 0.0,
+  "classes": {
+    "building": {
+      "query": "new buildings or houses constructed",
+      "n_pairs": 878,
+      "pointing_game": 0.2574,
+      "random_pointing": 0.2378,
+      "patch_AP": 0.2191,
+      "prevalence_floor": 0.2378
+    },
+    "road": {
+      "query": "a new road or street built",
+      "n_pairs": 603,
+      "pointing_game": 0.3118,
+      "random_pointing": 0.2083,
+      "patch_AP": 0.213,
+      "prevalence_floor": 0.2083
+    }
+  }
+}

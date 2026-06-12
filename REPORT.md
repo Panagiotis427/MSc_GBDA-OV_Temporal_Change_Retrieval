@@ -638,6 +638,51 @@ type-versus-transition split as QFabric. Reproduce: download `lcybuaa/LEVIR-CC`,
 build `levir_cc`, run `python -m scripts.benchmark_levir_cc` (writes per-query AP
 to `results/`).
 
+### 7.12 LEVIR-MCI — quantitative change localization
+
+The brief asks the engine to produce *"a heatmap highlighting the specific spatial
+region of the change"*. Until now that was only qualitative (a colour overlay).
+LEVIR-MCI (Liu et al., *Change-Agent*, 2024) is a strict superset of LEVIR-CC —
+the same 1929 test pairs and captions, plus a pixel-level change mask per pair
+(building = white, road = grey; `src/datasets/levir_mci.py`). This makes the
+heatmap deliverable measurable. For the building and road queries (the two masked
+classes; demolition / vegetation / water have captions but no mask), the
+query-conditioned **change** heatmap — per-patch Δ-similarity
+`cos(t, P2_p) − cos(t, P1_p)`, the same signal as the S3 scorer (§7.10 / B.10) and
+the app's `generate_change_heatmap` — is scored against the mask
+(`scripts/eval_localization.py`). Two metrics, each over pairs that contain that
+change and have ≥1 positive patch at grid resolution: **pointing-game** (is the
+single highest-Δ patch a true change patch?) and **patch-AP** (AP of the Δ map
+over the patch grid). Both are read against the random-patch floor — the mean
+positive-patch fraction — and grids differ by encoder (GeoRSCLIP ViT-B-32 = 7×7,
+the ViT-L encoders = 16×16), so each encoder is compared **only to its own floor**,
+never across grids.
+
+| encoder (grid) | class | pointing | floor | lift | patch-AP | floor |
+|---|---|---|---|---|---|---|
+| GeoRSCLIP (7×7) | road | 0.416 | 0.334 | **+0.082** | 0.410 | 0.334 |
+| GeoRSCLIP (7×7) | building | 0.351 | 0.378 | −0.027 | 0.421 | 0.378 |
+| RemoteCLIP (16×16) | road | 0.312 | 0.208 | **+0.104** | 0.213 | 0.208 |
+| RemoteCLIP (16×16) | building | 0.257 | 0.238 | +0.019 | 0.219 | 0.238 |
+| CLIP ViT-L/14 (16×16) | road | 0.151 | 0.208 | −0.057 | 0.172 | 0.208 |
+| CLIP ViT-L/14 (16×16) | building | 0.101 | 0.238 | **−0.137** | 0.193 | 0.238 |
+
+**The heatmap is a weak localizer, and this is the honest verdict.** Only **road**
+change is localized above chance, and only by the **RS-pretrained** encoders
+(RemoteCLIP +0.10, GeoRSCLIP +0.08 pointing-game lift); **building** change is not
+localized above its floor by any encoder; and generic CLIP ViT-L *anti-localizes*
+(−0.14 on building — its highest-Δ patch lands away from the change more often than
+chance). This is the spatial counterpart of the retrieval finding: frozen
+CLIP-variant embeddings recover change weakly, and localizing it — a harder task
+than retrieving it — is weaker still, with only RS pre-training buying a modest
+road signal. The overlay remains useful for a human in the loop, but it is not a
+quantitatively reliable change detector, and the report says so. (Caveat: the
+patch grid is coarse and the positive-patch threshold is "any changed pixel"
+[`--pos-thresh 0`]; a finer encoder grid or stricter threshold would sharpen the
+floor but not rescue the negative lifts. DEN carries no instance masks, so this
+metric is LEVIR-MCI-specific by design.) Reproduce: download `lcybuaa/LEVIR-MCI`,
+then `python -m scripts.eval_localization`.
+
 ### Error analysis — seasonal vs permanent
 
 The benchmark reports seasonal drift @K (non-relevant top-K retrievals that

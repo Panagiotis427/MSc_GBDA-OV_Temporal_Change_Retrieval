@@ -1,0 +1,25 @@
+{
+  "dataset": "levir_mci",
+  "encoder": "georsclip",
+  "split": "test",
+  "grid": "7x7",
+  "pos_thresh": 0.0,
+  "classes": {
+    "building": {
+      "query": "new buildings or houses constructed",
+      "n_pairs": 878,
+      "pointing_game": 0.3508,
+      "random_pointing": 0.3783,
+      "patch_AP": 0.4208,
+      "prevalence_floor": 0.3783
+    },
+    "road": {
+      "query": "a new road or street built",
+      "n_pairs": 603,
+      "pointing_game": 0.4163,
+      "random_pointing": 0.3337,
+      "patch_AP": 0.4097,
+      "prevalence_floor": 0.3337
+    }
+  }
+}

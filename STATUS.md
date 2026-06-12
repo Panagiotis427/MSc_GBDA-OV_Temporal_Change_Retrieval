@@ -44,8 +44,13 @@ Track 0 (disk audit — 56.6 GB free, ~4 GB redundant archives reclaimed, gate P
 (honest reframe — verified, zero stale `0.426` headlines), and the Track 2 **LEVIR-CC 5-query
 broadening** (added vegetation + water queries → salience gradient: buildings ~0.8, roads ~0.6,
 demolition/vegetation/water ~0.15–0.30; macro ~0.40; docs reframed; 9 tests green). **Next:**
-remaining Track 2 (LEVIR-MCI masks 2.77 GB, SECOND-CC, QFabric localization slice, DEN monthly)
-then Track 3 (localization/heatmap eval).
+**Track 3 (LEVIR-MCI localization) DONE** — downloaded LEVIR-MCI (2.77 GB, building/road masks on
+the same 1929 test pairs), added `levir_mci` loader + `scripts/eval_localization.py`. Honest
+negative: the query-conditioned change heatmap is a weak localizer — only road localizes above
+chance and only for RS-pretrained encoders (RemoteCLIP +0.10 / GeoRSCLIP +0.08 pointing lift);
+building at/below floor for all; generic CLIP anti-localizes (REPORT §7.12, main.tex §localization).
+**Next:** remaining Track 2 (SECOND-CC, QFabric localization slice, DEN monthly), then their masks
+feed the rest of Track 3.
 
 > **⚠ On `laptop-4060`, before ANY dataset download:** disk-gated. Track 0 cleared the gate
 > (56.6 GB free after reclaiming `labels.tar.gz` + `Levir-CC-dataset.zip` redundant archives to
