@@ -42,6 +42,13 @@ Nothing executing. **Active direction (2026-06-12):** a data-expansion + honest-
 written and pending implementation — see [`docs/DATA_EXPANSION_PLAN.md`](docs/DATA_EXPANSION_PLAN.md).
 The prior deliverable gap-pass (§4) is complete; the new direction supersedes it as next work.
 
+> **⚠ On `laptop-4060`, before ANY dataset download (Track 0 of the plan):** the expansion is
+> **disk-gated** — 57 GB free, 32.7 GB already used, ~20–27 GB of new data projected (at/over the
+> ceiling). Run `du -sh data/* .model_cache` first (manifests are dir-level only, so the current
+> per-dataset breakdown is unknown), reclaim stale caches/duplicates to `trash/`, and confirm
+> head-room. **Never** pull the 298 GB EVER-Z QFabric parquet; cap the QFabric slice. Full budget:
+> [`docs/DATA_EXPANSION_PLAN.md §3`](docs/DATA_EXPANSION_PLAN.md) · [`INVENTORY.md`](INVENTORY.md).
+
 ## 4. Next steps — course-deliverable gap pass (deliverable = written report + repo with presentation-grade README)
 
 Mapping the assignment + professors' 2026-05-06 comments to repo reality:

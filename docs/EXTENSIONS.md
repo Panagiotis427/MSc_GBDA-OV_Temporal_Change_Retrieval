@@ -9,8 +9,8 @@ Extensions ranked by effort. Implemented extensions marked ✅.
 ### LoRA adapter ✅
 Fine-tune GeoRSCLIP's attention weights via `peft` library.
 
-- **Status:** `src/lora_train.py`. Benchmarked: test mAP 0.159 (vs frozen zero-shot 0.426 — see REPORT.md §7.4). In-app toggle: Settings → **Use LoRA embeddings** (requires pre-cached run). CLI: `--lora / --no-lora`.
-- **Finding:** LoRA better than ProjectionHead cross-split (0.159 > 0.041) but below frozen NRG zero-shot. Spectral physics generalises; learned priors do not.
+- **Status:** `src/lora_train.py`. Benchmarked: test mAP 0.071 (vs frozen zero-shot — single-split 0.426 / CV 0.100 ± 0.139, see REPORT.md §7.4 / Appendix B.8). In-app toggle: Settings → **Use LoRA embeddings** (requires pre-cached run). CLI: `--lora / --no-lora`.
+- **Finding:** every learned adapter collapses out-of-distribution — LoRA test ≈0.071, ProjectionHead ≈0.041, both ≪ frozen NRG zero-shot. Spectral physics generalises; learned priors do not. (Earlier 0.159/0.246 readings were a since-fixed LoRA loss-bug + stale-cache artifact — REPORT §7.4.)
 
 ### NDVI ablation ✅
 Color mode `ndvi` benchmarked across all 3 encoders × 3 splits.
