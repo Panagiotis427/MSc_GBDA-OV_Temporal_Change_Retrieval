@@ -1,0 +1,57 @@
+{
+  "dataset": "second_cc",
+  "encoder": "remoteclip",
+  "split": "test",
+  "grid": "16x16",
+  "pos_thresh": 0.0,
+  "classes": {
+    "building": {
+      "query": "new buildings or structures appeared",
+      "n_pairs": 592,
+      "pointing_game": 0.1047,
+      "random_pointing": 0.1718,
+      "patch_AP": 0.1753,
+      "prevalence_floor": 0.1718
+    },
+    "tree": {
+      "query": "trees appeared or were cleared",
+      "n_pairs": 377,
+      "pointing_game": 0.0902,
+      "random_pointing": 0.1204,
+      "patch_AP": 0.1564,
+      "prevalence_floor": 0.1204
+    },
+    "low_vegetation": {
+      "query": "low vegetation or grassland changed",
+      "n_pairs": 452,
+      "pointing_game": 0.1836,
+      "random_pointing": 0.1582,
+      "patch_AP": 0.2037,
+      "prevalence_floor": 0.1582
+    },
+    "water": {
+      "query": "a water body appeared or changed",
+      "n_pairs": 81,
+      "pointing_game": 0.0864,
+      "random_pointing": 0.0712,
+      "patch_AP": 0.1249,
+      "prevalence_floor": 0.0712
+    },
+    "ground": {
+      "query": "bare ground or land cleared",
+      "n_pairs": 675,
+      "pointing_game": 0.1867,
+      "random_pointing": 0.1743,
+      "patch_AP": 0.1904,
+      "prevalence_floor": 0.1743
+    },
+    "playground": {
+      "query": "a playground or sports field",
+      "n_pairs": 22,
+      "pointing_game": 0.1364,
+      "random_pointing": 0.1042,
+      "patch_AP": 0.1405,
+      "prevalence_floor": 0.1042
+    }
+  }
+}

@@ -95,7 +95,7 @@ $L.Add("")
 
 $L.Add("## Config presence (never contents)")
 $L.Add("")
-foreach ($c in @("aris.env", ".env")) {
+foreach ($c in @(".env")) {
     $present = "no"
     if (Test-Path (Join-Path $root $c)) { $present = "yes" }
     $L.Add("- ${c}: $present")

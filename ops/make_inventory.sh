@@ -1,9 +1,9 @@
 #!/bin/bash
-# make_inventory.sh — READ-ONLY machine manifest generator (macOS / Linux / ARIS).
+# make_inventory.sh — READ-ONLY machine manifest generator (macOS / Linux).
 # Writes inventory/<machine-id>.md: git state + gitignored payloads + env.
-# Sanitized: $HOME -> "~", $ARIS_WORK_ROOT -> literal '$ARIS_WORK_ROOT'.
+# Sanitized: $HOME -> "~".
 # Usage (from anywhere inside the repo):
-#     bash ops/make_inventory.sh <machine-id>     # e.g. macbook | aris
+#     bash ops/make_inventory.sh <machine-id>     # e.g. macbook
 set -uo pipefail
 MID="${1:?usage: bash ops/make_inventory.sh <machine-id>}"
 ROOT="$(git rev-parse --show-toplevel)" || { echo "not a git repo" >&2; exit 1; }
@@ -11,7 +11,7 @@ REPO="$(basename "$ROOT")"
 OUT_DIR="$ROOT/inventory"; mkdir -p "$OUT_DIR"
 OUT="$OUT_DIR/$MID.md"
 
-san() { sed -e "s|${ARIS_WORK_ROOT:-__none__}|\$ARIS_WORK_ROOT|g" -e "s|$HOME|~|g"; }
+san() { sed -e "s|$HOME|~|g"; }
 mb()  { du -sm "$1" 2>/dev/null | cut -f1; }
 
 {
@@ -55,7 +55,7 @@ for v in "$ROOT/.venv" "$(dirname "$ROOT")/.venv"; do
   [ -x "$v/bin/python" ] && echo "- $(echo "$v" | san): \`$("$v/bin/python" --version 2>&1)\`"
 done
 if command -v conda >/dev/null 2>&1; then
-  # names only — never paths (a path here leaked a username once; see gitleaks hpc rules)
+  # names only — never paths (a path here would leak an OS username; see gitleaks rules)
   echo "- conda envs: $(conda env list 2>/dev/null | awk 'NR>2 && $1 !~ /^[#\/]/ {print $1}' | paste -sd', ' - | san)"
 fi
 echo
@@ -70,9 +70,8 @@ else echo "- no HF cache found"; fi
 echo
 echo "## Config presence (never contents)"
 echo
-for c in aris.env .env; do
+for c in .env; do
   if [ -f "$ROOT/$c" ]; then echo "- $c: yes"; else echo "- $c: no"; fi
 done
-[ -f "$HOME/aris.env" ] && echo "- ~/aris.env: yes"
 } > "$OUT"
 echo "manifest written: $(echo "$OUT" | san)"

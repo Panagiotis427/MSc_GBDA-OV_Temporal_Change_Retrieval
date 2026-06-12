@@ -153,8 +153,16 @@ edited** (`embeddings.py`, `retrieval.py`, `benchmark.py`, `train.py`, `app.py`,
   (REPORT §7.11, main.tex §levircc + abstract, README, STATUS, §1 above). 9 tests green.
 - **LEVIR-MCI:** extend the existing `levir_cc` path — add masks; use **all splits** (still test-only);
   the **vegetation + water queries** are now exercised (above).
-- **SECOND-CC:** new `src/datasets/second_cc.py` (`TemporalDataset`) + `src/queries/second_cc.py`
-  (queries spanning its 30 change categories); register.
+- **SECOND-CC — DONE 2026-06-12:** downloaded the real SECOND-CC (Zenodo `10.5281/zenodo.16937571`,
+  `SECOND-CC-AUG.zip` 2.5 GB, CC-BY-4.0, public; **not** the captionless SECOND base) — 6,041 pairs,
+  30,205 human captions, per-phase six-class semantic maps. Added `src/datasets/second_cc.py`
+  (`TemporalDataset` + caption-derived tags + `load_change_mask`/`transition_change_mask`) and
+  `src/queries/second_cc.py` (7 class queries: the six SECOND classes + road); registered. The
+  open-vocab **breadth** test the other datasets lacked. Results: zero-shot per-query AP buildings
+  ~0.70, road/ground/trees ~0.34–0.42, low-veg 0.28, water 0.17, playground 0.09 (sparse); macro
+  zs ~0.33 / naive ~0.45 vs prevalence floor 0.30 — every change type clears random (unlike DEN) but
+  modestly; naive > zero-shot (end-state content > temporal Δ, as on QFabric). Localization via the
+  semantic maps in Track 3. REPORT §7.13.
 - **QFabric localization:** new loader serving the capped pentatemporal slice + polygon masks
   (extends, does not replace, `qfabric_teo`); reuse `max_per_class` capping.
 - **DEN finer temporal — DONE 2026-06-12:** added `--pairing` to `scripts/patch_eval.py`
@@ -198,8 +206,7 @@ edited** (`embeddings.py`, `retrieval.py`, `benchmark.py`, `train.py`, `app.py`,
   encoders unless an existing extension point already covers it.
 - S1 SAR fusion stays **future-work** (off-brief, modality mismatch — `EXTENSIONS.md` SAR section)
   unless explicitly pulled in.
-- Course work stays self-contained; the thesis pins this repo at a release and must not be
-  perturbed by this plan.
+- Course work stays self-contained.
 
 ---
 
