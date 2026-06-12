@@ -205,7 +205,8 @@ testable in seconds with no network.
 14. **NIR false-colour (NRG)** — the on-disk `_infra.jpeg` NIR frames (one per
     daily timestep, grayscale, 1024²) are now usable via `color_mode='nrg'`
     (NIR-Red-Green) or `'ndvi'` (single-band NDVI × 3). GeoRSCLIP + NRG
-    zero-shot on held-out test AOIs: mAP **0.426** — best generalisation result.
+    zero-shot on the 110-pair test split: mAP **0.426** — a single lucky fold, **not** the
+    generalisation result (5-fold CV 0.100 ± 0.139; see §7.3 / Appendix B.8).
 15. **Cross-split evaluation** — pipeline extended with `--train-split` /
     `--eval-splits` flags; adapter trained on train split (605 pairs) evaluated
     on val (110 pairs) and test (110 pairs). PEFT overfits train; zero-shot and
@@ -221,7 +222,8 @@ testable in seconds with no network.
     not targeted). Trained with online image loading (no pre-caching), same
     masked InfoNCE loss as ProjectionHead. GeoRSCLIP+NRG, 20 epochs, rank=4:
     fits train (0.025→0.153) but test mAP collapses to **0.071** — overfits, far
-    below zero-shot NRG (0.426). Confirms zero-shot as the best generalising approach.
+    below frozen zero-shot NRG (single-split 0.426; CV 0.100 ± 0.139). Confirms frozen
+    zero-shot generalises better than the learned adapter — the project's core finding.
 
 ---
 
@@ -424,7 +426,7 @@ any time without restarting; CLI flags set startup defaults only.
 
 | Control | What it does |
 |---|---|
-| Color Mode | Switch dataset loader between `rgb`, `nrg` (NIR-Red-Green), `ndvi`. Loads the corresponding pre-cached embeddings. Best config: GeoRSCLIP + NRG (test mAP 0.426). |
+| Color Mode | Switch dataset loader between `rgb`, `nrg` (NIR-Red-Green), `ndvi`. Loads the corresponding pre-cached embeddings. Best config: GeoRSCLIP + NRG (CV mAP 0.100 ± 0.139, patch_top3 0.193; the single-split 0.426 is a lucky fold, not the result). |
 | Use LoRA embeddings | Load the LoRA-adapted embedding cache (`_lora` tag) instead of frozen embeddings. Requires prior `run_pipeline --lora` run. |
 
 **Filters & Re-ranking accordion (per-query — no rebuild needed):**
