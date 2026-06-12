@@ -599,30 +599,44 @@ A third dataset tests the engine where change is visually salient and described
 in genuine human language. LEVIR-CC (Liu et al., 2022) is 10,077 bi-temporal
 building-change pairs (256×256, 0.5 m) with five human captions and a binary
 change flag each; the loader (`src/datasets/levir_cc.py`) parses captions into
-open-vocabulary change tags, and three free-text queries (new buildings, new
-road, demolition; `src/queries/levir_cc.py`) are relevant to pairs carrying the
-matching tag. Test split (1929 pairs), frozen encoders, RGB; macro mAP over the
-three queries (random-ranking baseline ≈ **0.342** = mean query prevalence:
-building 45.2%, road 42.7%, demolition 14.8%):
+five open-vocabulary change tags (building, road, demolition, vegetation, water),
+and `src/queries/levir_cc.py` maps one free-text query to each. Test split (1929
+pairs), frozen encoders, RGB. The macro random-ranking baseline is the mean query
+prevalence, **0.255** (building 45.2%, road 42.7%, demolition 14.8%, vegetation
+23.9%, water 1.0%).
 
-| Encoder | naive | zero-shot |
-|---|---|---|
-| GeoRSCLIP | 0.540 | **0.557** |
-| CLIP ViT-L/14 | **0.543** | 0.498 |
-| RemoteCLIP | 0.539 | **0.573** |
+Per-query average precision (zero-shot) is the honest summary; a single macro
+hides a sharp salience gradient:
 
-**Retrieval is strong — 0.50–0.57 macro mAP, ~+0.2 above the 0.342 prevalence
-floor** — in sharp contrast to DEN's honest cross-validated ceiling of ≈0.20. The
-change here (new buildings, roads) is large, high-contrast, and described in the
-CLIP text tower's own vocabulary, so a frozen encoder localises it readily; DEN's
-directional spectral transitions are subtle and AOI-specific. The RS-pretrained
-encoders gain from the directional Δ (RemoteCLIP zero-shot 0.573, GeoRSCLIP 0.557
-both beat naive), while general CLIP prefers after-image content (naive 0.543 >
-zero-shot 0.498) — the same type-vs-transition split as QFabric. **The lesson
-holds across all three datasets: the open-vocabulary engine recovers the change
-signal in proportion to its spatial and semantic salience** — strongly on
-LEVIR-CC, weakly on DEN. Reproduce: download `lcybuaa/LEVIR-CC`, then build the
-`levir_cc` dataset and run `naive`/`zero_shot` on the test split.
+| query (test positives) | GeoRSCLIP | CLIP ViT-L/14 | RemoteCLIP |
+|---|---|---|---|
+| new buildings or houses (871) | **0.804** | 0.725 | **0.830** |
+| a new road or street (824) | 0.571 | 0.631 | 0.654 |
+| buildings demolished (286) | 0.297 | 0.138 | 0.234 |
+| trees or vegetation (462) | 0.159 | 0.182 | 0.186 |
+| a lake, pond, or water (19) | 0.151 | 0.221 | 0.096 |
+| **macro mAP (5 queries)** | **0.396** | 0.379 | 0.400 |
+
+(naive macro: GeoRSCLIP 0.409, CLIP 0.426, RemoteCLIP 0.413.)
+
+The five-query macro (~0.38–0.43) is held up by two strong queries and dragged by
+three weak ones, so the mean is the wrong summary. The honest reading is
+per-query: **building and road change — large, high-contrast, and described in
+the CLIP text tower's own vocabulary — are retrieved strongly (buildings ~0.8,
+roads ~0.6), while demolition, vegetation, and the 19-positive water class sit at
+or only just above their prevalence floors.** This is the same
+salience-proportional law the project finds everywhere: DEN's subtle spectral
+transitions recover to ≈0.20, QFabric construction types to ~0.27, and within
+LEVIR-CC itself salient construction recovers to ~0.8 while subtle land-cover and
+sparse classes stay near random. The earlier three-query headline (~0.55) was a
+macro over building/road/demolition only; adding the vegetation and water queries
+the loader always parsed does not weaken the engine — it shows the strong number
+was carried by the two construction queries, with demolition (0.30) already weak.
+The RS-pretrained encoders still gain from the directional Δ on the strong queries
+(RemoteCLIP and GeoRSCLIP zero-shot beat naive on buildings) — the same
+type-versus-transition split as QFabric. Reproduce: download `lcybuaa/LEVIR-CC`,
+build `levir_cc`, run `python -m scripts.benchmark_levir_cc` (writes per-query AP
+to `results/`).
 
 ### Error analysis — seasonal vs permanent
 

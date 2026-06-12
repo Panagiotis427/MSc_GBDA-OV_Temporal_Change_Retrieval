@@ -36,9 +36,12 @@ The low numbers are **not** primarily a "small subset" problem. The reassessment
   N≈2,476), discarding 3 of QFabric's 5 temporal dates **and** all polygon masks. A richer
   source exists (pentatemporal + change-type/status masks). More data tightens CIs but does not
   change the regime finding (end-state appearance > temporal Δ; zero-shot ≈ random).
-- **LEVIR-CC** — the **success case** (macro mAP ~0.50–0.57), but **under-utilized**: only the
-  test split + 3 queries were scored, and the loader already parses **vegetation + water tags
-  that have no queries**.
+- **LEVIR-CC** — the **success case**, but the ~0.50–0.57 was a 3-query macro carried by
+  buildings. **Broadened to 5 queries (2026-06-12, DONE)** by adding the vegetation + water
+  queries the loader always parsed: per-query AP exposes a salience gradient — buildings ~0.8,
+  roads ~0.6, demolition ~0.30, vegetation ~0.16, water ~0.15 (19 positives); 5-query macro
+  ~0.40. The strong number was real but construction-specific; subtle/sparse classes are
+  near-random. Still under-utilized on **splits** (test only) and **masks** (LEVIR-MCI, Track 2/3).
 
 So: the honest story is **purpose-mismatch + method ceiling**, plus genuine head-room in the
 change-captioning family. This plan acts on the head-room and retires the misleading framing.
@@ -66,12 +69,13 @@ cross-validated where applicable, vs the random-ranking floor — never a single
 | DEN (75-AOI, 5-fold CV, fraction relevance, 9 queries) | ~0.083 | global zero-shot **0.139 ± 0.024**; best patch_top3 **0.193 ± 0.051**; only **4/9** above random | weak |
 | QFabric change-type (N≈2,476, 6 queries) | 0.167 | naive **0.27**; zero-shot **0.18 ≈ random** | weak |
 | QFabric status (6 queries) | 0.045 | **0.057–0.084** | at floor |
-| LEVIR-CC (test, 3 queries) | 0.342 | **0.50–0.57** | strong |
+| LEVIR-CC (test, 5 queries, per-query) | 0.255 | buildings **~0.8** / roads **~0.6** strong; demolition/vegetation/water **~0.15–0.30** weak; macro **~0.40** | salience-split |
 
 The general claim: *open-vocabulary change retrieval with frozen CLIP-variant encoders recovers
-change in proportion to its visual salience — strong on large, high-contrast change
-(LEVIR ~0.55), at or barely above random on subtle land-cover change (DEN ~0.15) and
-construction-type retrieval (QFabric ~0.27).* The `0.426` is retired from all headlines.
+change in proportion to its visual salience — strong on large, high-contrast change (LEVIR
+construction ~0.6–0.8), at or barely above random on subtle land-cover change (DEN ~0.15, LEVIR
+vegetation/water ~0.15) and construction-type retrieval (QFabric ~0.27).* The same salience law
+holds **within** LEVIR-CC, not just across datasets. The `0.426` is retired from all headlines.
 
 ---
 
@@ -123,22 +127,32 @@ All tracks: **frozen backbones**, zero-shot + PEFT-light only, RTX 4060 (or burs
 edited** (`embeddings.py`, `retrieval.py`, `benchmark.py`, `train.py`, `app.py`,
 `scripts/run_pipeline.py`). See [`ARCHITECTURE.md`](ARCHITECTURE.md) / [`EXTENSIONS.md`](EXTENSIONS.md).
 
-### Track 0 — Disk audit (prerequisite)
+### Track 0 — Disk audit (prerequisite) — **DONE 2026-06-12**
 - `du` per-dataset on the 4060; reclaim; confirm head-room for the budget in §3.
 - **Verify:** free space ≥ projected total + 10% margin before any download.
+- **Outcome:** 56.6 GB free; data/ = 32.0 GB (QFabric 14.9 · DEN 8.4 · LEVIR-CC 5.0 ·
+  _torchgeo_labels 2.1 · cache 1.5). Reclaimed ~4 GB of redundant archives (`labels.tar.gz`,
+  `Levir-CC-dataset.zip` — extracted copies kept). PASS: worst-case +27 GB leaves ~30 GB spare.
+  Dead `_torchgeo_labels` (rejected DEN alt source, no code refs) flagged for later purge.
 
-### Track 1 — Honest reframe (no compute)
+### Track 1 — Honest reframe (no compute) — **DONE 2026-06-12 (verified)**
 - Retire `0.426` and every single-fold/single-query/single-mode "good case" from **headlines**
   in `REPORT.md`, `main.tex`, `README.md`, and stray quotes (e.g. `EXTENSIONS.md:12`).
 - Lead with the §1 true-to-purpose numbers and the salience claim.
 - Keep the `0.426 → 0.10` collapse as a **featured rigor example** in REPORT Appendix B
   (random baseline + permutation p + BH-FDR + 5-fold CV) — a strength, not a hidden footnote.
 - **Verify:** grep the repo for `0.426` and confirm every surviving instance is an explicit
-  cautionary/appendix context, never a headline.
+  cautionary/appendix context, never a headline. **PASS** — all `0.426` are data-table cells,
+  `single-split`-qualified, or cautionary; zero headlines. (Done in commits 33ba69f/1fa24ef/1977b42.)
 
 ### Track 2 — Data integration (new loaders + query sets)
-- **LEVIR-MCI:** extend the existing `levir_cc` path — add masks; use **all splits**; add the
-  **vegetation + water queries** the loader already supports but never exercised.
+- **LEVIR-CC 5-query broadening — DONE 2026-06-12:** added the vegetation + water queries the
+  loader always parsed (`src/queries/levir_cc.py`, queries-only edit). Per-query AP now persisted
+  to `results/` (`scripts/benchmark_levir_cc.py`). Result: salience gradient (buildings ~0.8,
+  roads ~0.6, demolition ~0.30, vegetation ~0.16, water ~0.15); 5-query macro ~0.40. Docs reframed
+  (REPORT §7.11, main.tex §levircc + abstract, README, STATUS, §1 above). 9 tests green.
+- **LEVIR-MCI:** extend the existing `levir_cc` path — add masks; use **all splits** (still test-only);
+  the **vegetation + water queries** are now exercised (above).
 - **SECOND-CC:** new `src/datasets/second_cc.py` (`TemporalDataset`) + `src/queries/second_cc.py`
   (queries spanning its 30 change categories); register.
 - **QFabric localization:** new loader serving the capped pentatemporal slice + polygon masks

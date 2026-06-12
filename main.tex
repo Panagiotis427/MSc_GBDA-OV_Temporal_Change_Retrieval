@@ -68,9 +68,11 @@ flip the tile's dominant class), and global-embedding dilution. Fixing the
 evaluation (pixel-fraction relevance) and the method (patch-level localised
 $\Delta$-scoring) recovers cross-validated mAP to $0.193 \pm 0.051$ and makes
 localised change-types --- new buildings and urban expansion, with new water
-borderline --- retrievable above chance for the first time. On LEVIR-CC, where building and road changes are
-salient and described in human language, the same frozen engine reaches
-$\approx$0.55 mAP, showing the recovered signal scales with change salience. The
+borderline --- retrievable above chance for the first time. On LEVIR-CC the same
+frozen engine retrieves salient building and road change strongly (per-query AP
+$\approx$0.6--0.8) but subtle vegetation and sparse water change only near their
+prevalence floors, so the open-vocabulary signal scales sharply with change
+salience. The
 recurring lesson is that spectral physics and spatial locality carry the signal,
 while global embeddings and learned visual priors dilute or memorise it, and that
 naive single-split numbers must not be trusted without cross-validation.
@@ -880,45 +882,52 @@ is set by task geometry rather than by the dataset.
 \label{sec:levircc}
 
 The third dataset tests the engine where change is visually salient and described
-in genuine human language. LEVIR-CC pairs are parsed into open-vocabulary change
-tags from their five captions (Section~\ref{sec:data}); three free-text queries
---- new buildings, a new road, buildings demolished --- are relevant to pairs
-whose captions carry the matching tag. On the held-out test split (1929 pairs,
-frozen encoders, RGB), Table~\ref{tab:levircc} reports macro mAP. The macro
-random-ranking baseline is the mean query prevalence, 0.342 (building 45.2\%,
-road 42.7\%, demolition 14.8\%).
+in genuine human language. LEVIR-CC pairs are parsed into five open-vocabulary
+change tags from their captions (Section~\ref{sec:data}) --- building, road,
+demolition, vegetation, water --- and one free-text query maps to each. On the
+held-out test split (1929 pairs, frozen encoders, RGB), Table~\ref{tab:levircc}
+reports per-query average precision and the five-query macro. The macro
+random-ranking baseline is the mean query prevalence, 0.255 (building 45.2\%,
+road 42.7\%, demolition 14.8\%, vegetation 23.9\%, water 1.0\%).
 
 \begin{table}[H]
     \centering
     \caption{LEVIR-CC open-vocabulary change retrieval (test split, 1929 pairs,
-    frozen, RGB; macro mAP over three caption-grounded queries). Random-ranking
-    baseline $\approx$0.342 (mean query prevalence). Best per row in bold.}
+    frozen, RGB; zero-shot average precision per query, with the five-query macro
+    mAP). Test positives per query in parentheses. Best per row in bold.}
     \label{tab:levircc}
-    \begin{tabular}{lcc}
+    \begin{tabular}{lccc}
         \toprule
-        \textbf{Encoder} & \textbf{naive} & \textbf{zero-shot} \\
+        \textbf{Query (positives)} & \textbf{GeoRSCLIP} & \textbf{CLIP ViT-L/14} & \textbf{RemoteCLIP} \\
         \midrule
-        GeoRSCLIP     & 0.540 & \textbf{0.557} \\
-        CLIP ViT-L/14 & \textbf{0.543} & 0.498 \\
-        RemoteCLIP    & 0.539 & \textbf{0.573} \\
+        new buildings or houses (871) & 0.804 & 0.725 & \textbf{0.830} \\
+        a new road or street (824)    & 0.571 & 0.631 & \textbf{0.654} \\
+        buildings demolished (286)    & \textbf{0.297} & 0.138 & 0.234 \\
+        trees or vegetation (462)     & 0.159 & 0.182 & \textbf{0.186} \\
+        a lake, pond, or water (19)   & 0.151 & \textbf{0.221} & 0.096 \\
+        \midrule
+        \textbf{macro mAP (5 queries)} & 0.396 & 0.379 & \textbf{0.400} \\
         \bottomrule
     \end{tabular}
 \end{table}
 
-Retrieval is strong --- 0.50 to 0.57 macro mAP, roughly $+0.2$ above the 0.342
-prevalence floor --- in sharp contrast to DEN, whose honest cross-validated
-ceiling is $\approx$0.20. The difference is the nature of the change: LEVIR-CC's
-new buildings and roads are large, high-contrast, and described in the same
-vocabulary the CLIP text tower was trained on, so a frozen encoder localises them
-readily, whereas DEN's directional spectral transitions are subtle and
-AOI-specific. The RS-pre-trained encoders gain from the directional $\Delta$
-(RemoteCLIP zero-shot 0.573 and GeoRSCLIP 0.557 both beat their naive scores),
-while general CLIP prefers after-image content (naive 0.543 over zero-shot 0.498)
---- the same type-versus-transition split seen on QFabric
-(Sections~\ref{sec:qfabric}, \ref{sec:qfabricstatus}). The lesson holds across all
-three datasets: the open-vocabulary engine recovers the change signal in
-proportion to its spatial and semantic salience --- strongly here, weakly on
-DEN's subtle transitions.
+The five-query macro (0.38--0.40 zero-shot; naive 0.41--0.43) is held up by two
+strong queries and dragged by three weak ones, so the mean is the wrong summary;
+the honest reading is per-query. Building and road change --- large,
+high-contrast, and described in the vocabulary the CLIP text tower was trained on
+--- are retrieved strongly (buildings $\approx$0.8, roads $\approx$0.6), whereas
+demolition, vegetation, and the 19-positive water class sit at or only just above
+their prevalence floors. This is the same salience-proportional law the project
+finds everywhere: DEN's subtle spectral transitions recover to $\approx$0.20,
+QFabric construction types to $\approx$0.27, and within LEVIR-CC itself salient
+construction recovers to $\approx$0.8 while subtle land-cover and sparse classes
+stay near random. The RS-pre-trained encoders still gain from the directional
+$\Delta$ on the strong queries (RemoteCLIP and GeoRSCLIP zero-shot beat their
+naive scores on buildings) --- the same type-versus-transition split seen on
+QFabric (Sections~\ref{sec:qfabric}, \ref{sec:qfabricstatus}). The lesson holds
+across all three datasets: the open-vocabulary engine recovers the change signal
+in proportion to its spatial and semantic salience --- strongly on salient
+construction, weakly on subtle or sparse change.
 
 \subsection{Error analysis --- seasonal vs permanent}
 \label{sec:erroranalysis}
@@ -1172,7 +1181,8 @@ a single best number: spectral physics and spatial locality carry the
 weak signal that exists, global embeddings and learned visual priors dilute or
 memorise it, and single-split scores must be cross-validated before they are
 believed. Across the three datasets the recovered signal tracks change salience:
-weak on DEN's subtle spectral transitions, dataset-dependent on QFabric, and
-strong ($\approx$0.55 mAP) on LEVIR-CC's salient, human-captioned building change.
+weak on DEN's subtle spectral transitions, dataset-dependent on QFabric, and ---
+within LEVIR-CC itself --- strong on salient building and road change (per-query
+AP $\approx$0.6--0.8) yet near-random on subtle vegetation and sparse water.
 
 \end{document}

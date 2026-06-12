@@ -4,18 +4,48 @@
   "split": "test",
   "color_mode": "rgb",
   "n_pairs": 1929,
-  "macro_prevalence_baseline": 0.3423,
+  "macro_prevalence_baseline": 0.2553,
   "query_prevalence": {
     "new buildings or houses constructed": 0.4515,
     "a new road or street built": 0.4272,
-    "buildings demolished or removed": 0.1483
+    "buildings demolished or removed": 0.1483,
+    "trees or vegetation cleared or grown": 0.2395,
+    "a lake, pond, or body of water": 0.0098
   },
   "approaches": {
     "naive": {
-      "macro_mAP": 0.5399
+      "macro_mAP": 0.4091,
+      "per_query_ap": {
+        "new buildings or houses constructed": 0.8241,
+        "a new road or street built": 0.593,
+        "buildings demolished or removed": 0.2025,
+        "trees or vegetation cleared or grown": 0.1843,
+        "a lake, pond, or body of water": 0.2417
+      },
+      "per_query_n_relevant": {
+        "new buildings or houses constructed": 871,
+        "a new road or street built": 824,
+        "buildings demolished or removed": 286,
+        "trees or vegetation cleared or grown": 462,
+        "a lake, pond, or body of water": 19
+      }
     },
     "zero_shot": {
-      "macro_mAP": 0.5574
+      "macro_mAP": 0.3964,
+      "per_query_ap": {
+        "new buildings or houses constructed": 0.8044,
+        "a new road or street built": 0.5707,
+        "buildings demolished or removed": 0.297,
+        "trees or vegetation cleared or grown": 0.1588,
+        "a lake, pond, or body of water": 0.1511
+      },
+      "per_query_n_relevant": {
+        "new buildings or houses constructed": 871,
+        "a new road or street built": 824,
+        "buildings demolished or removed": 286,
+        "trees or vegetation cleared or grown": 462,
+        "a lake, pond, or body of water": 19
+      }
     }
   }
 }

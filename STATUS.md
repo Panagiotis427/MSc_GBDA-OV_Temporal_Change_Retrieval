@@ -5,7 +5,7 @@ Machine-independent: read after `git pull` on any machine. What physically exist
 [`INVENTORY.md`](INVENTORY.md). Supersedes `NEXT_GBDA_STEPS.md` (folded here 2026-06-10;
 completed work lives in git history + [`REPORT.md`](REPORT.md)).*
 
-*Last meaningful update: **2026-06-10**.*
+*Last meaningful update: **2026-06-12**.*
 
 ---
 
@@ -38,16 +38,20 @@ Honest, audited numbers (random baseline + permutation p + BH-FDR + leakage-free
 
 ## 3. Running now
 
-Nothing executing. **Active direction (2026-06-12):** a data-expansion + honest-reframe plan is
-written and pending implementation — see [`docs/DATA_EXPANSION_PLAN.md`](docs/DATA_EXPANSION_PLAN.md).
-The prior deliverable gap-pass (§4) is complete; the new direction supersedes it as next work.
+Nothing executing. **Active direction (2026-06-12):** the data-expansion + honest-reframe plan
+([`docs/DATA_EXPANSION_PLAN.md`](docs/DATA_EXPANSION_PLAN.md)) is in implementation. **Done:**
+Track 0 (disk audit — 56.6 GB free, ~4 GB redundant archives reclaimed, gate PASS), Track 1
+(honest reframe — verified, zero stale `0.426` headlines), and the Track 2 **LEVIR-CC 5-query
+broadening** (added vegetation + water queries → salience gradient: buildings ~0.8, roads ~0.6,
+demolition/vegetation/water ~0.15–0.30; macro ~0.40; docs reframed; 9 tests green). **Next:**
+remaining Track 2 (LEVIR-MCI masks 2.77 GB, SECOND-CC, QFabric localization slice, DEN monthly)
+then Track 3 (localization/heatmap eval).
 
-> **⚠ On `laptop-4060`, before ANY dataset download (Track 0 of the plan):** the expansion is
-> **disk-gated** — 57 GB free, 32.7 GB already used, ~20–27 GB of new data projected (at/over the
-> ceiling). Run `du -sh data/* .model_cache` first (manifests are dir-level only, so the current
-> per-dataset breakdown is unknown), reclaim stale caches/duplicates to `trash/`, and confirm
-> head-room. **Never** pull the 298 GB EVER-Z QFabric parquet; cap the QFabric slice. Full budget:
-> [`docs/DATA_EXPANSION_PLAN.md §3`](docs/DATA_EXPANSION_PLAN.md) · [`INVENTORY.md`](INVENTORY.md).
+> **⚠ On `laptop-4060`, before ANY dataset download:** disk-gated. Track 0 cleared the gate
+> (56.6 GB free after reclaiming `labels.tar.gz` + `Levir-CC-dataset.zip` redundant archives to
+> `trash/`; ~30 GB worst-case spare). Still **never** pull the 298 GB EVER-Z QFabric parquet; cap
+> the QFabric slice. Full budget: [`docs/DATA_EXPANSION_PLAN.md §3`](docs/DATA_EXPANSION_PLAN.md)
+> · [`INVENTORY.md`](INVENTORY.md).
 
 ## 4. Next steps — course-deliverable gap pass (deliverable = written report + repo with presentation-grade README)
 
@@ -79,8 +83,9 @@ all written references repointed.*
 
 **Reassessed 2026-06-12.** Root cause of the weak numbers is **purpose-mismatch + method ceiling**,
 not subset size: DEN was used in full (75 AOIs, dense labels) and is source-maxed; QFabric was used
-in a reduced TEOChatlas form (no masks, 2/5 dates); LEVIR-CC (the ~0.50–0.57 success case) was
-under-utilized.
+in a reduced TEOChatlas form (no masks, 2/5 dates); LEVIR-CC was under-utilized (now broadened to
+5 queries: salient construction strong — buildings AP ~0.8, roads ~0.6 — subtle/sparse weak —
+demolition/vegetation/water ~0.15–0.30; 5-query macro ~0.40, was a 3-query ~0.55 carried by buildings).
 
 - **Committed (in the plan):** LEVIR-MCI (same images + building/road masks → localization eval),
   SECOND-CC (30 change categories → open-vocab breadth), QFabric pentatemporal + polygon masks
