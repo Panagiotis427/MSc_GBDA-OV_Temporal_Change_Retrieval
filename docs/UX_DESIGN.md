@@ -41,13 +41,18 @@ deployed as a HuggingFace Space). Goal: a sharp, public-facing demo.*
   on select**. Added `DATASET_PROFILES` (per-corpus root / split / colour / loader-extras) resolved
   in `reload()`, with a `loader_extra` dict on `RunConfig` threaded into `build_dataset` so QFabric's
   `labels_path` / `max_per_class` reach its loader. Verified all six load + return query results
-  in-app: LEVIR-CC (1929), LEVIR-MCI (1929), SECOND-CC (1227), QFabric-type (2476), DEN (110),
-  QFabric-status (4200). The dropdown is **sorted best-result-first** (`DATASET_RANK`): LEVIR-CC →
-  LEVIR-MCI → SECOND-CC → QFabric-type → DEN → QFabric-status. DEN stays the pre-selected default
-  (its curated examples are tuned to it). Profile roots are **Space-safe**: `reload()` falls back to
-  the current root when a profile's data dir is absent (e.g. the fixture-only HF Space), so a
-  non-fixture pick there errors gracefully instead of crashing. QFabric first query re-encodes its
-  crops (no matching app-tag cache) — a few seconds, progress shown.
+  in-app. **Dedup:** LEVIR-CC and LEVIR-MCI retrieve identically in-app (MCI's masks are
+  offline-script-only), so the dropdown keeps just the **MCI superset** entry (labelled "LEVIR-CC —
+  building/road change"); `levir_cc` stays registered for scripts. **QFabric:** both kept —
+  change-type (~0.27) and construction-status are *distinct tasks*, status just a weak demo
+  (≈ random), sorted last and labelled "(weak)". The dropdown is **sorted best-first** (`DATASET_RANK`):
+  LEVIR-CC, SECOND-CC, QFabric-type, Dynamic EarthNet, QFabric-status. **Default flipped to LEVIR-CC**
+  (best results → strongest first impression) with `zero_shot` (snappy; cached) and generic
+  cross-dataset example queries; DEN (the report's primary corpus, weakest absolute) is one click
+  away. `parse_args` now resolves root/split/colour/loader-extras from each dataset's profile, so
+  `python -m src.app` opens on LEVIR with no args. Profile roots are **Space-safe** (`reload()` falls
+  back to the current root when a profile dir is absent), and `app.py` pins the fixture-only HF Space
+  to `--dataset dynamic_earthnet`. QFabric first query re-encodes its crops (a few seconds, progress shown).
 
 ## Idea 1 — progressive disclosure (default view stays clean) · needs render
 Default view = **query box → ranked results**, nothing else. Everything verbose moves

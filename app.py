@@ -16,6 +16,10 @@ encoder = os.environ.get("ENCODER", "clip_vitl14")
 
 sys.argv = [
     "app.py",
+    # The Space ships only the Dynamic EarthNet fixture, so pin that dataset
+    # explicitly (the app's default corpus is now LEVIR-CC, whose data is not on
+    # the Space). Other corpora in the dropdown error gracefully here.
+    "--dataset", os.environ.get("DATASET", "dynamic_earthnet"),
     "--root", root,
     "--split", "all",
     "--encoder", encoder,
