@@ -135,6 +135,9 @@ def main() -> None:
                                           args.cache_dir, args.dataset)
         n_patch = P1.shape[1]
         side = int(round(n_patch ** 0.5))
+        if side * side != n_patch:           # _gt_patches assumes a square grid
+            raise ValueError(f"{enc_name}: non-square patch grid ({n_patch} patches); "
+                             "the localization metric needs a square grid")
         out = {"dataset": args.dataset, "encoder": enc_name, "split": args.split,
                "grid": f"{side}x{side}", "pos_thresh": args.pos_thresh, "classes": {}}
 

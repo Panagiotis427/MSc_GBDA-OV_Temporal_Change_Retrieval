@@ -56,7 +56,7 @@ Relevance is judged for **open-vocabulary temporal change *retrieval*** specific
 |---|---|---|---|
 | **LEVIR-MCI** ([`lcybuaa/LEVIR-MCI`](https://huggingface.co/datasets/lcybuaa/LEVIR-MCI)) | ★★★★★ — strict superset of the success case | **2.77 GB** | **COMMIT.** Same 10,077 pairs + 5 captions each **+ change-detection masks for buildings & roads** (40k+ masks). Adds pixel-level localization labels with the lowest possible friction. |
 | **SECOND-CC** ([arXiv 2501.10075](https://arxiv.org/html/2501.10075v1); base **SECOND**, 4,662 pairs / [captain-whu SCD](http://www.captain-whu.com/project/SCD)) | ★★★★★ — 6 land-cover classes → **30 change categories** | ~5 GB | **COMMIT.** 6,041 pairs / 30,205 captions, built to be harder/more diverse than LEVIR-CC. The genuine open-vocabulary **breadth** test the current datasets lack; SECOND base carries semantic change masks for localization. |
-| **QFabric (full / pentatemporal)** ([Granular AI](https://www.granular.ai/resources/blog/qfabric:-multi-task-change-detection-dataset); avoid [EVER-Z 298 GB](https://huggingface.co/datasets/EVER-Z/QFabric_mt_images_1024)) | ★★★ — regime-limited for retrieval; strong for localization | ~10–15 GB (capped) | **COMMIT (disk-gated).** 5 dates + polygon change-type/status masks. Buys **localization + time-step pinpointing**, not retrieval mAP. Use a capped slice — **never** the 298 GB EVER-Z parquet. |
+| **QFabric (full / pentatemporal)** (`labaerien/qfabric` HF, gated; avoid [EVER-Z 298 GB](https://huggingface.co/datasets/EVER-Z/QFabric_mt_images_1024)) | ★★★ — regime-limited for retrieval; strong for localization | ~3–5 GB (capped ~50 loc) | **COMMIT (access-gated).** 5 dates + polygon change-type/status masks. Buys **localization + time-step pinpointing**, not retrieval mAP. Capped ~50-location slice — **never** the 298 GB EVER-Z parquet. **Full spec → [`QFABRIC_FUTURE_WORK.md`](QFABRIC_FUTURE_WORK.md).** |
 | **DEN finer temporal** (existing frames) | ★★★ — time-step pinpointing the brief values | ~0 | **COMMIT.** No new imagery: add monthly (24-step) pairing alongside the current bimonthly to sharpen temporal localization. |
 | **DEN alternative sources** (TUM 525 GB raw, HEVC video, torchgeo) | — | — | **REJECT.** Same 75 AOIs, same monthly 7-class labels. No source adds change-type diversity or richer labels; source swap ≠ better data. |
 | **fMoW** ([arXiv 1711.07846](https://arxiv.org/abs/1711.07846)) | ★ — **no change labels** | — | **REJECT, with documented reasons (see §2).** |
@@ -105,7 +105,7 @@ imagery and must not** — it is docs/light-dev only.
 | current `data/` (DEN npy + QFabric crops + LEVIR-CC) | 32.7 GB | per-dataset breakdown **unknown** — `du` first (manifests are dir-level only) |
 | LEVIR-MCI | 2.77 GB | confirmed |
 | SECOND-CC | ~5 GB | estimate |
-| QFabric localization slice | ~10–15 GB | **capped**; never the 298 GB EVER-Z |
+| QFabric localization slice | ~3–5 GB | **capped ~50 loc** (5 dates × ~13 MB ≈ 65 MB/loc); never the 298 GB EVER-Z |
 | DEN monthly pairing | ~0 | reuses existing frames |
 | new embedding caches (all) | ~2–4 GB | `.npz`, keyed by split + color mode |
 | **projected total** | **~53–60 GB** | **at/over the 57 GB ceiling** |
@@ -163,8 +163,10 @@ edited** (`embeddings.py`, `retrieval.py`, `benchmark.py`, `train.py`, `app.py`,
   zs ~0.33 / naive ~0.45 vs prevalence floor 0.30 — every change type clears random (unlike DEN) but
   modestly; naive > zero-shot (end-state content > temporal Δ, as on QFabric). Localization via the
   semantic maps in Track 3. REPORT §7.13.
-- **QFabric localization:** new loader serving the capped pentatemporal slice + polygon masks
-  (extends, does not replace, `qfabric_teo`); reuse `max_per_class` capping.
+- **QFabric localization (access-gated — full spec [`QFABRIC_FUTURE_WORK.md`](QFABRIC_FUTURE_WORK.md)):**
+  new loader serving the capped pentatemporal slice + rasterized COCO polygon masks (sits beside,
+  does not replace, `qfabric_teo`); reuse `max_per_class` capping; same `load_change_mask`/`has_mask`
+  interface as `levir_mci`/`second_cc` so `eval_localization.py --dataset` picks it up.
 - **DEN finer temporal — DONE 2026-06-12:** added `--pairing` to `scripts/patch_eval.py`
   (additive; bimonthly cache/numbers untouched — non-default pairings get their own cache/results
   suffix). Monthly (all 24 frames, 1725 pairs) GeoRSCLIP NRG `patch_top3` = **CV mAP 0.138 ± 0.046**

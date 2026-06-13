@@ -82,11 +82,16 @@ def test_class_change_mask(ds):
     p = next(p for p in ds.list_pairs() if p.location_id == "00001_0_0")
     bm = ds.load_change_mask(p, "building")
     tm = ds.load_change_mask(p, "tree")
-    anych = ds.load_change_mask(p)
     assert bm.dtype == bool and bm.sum() == 9
     assert tm.sum() == 4
-    assert anych.sum() == 13          # 9 + 4 changed pixels
     assert not (bm & tm).any()
+    # change_class=None -> uint8 class-index map of the change (T2 class where changed,
+    # 0 elsewhere), matching LevirMCIDataset's contract.
+    idx = ds.load_change_mask(p)
+    assert idx.dtype == np.uint8
+    assert (idx > 0).sum() == 13                              # 9 building + 4 tree changed
+    assert (idx == CLASS_TO_INDEX["building"]).sum() == 9
+    assert (idx == CLASS_TO_INDEX["tree"]).sum() == 4
 
 
 def test_transition_mask(ds):

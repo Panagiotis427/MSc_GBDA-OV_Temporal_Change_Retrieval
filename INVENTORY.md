@@ -44,7 +44,8 @@ freed. **Disk now: ~55 GB free.**
 
 ## QFabric expansion (pending access)
 
-The remaining committed dataset is the pentatemporal + polygon-mask **QFabric** slice
+The remaining committed dataset is the pentatemporal + polygon-mask **QFabric** slice — full
+pickup-cold spec in [`docs/QFABRIC_FUTURE_WORK.md`](docs/QFABRIC_FUTURE_WORK.md)
 ([`docs/DATA_EXPANSION_PLAN.md`](docs/DATA_EXPANSION_PLAN.md) Track 2/3). Source:
 `labaerien/qfabric` (HF, **gated — access request awaiting Lab Aérien review**). Plan: pull a
 **capped ~50-location slice** (5 dates + COCO polygon vectors, ~3–5 GB) — **never** the 298 GB

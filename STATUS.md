@@ -33,7 +33,7 @@ Honest, audited numbers (random baseline + permutation p + BH-FDR + leakage-free
 - **Cross-dataset breadth (§7.11/7.13):** LEVIR-CC 5-query — salient construction strong (buildings AP ~0.8, roads ~0.6), subtle/sparse weak (~0.15–0.30), macro ~0.40. SECOND-CC 7-query — every type clears its prevalence floor but modestly (zero-shot macro ~0.33 vs floor 0.30; naive ~0.45 > zero-shot). Same salience law as DEN, wider vocabulary.
 - **Localization (§7.12/7.13, LEVIR-MCI + SECOND-CC masks):** the query-conditioned change heatmap is a *weak* localizer — pointing-game lift within ±0.04–0.10 of the random-patch floor; only road on RS-pretrained encoders is clearly positive. Localizing change is harder than retrieving it.
 - Ruled-out approaches documented in REPORT Appendix B (B.9, B.11, B.12) — do not re-propose.
-- Engine **deployed on HF Space**; tests **250 passed, 1 skipped** (~3 min, shared venv).
+- Engine **deployed on HF Space**; tests **256 passed, 1 skipped** (~90 s, shared venv).
 
 ## 3. Running now
 
@@ -67,6 +67,8 @@ leakage-free CV PEFT (NRG 0.196 ± 0.049) *overlaps* frozen zero-shot (0.139 ± 
 BLOCKED on external access:** QFabric pentatemporal + polygon masks via `labaerien/qfabric` (HF,
 **gated — access request awaiting Lab Aérien review**); plan = capped ~50-location slice (~3–5 GB,
 never the 298 GB EVER-Z). A session watcher polls access every 2h and auto-starts the build on grant.
+**Full pickup-cold spec (description, role, access, on-disk layout, build steps, watcher):
+[`docs/QFABRIC_FUTURE_WORK.md`](docs/QFABRIC_FUTURE_WORK.md).**
 
 > **⚠ On `laptop-4060`, before the QFabric download:** disk-gated but clear — **~55 GB free**
 > after the full expansion + ~14 GB reclaimed (redundant archives, dead `_torchgeo_labels`, and the
