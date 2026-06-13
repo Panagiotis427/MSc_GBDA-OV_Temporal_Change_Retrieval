@@ -51,8 +51,8 @@ build below. The probe:
 ```bash
 python -c "from huggingface_hub import hf_hub_download; hf_hub_download('labaerien/qfabric','vectors/random-split-1_2023_02_05-11_47_30/COCO/63df8f4e08b5b0034d8044eb.json',repo_type='dataset'); print('GRANTED')"
 ```
-Caveat: the watcher is **session-only** (dies if the local session closes) and auto-expires in
-7 days. If it lapses, just re-run the probe manually once the HF approval email lands.
+Caveat: the watcher is **session-only** (it lives only in the local session that scheduled it) and
+auto-expires in 7 days. If it lapses, just re-run the probe manually once the HF approval email lands.
 
 ## 3. On-disk structure of the `labaerien/qfabric` mirror
 
