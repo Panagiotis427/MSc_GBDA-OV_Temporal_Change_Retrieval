@@ -1493,5 +1493,9 @@ This corrects an earlier summary that cited the **RGB** colour mode's lower CV P
 against the **NRG** zero-shot (0.100), a colour-mode mismatch; the matched-NRG comparison is the one
 above. The project conclusion is unchanged in spirit — low-compute fine-tuning is not shown to help
 retrieval OOD — but the honest statement is *"PEFT ≈ frozen within variance,"* not *"PEFT collapses
-below frozen."* Artifact: `results/peft_augment__georsclip__nrg.json`. Reproduce:
+below frozen."* **This reinforces, rather than weakens, the headline:** under leakage-free CV, frozen
+zero-shot (0.139), patch_top3 (0.193, B.10) and PEFT (0.196) all land within fold variance of the
+**~0.20 frozen-VLM ceiling** — the method barely moves the result, which is exactly the point: the
+ceiling is intrinsic to frozen CLIP-variant embeddings on subtle land-cover change, not an artefact
+of which adapter or scorer is used. Artifact: `results/peft_augment__georsclip__nrg.json`. Reproduce:
 `python -m scripts.peft_augment_eval --encoder georsclip --color-mode nrg --folds 5`.
