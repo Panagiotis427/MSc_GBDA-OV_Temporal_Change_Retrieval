@@ -36,15 +36,18 @@ deployed as a HuggingFace Space). Goal: a sharp, public-facing demo.*
   consolidates: what it is, honest expectations, the four approaches, how to read the match score +
   heatmap, and the corpus selector note. Default view stays clean (collapsed); the verbose
   explanation no longer clutters the query area.
-- **Dataset switching actually works now (functional fix, was broken).** The Dataset dropdown
-  listed every corpus but `reload()` reused the DEN root, so picking LEVIR-CC / LEVIR-MCI / SECOND-CC
-  / QFabric **errored on select**. Added `DATASET_PROFILES` (per-corpus root / split / colour) and
-  resolved it in `reload()`; verified DEN (110), LEVIR-CC (1929), SECOND-CC (1227), LEVIR-MCI (1929)
-  all load + return query results in-app. The session's new datasets (SECOND-CC, LEVIR-MCI) are now
-  genuinely usable, not just labelled. **QFabric (`qfabric_teo`/`qfabric_status`) is dropped from the
-  app dropdown** — its loader needs extra args (`labels_path`, `max_per_class`) and a custom-tagged
-  cache the app path doesn't supply, so it errored on select; it stays fully usable via
-  `scripts/benchmark_qfabric.py`. (`_app_dataset_choices()` = query-set ∩ profile.)
+- **All processed corpora are switchable in-app now (functional fix, was broken).** The Dataset
+  dropdown listed corpora but `reload()` reused the DEN root, so picking anything non-DEN **errored
+  on select**. Added `DATASET_PROFILES` (per-corpus root / split / colour / loader-extras) resolved
+  in `reload()`, with a `loader_extra` dict on `RunConfig` threaded into `build_dataset` so QFabric's
+  `labels_path` / `max_per_class` reach its loader. Verified all six load + return query results
+  in-app: LEVIR-CC (1929), LEVIR-MCI (1929), SECOND-CC (1227), QFabric-type (2476), DEN (110),
+  QFabric-status (4200). The dropdown is **sorted best-result-first** (`DATASET_RANK`): LEVIR-CC →
+  LEVIR-MCI → SECOND-CC → QFabric-type → DEN → QFabric-status. DEN stays the pre-selected default
+  (its curated examples are tuned to it). Profile roots are **Space-safe**: `reload()` falls back to
+  the current root when a profile's data dir is absent (e.g. the fixture-only HF Space), so a
+  non-fixture pick there errors gracefully instead of crashing. QFabric first query re-encodes its
+  crops (no matching app-tag cache) — a few seconds, progress shown.
 
 ## Idea 1 — progressive disclosure (default view stays clean) · needs render
 Default view = **query box → ranked results**, nothing else. Everything verbose moves

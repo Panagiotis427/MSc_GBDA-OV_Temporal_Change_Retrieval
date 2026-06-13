@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import argparse
 import traceback
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional
 
@@ -80,6 +80,7 @@ def _labeled(choices, labels):
 # ``__test`` caches. Datasets *not* listed here are excluded from the app dropdown
 # (e.g. QFabric needs extra loader args + a custom-tagged cache — use its
 # benchmark scripts). Paths are repo-relative.
+_QFABRIC_CROPS = str(_PROJECT_ROOT / "data" / "QFabric" / "teochat_crops")
 DATASET_PROFILES = {
     "dynamic_earthnet": {"root": str(_PROJECT_ROOT / "data" / "DynamicEarthNet"),
                          "split": "test", "pairing": "bimonthly"},
@@ -89,13 +90,32 @@ DATASET_PROFILES = {
                   "split": "test", "color_mode": "rgb"},
     "second_cc": {"root": str(_PROJECT_ROOT / "data" / "_second_cc" / "extracted" / "SECOND-CC-AUG"),
                   "split": "test", "color_mode": "rgb"},
+    "qfabric_teo": {"root": _QFABRIC_CROPS, "split": None, "color_mode": "rgb",
+                    "loader_extra": {"labels_path": str(_PROJECT_ROOT / "data" / "QFabric"
+                                                        / "qfabric_teo_labels.json"),
+                                     "max_per_class": 120}},
+    "qfabric_status": {"root": _QFABRIC_CROPS, "split": None, "color_mode": "rgb",
+                       "loader_extra": {"labels_path": str(_PROJECT_ROOT / "data" / "QFabric"
+                                                           / "qfabric_status_labels.json"),
+                                        "max_per_class": 120}},
+}
+
+# Peak retrieval mAP achieved per dataset (REPORT §7), used only to sort the app
+# dropdown best-first so the strongest corpora surface at the top. (LEVIR salient
+# construction ~0.8; SECOND-CC buildings ~0.7; QFabric change-type ~0.27; DEN
+# patch_top3 ~0.19; QFabric status ~0.08.)
+DATASET_RANK = {
+    "levir_cc": 0.83, "levir_mci": 0.83, "second_cc": 0.70,
+    "qfabric_teo": 0.27, "dynamic_earthnet": 0.19, "qfabric_status": 0.08,
 }
 
 
 def _app_dataset_choices() -> list:
     """Datasets offered in the app dropdown: those with a query set AND a launch
-    profile (so switching to them in the UI actually loads them)."""
-    return [d for d in _app_datasets() if d in DATASET_PROFILES]
+    profile (so switching to them in the UI actually loads them), sorted by best
+    achieved result (descending) so the strongest corpora appear first."""
+    profiled = [d for d in _app_datasets() if d in DATASET_PROFILES]
+    return sorted(profiled, key=lambda d: -DATASET_RANK.get(d, 0.0))
 
 
 @dataclass
@@ -123,6 +143,9 @@ class RunConfig:
     geo_filter: bool = False        # enable geographic region filtering
     rerank: bool = False            # enable post-retrieval re-ranking
     rerank_strategy: str = "diversity"  # diversity | coherence
+    # Extra loader kwargs forwarded to build_dataset (e.g. QFabric's labels_path /
+    # max_per_class). Empty for the simple root+split datasets.
+    loader_extra: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -191,7 +214,8 @@ class SemanticChangeSearch:
         from src.embeddings import cache_tag_for
         self.dataset = build_dataset(cfg.dataset, root=cfg.root,
                                      pairing=cfg.pairing, split=cfg.split,
-                                     color_mode=cfg.color_mode)
+                                     color_mode=cfg.color_mode,
+                                     **cfg.loader_extra)
         self.encoder = get_encoder(cfg.encoder)
 
         # Canonical cache tag (single source of truth in src.embeddings) so the
@@ -414,7 +438,11 @@ class SemanticChangeSearch:
             # the right directory/split/colour. DEN honours the colour dropdown;
             # other corpora pin colour (rgb) via the profile.
             prof = DATASET_PROFILES.get(dataset, {})
-            root = prof.get("root", self.cfg.root)
+            prof_root = prof.get("root")
+            # Use the profile's data dir when it exists; otherwise keep the current
+            # root (e.g. on the fixture-only HF Space, where the real corpora are
+            # absent — switching to a non-fixture dataset then errors gracefully).
+            root = prof_root if prof_root and Path(prof_root).exists() else self.cfg.root
             split = prof.get("split", self.cfg.split)
             pairing = prof.get("pairing", self.cfg.pairing)
             color = prof.get("color_mode", color_mode)
@@ -425,6 +453,7 @@ class SemanticChangeSearch:
                 color_mode=color, use_lora=use_lora,
                 geo_filter=self.cfg.geo_filter, rerank=self.cfg.rerank,
                 rerank_strategy=self.cfg.rerank_strategy,
+                loader_extra=prof.get("loader_extra", {}),
             )
             self._build(self.cfg)
             lora_note = " + LoRA" if use_lora else ""

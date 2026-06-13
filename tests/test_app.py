@@ -83,20 +83,26 @@ def test_peft_without_adapter_errors(engine):
 
 
 def test_dataset_profiles_contract():
-    """The in-app Dataset dropdown must only offer corpora that actually load
-    (a launch profile + a registered query set), with colour pinned correctly."""
+    """The in-app Dataset dropdown offers every processed corpus (a launch profile
+    + a registered query set), colour pinned correctly, sorted best-result-first."""
     import os
-    from src.app import DATASET_PROFILES, _app_dataset_choices
+    from src.app import DATASET_PROFILES, DATASET_RANK, _app_dataset_choices
     from src.queries import get_queries
 
     for ds, prof in DATASET_PROFILES.items():
         assert get_queries(ds), f"{ds} has no query set"
         assert os.path.isabs(prof["root"]), f"{ds} root not absolute"
+        assert ds in DATASET_RANK, f"{ds} has no rank for sorting"
     # DEN honours the colour dropdown (no pinned colour); other corpora are rgb-only
     assert "color_mode" not in DATASET_PROFILES["dynamic_earthnet"]
-    for ds in ("levir_cc", "levir_mci", "second_cc"):
+    for ds in ("levir_cc", "levir_mci", "second_cc", "qfabric_teo", "qfabric_status"):
         assert DATASET_PROFILES[ds]["color_mode"] == "rgb"
-    # dropdown = query-set ∩ profile; QFabric (needs extra loader args) is excluded
-    choices = set(_app_dataset_choices())
-    assert choices == set(DATASET_PROFILES)
-    assert "qfabric_teo" not in choices and "qfabric_status" not in choices
+    # QFabric loaders need their label paths threaded as loader_extra
+    for ds in ("qfabric_teo", "qfabric_status"):
+        assert "labels_path" in DATASET_PROFILES[ds]["loader_extra"], ds
+    # dropdown = query-set ∩ profile (all processed corpora), sorted best-first
+    choices = _app_dataset_choices()
+    assert set(choices) == set(DATASET_PROFILES)
+    assert "qfabric_teo" in choices and "qfabric_status" in choices
+    ranks = [DATASET_RANK[d] for d in choices]
+    assert ranks == sorted(ranks, reverse=True), f"dropdown not best-first: {choices}"
