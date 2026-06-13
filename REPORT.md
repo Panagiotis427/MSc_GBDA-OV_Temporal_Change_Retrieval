@@ -20,7 +20,11 @@ retrieval; evaluation was a synthetic identity hack; no data). We repaired the
 correctness bugs, built the missing change-retrieval core, added a
 label-grounded benchmark, implemented PEFT training, finished/added the three
 encoders, rewired the Gradio app, and validated everything on a deterministic
-fixture and on real Dynamic EarthNet.
+fixture and on real Dynamic EarthNet. The dataset-agnostic design was then
+exercised on three further datasets — QFabric (construction change-types),
+LEVIR-CC/MCI (human-captioned building/road change) and SECOND-CC (a seven-class
+open vocabulary) — and the change-heatmap deliverable was made quantitative using
+the LEVIR-MCI and SECOND-CC pixel masks (§7.8–§7.13).
 
 Training-set fit (real DEN, train split, 605 pairs — the **PEFT column is the adapter scored on
 its own training pairs**, i.e. memorisation capacity, not a retrieval result; see §7.1):

@@ -5,7 +5,7 @@ Machine-independent: read after `git pull` on any machine. What physically exist
 [`INVENTORY.md`](INVENTORY.md). Supersedes `NEXT_GBDA_STEPS.md` (folded here 2026-06-10;
 completed work lives in git history + [`REPORT.md`](REPORT.md)).*
 
-*Last meaningful update: **2026-06-12**.*
+*Last meaningful update: **2026-06-13**.*
 
 ---
 
@@ -30,14 +30,17 @@ Honest, audited numbers (random baseline + permutation p + BH-FDR + leakage-free
 - B.13 query-gated hybrid 0.186 ± 0.051 (4/9) — within noise; geometry routing doesn't help (closed).
 - Global zero-shot 0.139 ± 0.024 (2/9); full-corpus macro 0.116; **0.426 = lucky single fold, never cite**.
 - PEFT: high in-distribution train-fit is memorisation; leakage-free CV PEFT (NRG 0.196 ± 0.049) overlaps frozen zero-shot (0.139 ± 0.024) within fold variance — no clear OOD gain, not a collapse (B.5/B.9/B.14; RGB lower at 0.049). Feature-noise augmentation doesn't help (B.14). Seasonal gate FPR→0 at thr ≥ 0.05.
+- **Cross-dataset breadth (§7.11/7.13):** LEVIR-CC 5-query — salient construction strong (buildings AP ~0.8, roads ~0.6), subtle/sparse weak (~0.15–0.30), macro ~0.40. SECOND-CC 7-query — every type clears its prevalence floor but modestly (zero-shot macro ~0.33 vs floor 0.30; naive ~0.45 > zero-shot). Same salience law as DEN, wider vocabulary.
+- **Localization (§7.12/7.13, LEVIR-MCI + SECOND-CC masks):** the query-conditioned change heatmap is a *weak* localizer — pointing-game lift within ±0.04–0.10 of the random-patch floor; only road on RS-pretrained encoders is clearly positive. Localizing change is harder than retrieving it.
 - Ruled-out approaches documented in REPORT Appendix B (B.9, B.11, B.12) — do not re-propose.
-- Engine **deployed on HF Space**; tests 233 passed (fast suite ~2 min, shared venv).
+- Engine **deployed on HF Space**; tests **250 passed, 1 skipped** (~3 min, shared venv).
 
 ## 3. Running now
 
-Nothing executing. **Active direction (2026-06-12):** the data-expansion + honest-reframe plan
-([`docs/DATA_EXPANSION_PLAN.md`](docs/DATA_EXPANSION_PLAN.md)) is in implementation. **Done:**
-Track 0 (disk audit — 56.6 GB free, ~4 GB redundant archives reclaimed, gate PASS), Track 1
+Nothing executing. **Status (2026-06-13):** the data-expansion + honest-reframe plan
+([`docs/DATA_EXPANSION_PLAN.md`](docs/DATA_EXPANSION_PLAN.md)) is **complete through Tracks 0–4**;
+the only remaining item, QFabric, is blocked on external access (below). **Done:**
+Track 0 (disk audit + cleanup — ~14 GB reclaimed across both repos, now ~55 GB free), Track 1
 (honest reframe — verified, zero stale `0.426` headlines), and the Track 2 **LEVIR-CC 5-query
 broadening** (added vegetation + water queries → salience gradient: buildings ~0.8, roads ~0.6,
 demolition/vegetation/water ~0.15–0.30; macro ~0.40; docs reframed; 9 tests green). **Next:**
@@ -56,14 +59,19 @@ public, CC-BY-4.0; the captioned superset, **not** the captionless SECOND base):
 open-vocab **breadth** test: across 7 change types every query clears its prevalence floor (unlike
 DEN) but modestly — zero-shot macro ~0.33 / naive ~0.45 vs floor 0.30; buildings ~0.70 dominate,
 water/playground weak; naive > zero-shot (end-state > Δ). Localization weak (lifts ±0.04, matches
-LEVIR-MCI). REPORT §7.13. **Next (BLOCKED on external access):** QFabric pentatemporal — needs
-Granular login or a capped extraction; deferred pending access.
+LEVIR-MCI). REPORT §7.13. **Track 4 DONE** — anti-memorization check
+(`scripts/peft_augment_eval.py`): embedding-space feature-noise does not help PEFT (σ=0.25 → 0.206
+within noise of no-aug 0.196; degrades higher). It also surfaced + fixed a mis-cited claim — matched
+leakage-free CV PEFT (NRG 0.196 ± 0.049) *overlaps* frozen zero-shot (0.139 ± 0.024), not the RGB
+0.049 some summaries paired against NRG (REPORT B.14; all docs aligned). **Only remaining item —
+BLOCKED on external access:** QFabric pentatemporal + polygon masks via `labaerien/qfabric` (HF,
+**gated — access request awaiting Lab Aérien review**); plan = capped ~50-location slice (~3–5 GB,
+never the 298 GB EVER-Z). A session watcher polls access every 2h and auto-starts the build on grant.
 
-> **⚠ On `laptop-4060`, before ANY dataset download:** disk-gated. Track 0 cleared the gate
-> (56.6 GB free after reclaiming `labels.tar.gz` + `Levir-CC-dataset.zip` redundant archives to
-> `trash/`; ~30 GB worst-case spare). Still **never** pull the 298 GB EVER-Z QFabric parquet; cap
-> the QFabric slice. Full budget: [`docs/DATA_EXPANSION_PLAN.md §3`](docs/DATA_EXPANSION_PLAN.md)
-> · [`INVENTORY.md`](INVENTORY.md).
+> **⚠ On `laptop-4060`, before the QFabric download:** disk-gated but clear — **~55 GB free**
+> after the full expansion + ~14 GB reclaimed (redundant archives, dead `_torchgeo_labels`, and the
+> `_levir_cc` duplicate deduped onto the LEVIR-MCI dir). Ample for a capped QFabric slice; still
+> **never** pull the 298 GB EVER-Z parquet. Current `data/` breakdown → [`INVENTORY.md`](INVENTORY.md).
 
 ## 4. Next steps — course-deliverable gap pass (deliverable = written report + repo with presentation-grade README)
 

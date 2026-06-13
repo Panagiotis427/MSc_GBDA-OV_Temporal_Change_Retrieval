@@ -21,20 +21,34 @@ scan date. Repo status → [`STATUS.md`](STATUS.md).*
 
 | manifest | last scan | notes |
 |---|---|---|
-| [`inventory/laptop-4060.md`](inventory/laptop-4060.md) | 2026-06-10 | `data/` 32.7 GB / 271,860 files; `.model_cache/` 3.8 GB (RemoteCLIP etc.); **`main.tex` = gitignored single copy** |
+| [`inventory/laptop-4060.md`](inventory/laptop-4060.md) | **regen pending (post-expansion)** | stale @ 2026-06-10 (`data/` 32.7 GB pre-expansion); current `data/` ≈ 30 GB after adding LEVIR-MCI/SECOND-CC and reclaiming ~14 GB — re-run `make_inventory.ps1` for the exact breakdown |
 | `inventory/macbook.md` | — pending | `bash ops/make_inventory.sh macbook`, commit |
 | [`inventory/cloud.md`](inventory/cloud.md) | 2026-06-10 | remotes, HF Space, dataset pointers |
 
-## Planned-expansion disk constraint (2026-06-12)
+*`main.tex` is tracked in git (not a gitignored single copy).*
 
-The data-expansion plan ([`docs/DATA_EXPANSION_PLAN.md`](docs/DATA_EXPANSION_PLAN.md) §3) is
-**disk-gated**: `laptop-4060` reports **57 GB free** with **32.7 GB already in `data/`**, and the
-committed datasets add ~20–27 GB (LEVIR-MCI 2.77 GB · SECOND-CC ~5 GB · QFabric localization slice
-~10–15 GB capped · embedding caches ~2–4 GB) — projecting to **~53–60 GB, at/over the ceiling**.
-**Prerequisite:** run a per-dataset `du -sh data/*` on the 4060 (manifests are dir-level only, so
-the current 32.7 GB breakdown is unknown) and reclaim stale caches/duplicates before downloading.
-Never pull the 298 GB EVER-Z QFabric parquet; cap the QFabric slice. No dataset imagery on the
-MacBook.
+## Datasets on disk (`data/`, gitignored; 2026-06-13)
+
+| dataset | dir | ~size | role |
+|---|---|---|---|
+| Dynamic EarthNet | `data/DynamicEarthNet/` | 8.4 GB | primary; DEN npy + torchgeo meta |
+| QFabric (TEOChatlas) | `data/QFabric/` | 14.9 GB | `qfabric_teo` + `qfabric_status` crops |
+| LEVIR-CC **and** LEVIR-MCI | `data/_levir_mci/extracted/LEVIR-MCI-dataset/` | 2.6 GB | one shared copy — MCI is a strict superset of CC (identical pairs + captions + change masks); both `levir_cc` and `levir_mci` loaders read it |
+| SECOND-CC | `data/_second_cc/extracted/SECOND-CC-AUG/` | 2.4 GB | captioned six-class land-cover change + per-phase semantic maps |
+| embedding/patch caches | `data/cache/` | ~2–3 GB | `.npz` global + patch + localization caches |
+
+**Reclaimed this expansion (2026-06-12):** redundant download archives (LEVIR-MCI/SECOND-CC zips,
+SECOND base zip/rar, `labels.tar.gz`, `Levir-CC-dataset.zip`), the dead `_torchgeo_labels` (rejected
+DEN alt source), and the duplicate `_levir_cc/extracted` (deduped onto the LEVIR-MCI dir) — ~14 GB
+freed. **Disk now: ~55 GB free.**
+
+## QFabric expansion (pending access)
+
+The remaining committed dataset is the pentatemporal + polygon-mask **QFabric** slice
+([`docs/DATA_EXPANSION_PLAN.md`](docs/DATA_EXPANSION_PLAN.md) Track 2/3). Source:
+`labaerien/qfabric` (HF, **gated — access request awaiting Lab Aérien review**). Plan: pull a
+**capped ~50-location slice** (5 dates + COCO polygon vectors, ~3–5 GB) — **never** the 298 GB
+EVER-Z parquet. ~55 GB free is ample for the capped slice. No dataset imagery on the MacBook.
 
 ## How to add / refresh a machine
 
