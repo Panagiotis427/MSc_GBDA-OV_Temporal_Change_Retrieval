@@ -14,7 +14,10 @@
   `.model_cache/` (see machine manifests)
 - Hub private repos: none yet (cold-archive option if artifacts outgrow git)
 
-## Download-pointers (canonical sources — never redistributed)
+## Download-pointers (how *we* source each dataset — never redistributed)
+
+*Operational notes only (which loader, where stored). Full external link catalog (papers, mirrors,
+model weights) → [`../docs/Common_Resources.md`](../docs/Common_Resources.md) §1.*
 
 - **Dynamic EarthNet**: official source (earthnet.tech) — local copy in `data/` (laptop manifest)
 - **QFabric**: via `jirvin16/TEOChatlas` parsed subsets (`qfabric_teo`, `qfabric_status`)

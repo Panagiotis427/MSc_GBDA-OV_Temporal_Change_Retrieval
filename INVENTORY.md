@@ -21,26 +21,29 @@ scan date. Repo status → [`STATUS.md`](STATUS.md).*
 
 | manifest | last scan | notes |
 |---|---|---|
-| [`inventory/laptop-4060.md`](inventory/laptop-4060.md) | **regen pending (post-expansion)** | stale @ 2026-06-10 (`data/` 32.7 GB pre-expansion); current `data/` ≈ 30 GB after adding LEVIR-MCI/SECOND-CC and reclaiming ~14 GB — re-run `make_inventory.ps1` for the exact breakdown |
+| [`inventory/laptop-4060.md`](inventory/laptop-4060.md) | **regen pending (post-expansion)** | stale @ 2026-06-10 (`data/` 32.7 GB pre-expansion); current `data/` = **42 GB** (measured 2026-06-13; breakdown below) — re-run `make_inventory.ps1` to refresh the committed manifest |
 | `inventory/macbook.md` | — pending | `bash ops/make_inventory.sh macbook`, commit |
 | [`inventory/cloud.md`](inventory/cloud.md) | 2026-06-10 | remotes, HF Space, dataset pointers |
 
 *`main.tex` is tracked in git (not a gitignored single copy).*
 
-## Datasets on disk (`data/`, gitignored; 2026-06-13)
+## Datasets on disk (`data/` = 42 GB, gitignored; measured 2026-06-13)
 
-| dataset | dir | ~size | role |
+| dataset | dir | size | role |
 |---|---|---|---|
-| Dynamic EarthNet | `data/DynamicEarthNet/` | 8.4 GB | primary; DEN npy + torchgeo meta |
-| QFabric (TEOChatlas) | `data/QFabric/` | 14.9 GB | `qfabric_teo` + `qfabric_status` crops |
-| LEVIR-CC **and** LEVIR-MCI | `data/_levir_mci/extracted/LEVIR-MCI-dataset/` | 2.6 GB | one shared copy — MCI is a strict superset of CC (identical pairs + captions + change masks); both `levir_cc` and `levir_mci` loaders read it |
-| SECOND-CC | `data/_second_cc/extracted/SECOND-CC-AUG/` | 2.4 GB | captioned six-class land-cover change + per-phase semantic maps |
-| embedding/patch caches | `data/cache/` | ~2–3 GB | `.npz` global + patch + localization caches |
+| QFabric (TEOChatlas) | `data/QFabric/` | 16 GB | `qfabric_teo` + `qfabric_status` crops |
+| embedding/patch caches | `data/cache/` | 11 GB | `.npz` global + patch + localization caches (regenerable; biggest reclaimable if disk gets tight) |
+| Dynamic EarthNet | `data/DynamicEarthNet/` | 8.7 GB | primary; DEN npy + torchgeo meta |
+| SECOND-CC | `data/_second_cc/extracted/SECOND-CC-AUG/` | 4.3 GB | captioned six-class land-cover change + per-phase semantic maps |
+| LEVIR-CC **and** LEVIR-MCI | `data/_levir_mci/extracted/LEVIR-MCI-dataset/` | 2.8 GB | one shared copy — MCI is a strict superset of CC (identical pairs + captions + change masks); both `levir_cc` and `levir_mci` loaders read it |
+
+(`.model_cache/` = 3.8 GB, separate from `data/`: the CLIP/GeoRSCLIP/RemoteCLIP weights.)
 
 **Reclaimed this expansion (2026-06-12):** redundant download archives (LEVIR-MCI/SECOND-CC zips,
 SECOND base zip/rar, `labels.tar.gz`, `Levir-CC-dataset.zip`), the dead `_torchgeo_labels` (rejected
 DEN alt source), and the duplicate `_levir_cc/extracted` (deduped onto the LEVIR-MCI dir) — ~14 GB
-freed. **Disk now: ~55 GB free.**
+freed. **Disk now: ~55 GB free.** If the QFabric slice needs room, `data/cache/` (11 GB,
+regenerable from `scripts/export_results.py` / re-encode) is the first reclaim.
 
 ## QFabric expansion (pending access)
 
