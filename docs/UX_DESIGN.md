@@ -54,6 +54,25 @@ deployed as a HuggingFace Space). Goal: a sharp, public-facing demo.*
   back to the current root when a profile dir is absent), and `app.py` pins the fixture-only HF Space
   to `--dataset dynamic_earthnet`. QFabric first query re-encodes its crops (a few seconds, progress shown).
 
+## Done (offline, 2026-06-13 round 2) — build-verified (full Gradio tree constructs; app + adapter tests green)
+- **Title = the brief's name** — app title and H1 set to "Open Vocabulary Temporal Change Retrieval"
+  (matching `docs/GBDA_Case11_Overview.md`), with a one-line "semantic change search engine" tagline.
+- **Patch approach is now explained** — `APPROACH_HELP` and the approach dropdown label spell out what
+  "Patch (localised)" does: scores the top-3 per-patch change Δ, catching small/localised change a
+  whole-image embedding averages away; flagged as the best approach on Dynamic EarthNet.
+- **One Settings menu** — the former separate "Settings" and "Filters & Re-ranking" accordions are
+  merged into a single `⚙ Settings` accordion with two labelled sections ("Corpus & model",
+  "Filters & re-ranking"), each control carrying a brief `info=` description, and the Apply-settings
+  (re-encode) vs per-query (filters) distinction made explicit.
+- **QFabric scope clarified in About** — note distinguishes the in-app QFabric (the reduced *2-date*
+  TEOChatlas crop subset, retrieval-only) from the awaited full *5-date* QFabric with polygon
+  change-masks (committed future work, pending dataset access — **not** the same dataset).
+- **Match pill recoloured (honesty)** — the traffic-light green/amber/red pill implied absolute
+  good/bad quality, but the score is a **relative rank within the candidate set**, so a green
+  "match 1.00" oversold a weak (~0.2-mAP) retrieval. Replaced with a single-hue **blue intensity
+  ramp** (deep→pale = stronger→weaker *position*), reusing the `#1565c0` stats accent — no
+  good/bad colour signal. (`_CSS .conf-pill` + `_pill()` thresholds unchanged.)
+
 ## Idea 1 — progressive disclosure (default view stays clean) · needs render
 Default view = **query box → ranked results**, nothing else. Everything verbose moves
 behind disclosure:
