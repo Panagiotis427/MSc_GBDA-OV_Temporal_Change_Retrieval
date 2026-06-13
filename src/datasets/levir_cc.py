@@ -77,6 +77,10 @@ class LevirCCDataset:
             }
         self._locations = sorted(self._records)
         self._split = split
+        if split and not self._records:
+            import warnings
+            warnings.warn(f"{type(self).__name__}: no pairs found for split={split!r} "
+                          f"under {self.root} — check the split name / layout.")
 
     @staticmethod
     def _tags(captions: List[str], flag: int) -> List[str]:

@@ -123,6 +123,10 @@ class SecondCCDataset:
             }
         self._locations = sorted(self._records)
         self._split = split
+        if split and not self._records:
+            import warnings
+            warnings.warn(f"SecondCCDataset: no pairs found for split={split!r} "
+                          f"under {self.root} — check the split name / layout.")
 
     @staticmethod
     def _tags(captions: List[str], flag: int) -> List[str]:
@@ -198,13 +202,16 @@ class SecondCCDataset:
                          change_class: Optional[str] = None) -> np.ndarray:
         """Change mask from the two semantic maps.
 
-        ``change_class=None`` -> boolean any-change mask (T1 class != T2 class).
+        ``change_class=None`` -> ``uint8`` class-index map of the change: changed
+        pixels carry their **T2** class index (1..6 per :data:`CLASS_TO_INDEX`),
+        unchanged pixels are 0. (Same contract as ``LevirMCIDataset.load_change_mask``:
+        ``None`` returns a class-index map, a class name returns a boolean mask.)
         A class name -> boolean mask of changed pixels whose **T2** class is that
         class (the "appeared as" basis, matching the localization queries)."""
         l1, l2 = self._sem_pair(pair)
         changed = l1 != l2
         if change_class is None:
-            return changed
+            return np.where(changed, l2, 0).astype(np.uint8)
         if change_class not in CLASS_TO_INDEX:
             raise ValueError(f"unknown class {change_class!r}; expected one of "
                              f"{sorted(CLASS_TO_INDEX)}")
@@ -224,4 +231,6 @@ class SecondCCDataset:
         return (l1 == CLASS_TO_INDEX[from_cls]) & (l2 == CLASS_TO_INDEX[to_cls])
 
     def has_mask(self, location_id: str) -> bool:
+        if location_id not in self._records:
+            return False
         return self._sem_path(location_id, "B").exists()

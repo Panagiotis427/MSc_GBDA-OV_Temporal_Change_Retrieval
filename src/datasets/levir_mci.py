@@ -59,6 +59,8 @@ class LevirMCIDataset(LevirCCDataset):
         return self.root / "images" / r["split"] / "label" / r["filename"]
 
     def has_mask(self, location_id: str) -> bool:
+        if location_id not in self._records:
+            return False
         return self._mask_path(location_id).exists()
 
     def load_change_mask(

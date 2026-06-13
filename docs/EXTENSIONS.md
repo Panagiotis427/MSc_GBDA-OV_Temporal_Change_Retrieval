@@ -85,7 +85,11 @@ different taxonomy (6 construction change-types) and temporal axis.
     train (≈0.999) but on test is at-or-above naive (GeoRSCLIP 0.334, +0.06),
     unlike DEN where PEFT collapses. `benchmark_qfabric.py --peft`.
   - **Headroom:** crop-precise polygon grounding; per-timepoint status labels
-    (RQA5) for finer transition queries.
+    (RQA5) for finer transition queries. **This headroom is the committed pentatemporal +
+    polygon-mask upgrade — full future-work spec in
+    [`QFABRIC_FUTURE_WORK.md`](QFABRIC_FUTURE_WORK.md)** (source `labaerien/qfabric`, gated;
+    5 dates + COCO polygon masks → construction-domain localization). The section above describes
+    the *current* reduced 2-date `qfabric_teo` form.
 - **Run (label-grounded):**
   `python -m scripts.build_qfabric_labels` then
   `python -m scripts.benchmark_qfabric --extract-from <eval tar> --crops-root data/QFabric/teochat_crops --extract-only`
