@@ -25,7 +25,7 @@ choices live in their own modules and self-register.
 src/datasets/<name>.py          # loader, register_dataset(...)
 src/queries/<name>.py           # query set, register_queries(...)
 src/queries/__init__.py         # ONE import line: `from . import <name>`
-tests/test_<name>_dataset.py    # loader-level tests
+tests/test_<name>.py            # loader-level tests (e.g. test_second_cc.py)
 ```
 
 If you find yourself editing `embeddings.py`, `retrieval.py`, `benchmark.py`,

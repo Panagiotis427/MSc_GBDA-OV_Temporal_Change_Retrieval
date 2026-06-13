@@ -10,55 +10,20 @@ Complete Resource Reference
 
 A multi-task change detection dataset with 450,000 change polygons annotated across 504 locations in 100 cities, covering 6 change types and 9 change status classes. Presented at CVPR EarthVision 2021 by Verma et al. (Granular AI).
 
-<table>
-<colgroup>
-<col style="width: 38%" />
-<col style="width: 61%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th><strong>Resource</strong></th>
-<th><strong>Link</strong></th>
-</tr>
-<tr class="odd">
-<th>Paper (CVPR EarthVision 2021)</th>
-<th><a href="https://openaccess.thecvf.com/content/CVPR2021W/EarthVision/papers/Verma_QFabric_Multi-Task_Change_Detection_Dataset_CVPRW_2021_paper.pdf"><u>openaccess.thecvf.com</u></a></th>
-</tr>
-<tr class="header">
-<th>IEEE Xplore</th>
-<th><a href="https://ieeexplore.ieee.org/document/9523090/"><u>ieeexplore.ieee.org</u></a></th>
-</tr>
-<tr class="odd">
-<th>arXiv / HAL</th>
-<th><a href="https://hal.science/hal-03294534"><u>hal.science/hal-03294534</u></a></th>
-</tr>
-<tr class="header">
-<th>Project Page (Granular AI)</th>
-<th><a href="https://www.granular.ai/resources/blog/qfabric:-multi-task-change-detection-dataset"><u>granular.ai</u></a></th>
-</tr>
-<tr class="odd">
-<th>Semantic Scholar</th>
-<th><a href="https://www.semanticscholar.org/paper/QFabric:-Multi-Task-Change-Detection-Dataset-Verma-Panigrahi/2b8940e5b3de02c6db110b4bbe7fd1febc32ee76"><u>semanticscholar.org</u></a></th>
-</tr>
-<tr class="header">
-<th>Download (Granular AI Engine, login required)</th>
-<th><a href="https://engine.granular.ai/organizations/granular/projects/631e0974b59aa3b615b0d29a/overview"><u>engine.granular.ai</u></a></th>
-</tr>
-<tr class="odd">
-<th>Download via HuggingFace (TEOChatlas, includes QFabric)</th>
-<th><a href="https://huggingface.co/datasets/jirvin16/TEOChatlas"><u>huggingface.co/datasets/jirvin16/TEOChatlas</u></a></th>
-</tr>
-<tr class="header">
-<th>QFabric Hugging<br />
-Πατάς στο Files and Versions και μετά στο data για να πας στα .parquet</th>
-<th><u>https://huggingface.co/datasets/EVER-Z/QFabric_mt_images_1024</u></th>
-</tr>
-</thead>
-<tbody>
-</tbody>
-</table>
+| **Resource** | **Link** |
+|---|---|
+| Paper (CVPR EarthVision 2021) | [openaccess.thecvf.com](https://openaccess.thecvf.com/content/CVPR2021W/EarthVision/papers/Verma_QFabric_Multi-Task_Change_Detection_Dataset_CVPRW_2021_paper.pdf) |
+| IEEE Xplore | [ieeexplore.ieee.org](https://ieeexplore.ieee.org/document/9523090/) |
+| arXiv / HAL | [hal.science/hal-03294534](https://hal.science/hal-03294534) |
+| Project Page (Granular AI) | [granular.ai](https://www.granular.ai/resources/blog/qfabric:-multi-task-change-detection-dataset) |
+| Download — **`labaerien/qfabric`** (HF, **gated**; 5-date rasters + COCO polygon masks — the form we use) | [huggingface.co/datasets/labaerien/qfabric](https://huggingface.co/datasets/labaerien/qfabric) |
+| Download — Granular AI Engine (free account) | [engine.granular.ai](https://engine.granular.ai/organizations/granular/projects/631e0974b59aa3b615b0d29a/overview) |
+| Reduced form already in-repo (TEOChatlas, 2-date crops, `qfabric_teo`) | [huggingface.co/datasets/jirvin16/TEOChatlas](https://huggingface.co/datasets/jirvin16/TEOChatlas) |
+| ⚠ AVOID — `EVER-Z/QFabric_mt_images_1024` | 298 GB, image-only (no polygon masks); out of scope by size |
 
-*⚠ The original project page (sagarverma.github.io/qfabric) is currently a 404. The Granular AI Engine link requires a free account to download the data.*
+*⚠ The original project page (sagarverma.github.io/qfabric) is a 404. The full pentatemporal +
+polygon-mask plan (the committed future work) is specified in
+[`QFABRIC_FUTURE_WORK.md`](QFABRIC_FUTURE_WORK.md).*
 
 ## **1.2 Dynamic EarthNet** {#dynamic-earthnet}
 
@@ -128,22 +93,9 @@ CLIP fine-tuned on RS5M, a large-scale remote sensing vision-language dataset as
 | GitHub (Official --- RS5M repo) | [[github.com/om-ai-lab/RS5M]{.underline}](https://github.com/om-ai-lab/RS5M)           |
 | HuggingFace Model               | [[huggingface.co/Zilun/GeoRSCLIP]{.underline}](https://huggingface.co/Zilun/GeoRSCLIP) |
 
-# 
+# **3. Implementation Notes**
 
-# 
-
-# 
-
-# **3. Implementation Notes** {#implementation-notes}
-
-The architecture described in this project uses frozen backbones to minimize GPU requirements:
-
-- Dual-stream encoder (T1 and T2 images) using a frozen CLIP/RemoteCLIP/GeoRSCLIP backbone.
-
-- Change feature: difference vector Δf = fT2 − fT1, or concatenated representation passed through a lightweight Linear Adapter.
-
-- Cosine similarity between change embedding and text embedding from the user\'s natural language query.
-
-- Evaluation: Recall@K and mAP on retrieval; error analysis on seasonal vs. permanent change confusion.
-
-- Deliverable: Gradio-based Semantic Change Search Engine with ranked results, T1/T2 side-by-side display, heatmap, and confidence score.
+This file is a **download-link / resource reference only**. The architecture (frozen dual-stream
+encoder, Δf change feature, cosine retrieval, Recall@K/mAP evaluation, Gradio deliverable) is
+documented once in [`ARCHITECTURE.md`](ARCHITECTURE.md) and [`../README.md`](../README.md) — not
+duplicated here.
