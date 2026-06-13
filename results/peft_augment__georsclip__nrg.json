@@ -1,0 +1,35 @@
+{
+  "dataset": "dynamic_earthnet",
+  "encoder": "georsclip",
+  "color_mode": "nrg",
+  "relevance": "fraction",
+  "frac_thresh": 0.05,
+  "folds": 5,
+  "epochs": 40,
+  "arms": {
+    "zero_shot_frozen": {
+      "cv_mean": 0.1386,
+      "cv_std": 0.0242
+    },
+    "peft_noaug": {
+      "cv_mean": 0.1959,
+      "cv_std": 0.0489,
+      "noise_std": 0.0
+    },
+    "peft_noise_0.25": {
+      "cv_mean": 0.2064,
+      "cv_std": 0.1067,
+      "noise_std": 0.25
+    },
+    "peft_noise_0.5": {
+      "cv_mean": 0.1928,
+      "cv_std": 0.0936,
+      "noise_std": 0.5
+    },
+    "peft_noise_1.0": {
+      "cv_mean": 0.1736,
+      "cv_std": 0.0712,
+      "noise_std": 1.0
+    }
+  }
+}

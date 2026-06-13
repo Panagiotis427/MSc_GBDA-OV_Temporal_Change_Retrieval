@@ -575,8 +575,10 @@ re-evaluating on the full corpus and under 5-fold AOI cross-validation collapses
 every test-split number (Table~\ref{tab:cv}). GeoRSCLIP+NRG goes from 0.426 to a
 full-corpus 0.037 / cross-validated $0.100 \pm 0.139$ (folds span 0.032--0.348;
 the 110-pair test split coincided with the easy high-wetland fold). Leakage-free
-cross-validated PEFT ($0.049 \pm 0.018$) is at or below zero-shot ---
-confirming the in-distribution PEFT figures were memorisation.
+cross-validated PEFT on GeoRSCLIP+NRG ($0.196 \pm 0.049$, fraction relevance)
+overlaps frozen zero-shot ($0.139 \pm 0.024$) within fold variance --- neither a
+collapse nor a gain --- confirming the high in-distribution PEFT figures
+($0.42$--$0.998$) were memorisation, not generalisation.
 
 \begin{table}[H]
     \centering
@@ -1205,12 +1207,14 @@ The system fulfils the Case 11 brief: an open-vocabulary, frozen-backbone change
 search engine with a Gradio interface, a label-grounded Recall@$K$/mAP
 benchmark, seasonal-vs-permanent error analysis, and a clear zero-shot vs PEFT
 comparison across three CLIP-variant encoders on Dynamic EarthNet, reported under
-a strict statistical audit. Four findings emerge. First, learned adapters only
-memorise the training set: the large in-distribution PEFT lift
+a strict statistical audit. Four findings emerge. First, a learned adapter shows
+no out-of-distribution gain: the large in-distribution PEFT lift
 ($0.043 \rightarrow 0.420$, up to 0.998 on QFabric) is the adapter scored on its
-own training pairs, and cross-validated leakage-free PEFT ($0.049$) sits at or below
-zero-shot ($0.100$), so low-compute fine-tuning is not shown to help retrieval
-out-of-distribution. Second, out-of-distribution the frozen zero-shot wins, but
+own training pairs (memorisation), and under the headline GeoRSCLIP+NRG config
+leakage-free cross-validated PEFT ($0.196 \pm 0.049$) merely overlaps frozen
+zero-shot ($0.139 \pm 0.024$) within fold variance --- and feature-space
+augmentation does not change this --- so low-compute fine-tuning is not shown to
+help retrieval out-of-distribution. Second, out-of-distribution the frozen zero-shot wins, but
 weakly and on an inflated headline: the widely-quoted 0.426 (GeoRSCLIP+NRG test
 split) is a lucky single fold, and under 5-fold AOI cross-validation it is
 $0.100 \pm 0.139$; RS pre-training and NIR false-colour help, but the absolute

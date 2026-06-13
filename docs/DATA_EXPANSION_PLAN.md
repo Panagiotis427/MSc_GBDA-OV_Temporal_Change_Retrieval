@@ -191,11 +191,18 @@ edited** (`embeddings.py`, `retrieval.py`, `benchmark.py`, `train.py`, `app.py`,
   CLIP ViT-L anti-localizes (−0.14). Written up in REPORT §7.12 + main.tex §sec:localization. 17
   tests green. **Remaining Track 3:** SECOND-CC + QFabric-polygon masks once those loaders land.
 
-### Track 4 — Bounded method check (optional, low priority)
+### Track 4 — Bounded method check (optional) — **DONE 2026-06-12 (honest negative + a correction)**
 - One capped learned change-attention + augmentation run to confirm/deny the memorization prior
   (REPORT B.5/B.12). Reported as an honest positive **or** negative — not a centerpiece.
-- **Verify:** cross-validated, leakage-free; compared against frozen zero-shot within fold
-  variance.
+- **Verify:** cross-validated, leakage-free; compared against frozen zero-shot within fold variance.
+- **DONE:** `scripts/peft_augment_eval.py` (new; imports the shared training pieces, edits no shared
+  pipeline file) runs frozen / PEFT-no-aug / PEFT+feature-noise on the same leakage-free folds.
+  Embedding-space (Δf Gaussian) noise is the right test — training runs on cached embeddings, not
+  pixels. **Result:** augmentation does not help (σ=0.25 → 0.206 ± 0.107, within noise of no-aug
+  0.196; σ=1.0 → 0.174 degrades). **Plus a correction it surfaced:** the matched-NRG leakage-free CV
+  PEFT is **0.196 ± 0.049** (reproduced 3×), which *overlaps* frozen zero-shot (0.139 ± 0.024) within
+  variance — not the "0.049 below zero-shot" some summaries claimed (that was the RGB colour mode
+  mis-cited against NRG). REPORT B.14 + summary/conclusion lines fixed; STATUS/main.tex aligned.
 
 ---
 

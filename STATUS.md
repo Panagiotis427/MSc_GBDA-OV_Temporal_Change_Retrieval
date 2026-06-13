@@ -29,7 +29,7 @@ Honest, audited numbers (random baseline + permutation p + BH-FDR + leakage-free
   (buildings, urban, wetland↔farmland transitions). **~0.20 is a robust frozen-VLM ceiling.**
 - B.13 query-gated hybrid 0.186 ± 0.051 (4/9) — within noise; geometry routing doesn't help (closed).
 - Global zero-shot 0.139 ± 0.024 (2/9); full-corpus macro 0.116; **0.426 = lucky single fold, never cite**.
-- PEFT/LoRA memorise train AOIs — zero-shot generalises better (B.5); seasonal gate FPR→0 at thr ≥ 0.05.
+- PEFT: high in-distribution train-fit is memorisation; leakage-free CV PEFT (NRG 0.196 ± 0.049) overlaps frozen zero-shot (0.139 ± 0.024) within fold variance — no clear OOD gain, not a collapse (B.5/B.9/B.14; RGB lower at 0.049). Feature-noise augmentation doesn't help (B.14). Seasonal gate FPR→0 at thr ≥ 0.05.
 - Ruled-out approaches documented in REPORT Appendix B (B.9, B.11, B.12) — do not re-propose.
 - Engine **deployed on HF Space**; tests 233 passed (fast suite ~2 min, shared venv).
 
@@ -73,7 +73,7 @@ Mapping the assignment + professors' 2026-05-06 comments to repo reality:
 |---|---|
 | subset of datasets | ✅ DEN (primary) + QFabric + LEVIR-CC + LEVIR-MCI (masks) + SECOND-CC (breadth, masks) |
 | CLIP-variant embeddings | ✅ CLIP ViT-L/14, GeoRSCLIP, RemoteCLIP (3-encoder comparison) |
-| zero-shot & light PEFT | ✅ both run; honest leakage-free comparison (PEFT memorises) |
+| zero-shot & light PEFT | ✅ both run; honest leakage-free CV (PEFT ≈ frozen zero-shot OOD within variance; train-fit is memorisation) |
 | visual comparisons zero-shot vs PEFT | ✅ `assets/figures/zeroshot_vs_peft__clip_vitl14__train.png` — embedded in `main.tex` (§6.1) and README; generator `scripts/make_comparison_figure.py` |
 | retrieval metrics (mAP/R@K) + temporal pinpointing | ✅ REPORT §7 + B (R@K ceiling-bounded caveat documented) |
 | seasonal-drift error analysis | ✅ seasonal gate + stable-pair FPR analysis |

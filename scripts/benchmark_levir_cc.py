@@ -9,7 +9,12 @@ the DEN / QFabric results.
 
 Run::
 
-    python -m scripts.benchmark_levir_cc --root data/_levir_cc/extracted
+    python -m scripts.benchmark_levir_cc --root data/_levir_mci/extracted/LEVIR-MCI-dataset
+
+The default root is the LEVIR-MCI directory: LEVIR-MCI is a strict superset of
+LEVIR-CC (identical 10,077 pairs + identical ``LevirCCcaptions.json``, plus change
+masks), so the ``levir_cc`` images are not duplicated on disk — both ``levir_cc``
+and ``levir_mci`` read the same A/B pairs from this one directory.
 """
 from __future__ import annotations
 
@@ -27,8 +32,9 @@ from src.retrieval import ChangeRetriever
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="LEVIR-CC open-vocab retrieval benchmark")
-    ap.add_argument("--root", default="data/_levir_cc/extracted",
-                    help="LEVIR-CC dir (LevirCCcaptions.json + images/)")
+    ap.add_argument("--root", default="data/_levir_mci/extracted/LEVIR-MCI-dataset",
+                    help="LEVIR-CC/MCI dir (LevirCCcaptions.json + images/{split}/{A,B}); "
+                         "defaults to the LEVIR-MCI superset so images aren't duplicated")
     ap.add_argument("--split", default="test")
     ap.add_argument("--encoders", nargs="+",
                     default=["georsclip", "clip_vitl14", "remoteclip"])

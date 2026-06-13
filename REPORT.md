@@ -47,9 +47,11 @@ robust estimate is ~10× lower because this 110-pair split is a lucky high-wetla
 under cross-validation; only GeoRSCLIP NRG shows any above-random per-query signal, confined to
 wetland-formation.
 
-**Key findings:** PEFT adapters only memorise train AOIs — the high train-fit numbers above are
-the adapter scored on its own training data and collapse to ≤ zero-shot (sometimes below random)
-on held-out splits; PEFT is not shown to help retrieval. Frozen zero-shot generalises better.
+**Key findings:** the high PEFT train-fit numbers above are the adapter scored on its own training
+data (memorisation); on held-out evaluation PEFT does not beat frozen zero-shot — single-split test
+collapses (RGB 0.041) while leakage-free 5-fold CV on the headline GeoRSCLIP+NRG (0.196 ± 0.049)
+overlaps frozen zero-shot (0.139 ± 0.024) within fold variance. PEFT is therefore not shown to help
+retrieval out-of-distribution (neither a clear gain nor, under the matched-NRG CV, a collapse).
 NRG false-colour (NIR-Red-Green) outperforms RGB and NDVI for all encoders on unseen AOIs; NDVI
 collapses spectral texture to a single channel, losing the inter-channel contrasts NRG preserves.
 GeoRSCLIP + NRG zero-shot (0.426) is the best configuration *on this 110-pair test split* — but
@@ -222,8 +224,9 @@ testable in seconds with no network.
     not targeted). Trained with online image loading (no pre-caching), same
     masked InfoNCE loss as ProjectionHead. GeoRSCLIP+NRG, 20 epochs, rank=4:
     fits train (0.025→0.153) but test mAP collapses to **0.071** — overfits, far
-    below frozen zero-shot NRG (single-split 0.426; CV 0.100 ± 0.139). Confirms frozen
-    zero-shot generalises better than the learned adapter — the project's core finding.
+    below frozen zero-shot NRG (single-split 0.426; CV 0.100 ± 0.139). Confirms the LoRA adapter
+    overfits and does not beat frozen zero-shot out-of-distribution — consistent with the
+    ProjectionHead leakage-free CV (NRG 0.196 ± 0.049, overlaps zero-shot within variance; B.9/B.14).
 
 ---
 
@@ -634,9 +637,10 @@ the loader always parsed does not weaken the engine — it shows the strong numb
 was carried by the two construction queries, with demolition (0.30) already weak.
 The RS-pretrained encoders still gain from the directional Δ on the strong queries
 (RemoteCLIP and GeoRSCLIP zero-shot beat naive on buildings) — the same
-type-versus-transition split as QFabric. Reproduce: download `lcybuaa/LEVIR-CC`,
-build `levir_cc`, run `python -m scripts.benchmark_levir_cc` (writes per-query AP
-to `results/`).
+type-versus-transition split as QFabric. Reproduce: `python -m scripts.benchmark_levir_cc`
+(writes per-query AP to `results/`; reads the LEVIR-MCI directory, a strict superset of
+LEVIR-CC with identical pairs + captions, so the images are stored once and shared with
+`levir_mci`).
 
 ### 7.12 LEVIR-MCI — quantitative change localization
 
@@ -1004,7 +1008,7 @@ PEFT** comparison across **three CLIP-variant encoders** on Dynamic EarthNet.
 
 Three complementary findings:
 
-1. **Adapters only memorise the training set.** PEFT reaches mAP ~8–10× the train
+1. **The high in-distribution adapter numbers are memorisation.** PEFT reaches mAP ~8–10× the train
    zero-shot baseline (0.043 → 0.420, CLIP L/14) — but this number is the adapter scored on its
    **own training pairs** (§7.1), so it measures fit, not retrieval. The honest test is
    out-of-distribution, and there it fails (finding 2). On QFabric the same train-fit reaches
@@ -1020,10 +1024,14 @@ Three complementary findings:
    **wetland-formation**; general open-vocabulary change retrieval is not demonstrated on this
    (agri/wetland-dominated) DEN subset.
 
-3. **No fine-tuning helps out-of-distribution.** Cross-validated PEFT (0.049 ± 0.018) is
-   at or below zero-shot (0.100); LoRA (every config overfits, best test ≈0.07) also stays
-   below frozen zero-shot. Consistent conclusion: **spectral physics (NRG) carries the weak signal
-   that exists; learned visual priors — however parameter-efficient — only memorise the train set.**
+3. **No fine-tuning clearly helps out-of-distribution.** Under the headline GeoRSCLIP+NRG
+   config, leakage-free cross-validated PEFT (**0.196 ± 0.049**, fraction relevance) *overlaps*
+   frozen zero-shot (0.139 ± 0.024) within fold variance — neither a collapse nor a clear gain
+   (the lower RGB color mode is 0.049 ± 0.018; B.5/B.9). Feature-space augmentation does not change
+   this (B.14). LoRA (every config overfits, best test ≈0.07) also fails to beat frozen zero-shot,
+   and the large in-distribution train-fit (0.42–0.998) is memorisation. Consistent conclusion:
+   **spectral physics (NRG) carries the weak signal that exists; a learned adapter matches but does
+   not exceed it out-of-distribution.**
 
 The contrast between these regimes maps directly onto the deliverable's
 grading expectation: a motivated comparison of zero-shot vs PEFT approaches,
@@ -1180,7 +1188,7 @@ appearance, not change. **Reporting rule: quote PEFT/LoRA from test/val only, ne
 change above chance under cross-validation (the only above-random per-query signal; B.8); domain
 pretraining helps (GeoRSCLIP > CLIP-L/14 ≈ RemoteCLIP); spectral NRG is the best colour mode; on DEN
 directional change beats end-state matching, on QFabric the reverse (end-state queries); learned
-adapters (PEFT/LoRA) only memorise — cross-validated PEFT (0.049) is at or below zero-shot (0.100).
+a learned adapter shows no out-of-distribution gain — leakage-free cross-validated PEFT (NRG 0.196 ± 0.049) overlaps zero-shot (0.139 ± 0.024) within fold variance, while the large in-distribution train-fit (0.42–0.998) is memorisation.
 **Cannot say:** "open-vocabulary change retrieval works" — under CV no config exceeds ~0.10 mAP,
 the 0.426 was a lucky test fold (B.8), and 4 of 10 change-types have zero positives in the data;
 "PEFT/LoRA improves retrieval" (never beats frozen zero-shot held-out; high numbers are train
@@ -1215,9 +1223,13 @@ artifacts and collapse to near-random:**
   bare-soil / forest-loss, are at or below chance. CLIP-L/14 and RemoteCLIP have **zero**
   above-random queries on the full corpus. Even the significant queries have std ≈ mean across
   folds (e.g. ag→wetland 0.136 ± 0.202) — high instability.
-- **Leakage-free PEFT confirms B.5.** Cross-validated PEFT (train on 4 folds, eval on the 5th)
-  scores 0.049 ± 0.018 — statistically indistinguishable from zero-shot's 0.100, and nowhere near
-  the train-fit 0.42. PEFT does not help once it cannot see the eval pairs.
+- **Leakage-free PEFT (matched config).** Cross-validated PEFT (train on 4 folds, eval on the 5th)
+  on GeoRSCLIP+NRG scores **0.196 ± 0.049** (fraction relevance; B.9) — statistically
+  indistinguishable from frozen zero-shot (0.139 ± 0.024) within the large fold variance, and
+  nowhere near the in-distribution train-fit (0.42–0.998). The RGB color mode is lower
+  (0.049 ± 0.018). So PEFT neither collapses nor helps once it cannot see the eval AOIs: it matches
+  frozen, not beats it. (The earlier summary citing the RGB 0.049 against NRG zero-shot 0.100 mixed
+  colour modes; the matched-NRG comparison is the one above.)
 
 **Net:** the only defensible DEN claim is *"GeoRSCLIP (RS-pretrained, NRG) retrieves
 wetland-formation change above chance"* — a narrow, single-direction, high-variance signal, not a
@@ -1450,3 +1462,36 @@ and query geometry is not a usable routing signal at this encoder scale; this cl
 future-work item (a within-noise result, reported as such). Full corpus macro mAP 0.116 (825 pairs,
 49-patch grid). Artifact: `results/patch_eval__georsclip__nrg__gated.json`.
 Reproduce: `python -m scripts.patch_eval --encoder georsclip --color-mode nrg --approach gated`.
+
+## B.14 Anti-memorization augmentation — does regularizing PEFT recover OOD signal? (honest negative)
+
+B.5 established that the high in-distribution PEFT numbers are memorisation. The open future-work
+question was whether an *anti-memorization* regularizer lets the adapter generalise. Image
+augmentation is impossible here without re-encoding (training runs on cached per-pair embeddings,
+not pixels), so the architecturally-correct test is **embedding-space augmentation**: add Gaussian
+noise to the change feature Δf each batch (noise scaled to the per-batch feature std), a standard
+"don't memorise the exact vector" regularizer. `scripts/peft_augment_eval.py` runs three arms on the
+**same** leakage-free AOI folds (GeoRSCLIP+NRG, fraction relevance, 5-fold CV) — frozen zero-shot,
+PEFT no-aug, and PEFT + feature-noise — so the comparison is apples-to-apples (no shared pipeline
+file is edited; the script imports the training pieces).
+
+| arm | CV mAP |
+|---|---|
+| frozen zero-shot | 0.139 ± 0.024 |
+| PEFT, no augmentation | **0.196 ± 0.049** |
+| PEFT + feature noise σ=0.25 | 0.206 ± 0.107 |
+| PEFT + feature noise σ=0.50 | 0.193 ± 0.094 |
+| PEFT + feature noise σ=1.00 | 0.174 ± 0.071 |
+
+**Two readings, both honest.** (i) *Augmentation does not help.* The σ=0.25 mean (0.206) is within
+fold noise of no-aug (0.196) and inflates the variance (±0.107); larger noise degrades (σ=1.0 →
+0.174). Feature-space regularization neither rescues nor improves the adapter — recorded as a
+negative. (ii) *The PEFT baseline itself is not a collapse.* The no-aug leakage-free CV PEFT
+(0.196 ± 0.049) reproduces the committed B.9 number exactly and **overlaps frozen zero-shot
+(0.139 ± 0.024) within fold variance** — PEFT matches, does not beat, frozen out-of-distribution.
+This corrects an earlier summary that cited the **RGB** colour mode's lower CV PEFT (0.049 ± 0.018)
+against the **NRG** zero-shot (0.100), a colour-mode mismatch; the matched-NRG comparison is the one
+above. The project conclusion is unchanged in spirit — low-compute fine-tuning is not shown to help
+retrieval OOD — but the honest statement is *"PEFT ≈ frozen within variance,"* not *"PEFT collapses
+below frozen."* Artifact: `results/peft_augment__georsclip__nrg.json`. Reproduce:
+`python -m scripts.peft_augment_eval --encoder georsclip --color-mode nrg --folds 5`.

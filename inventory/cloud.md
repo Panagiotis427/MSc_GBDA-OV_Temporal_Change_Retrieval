@@ -18,6 +18,8 @@
 
 - **Dynamic EarthNet**: official source (earthnet.tech) — local copy in `data/` (laptop manifest)
 - **QFabric**: via `jirvin16/TEOChatlas` parsed subsets (`qfabric_teo`, `qfabric_status`)
-- **LEVIR-CC**: official release; loader + benchmark in-repo
+- **LEVIR-CC / LEVIR-MCI**: `lcybuaa/LEVIR-MCI` (Zenodo/HF) is a strict superset of LEVIR-CC
+  (identical pairs + captions, plus change masks) — stored once under `data/_levir_mci/`; both the
+  `levir_cc` and `levir_mci` loaders read it (no duplicate LEVIR-CC copy)
 - **SECOND-CC**: Zenodo `10.5281/zenodo.16937571` (`SECOND-CC-AUG.zip`, CC-BY-4.0, public); loader + benchmark in-repo
 - fMoW (optional future): same-source via TEOChatlas
