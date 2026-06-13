@@ -55,10 +55,10 @@ def _app_datasets() -> list:
 DATASET_LABELS = {
     "dynamic_earthnet": "Dynamic EarthNet — land-cover transitions",
     "levir_cc": "LEVIR-CC — building/road (captions)",
-    "levir_mci": "LEVIR-MCI — building/road (+ masks)",
-    "second_cc": "SECOND-CC — 6-class land cover (+ masks)",
+    "levir_mci": "LEVIR-CC — building/road change",
+    "second_cc": "SECOND-CC — 6-class land cover",
     "qfabric_teo": "QFabric — change type",
-    "qfabric_status": "QFabric — construction status",
+    "qfabric_status": "QFabric — construction status (weak)",
 }
 ENCODER_LABELS = {
     "clip_vitl14": "CLIP ViT-L/14",
@@ -84,8 +84,9 @@ _QFABRIC_CROPS = str(_PROJECT_ROOT / "data" / "QFabric" / "teochat_crops")
 DATASET_PROFILES = {
     "dynamic_earthnet": {"root": str(_PROJECT_ROOT / "data" / "DynamicEarthNet"),
                          "split": "test", "pairing": "bimonthly"},
-    "levir_cc":  {"root": str(_PROJECT_ROOT / "data" / "_levir_mci" / "extracted" / "LEVIR-MCI-dataset"),
-                  "split": "test", "color_mode": "rgb"},
+    # LEVIR: keep only the MCI superset (identical retrieval to LEVIR-CC in-app,
+    # plus masks for the offline localization script). levir_cc stays registered
+    # for scripts but is not a separate app dropdown entry.
     "levir_mci": {"root": str(_PROJECT_ROOT / "data" / "_levir_mci" / "extracted" / "LEVIR-MCI-dataset"),
                   "split": "test", "color_mode": "rgb"},
     "second_cc": {"root": str(_PROJECT_ROOT / "data" / "_second_cc" / "extracted" / "SECOND-CC-AUG"),
@@ -105,7 +106,7 @@ DATASET_PROFILES = {
 # construction ~0.8; SECOND-CC buildings ~0.7; QFabric change-type ~0.27; DEN
 # patch_top3 ~0.19; QFabric status ~0.08.)
 DATASET_RANK = {
-    "levir_cc": 0.83, "levir_mci": 0.83, "second_cc": 0.70,
+    "levir_mci": 0.83, "second_cc": 0.70,
     "qfabric_teo": 0.27, "dynamic_earthnet": 0.19, "qfabric_status": 0.08,
 }
 
@@ -120,24 +121,22 @@ def _app_dataset_choices() -> list:
 
 @dataclass
 class RunConfig:
-    dataset: str = "dynamic_earthnet"
-    # Defaults match the REPORT headline config (GeoRSCLIP + NRG zero-shot on the
-    # held-out test split — the best generalising setup, §7.3). Earlier defaults
-    # (clip_vitl14 / rgb / split=train) diverged from every reported number and,
-    # worse, split=train is the corpus the PEFT adapter was fit on (memorisation).
+    # Default corpus = LEVIR-CC (via the MCI superset loader): the strongest demo
+    # (salient building/road change, per-query AP up to ~0.8) for the best first
+    # impression. zero_shot uses the cached global embeddings (snappy first query);
+    # patch would re-encode 1929 pairs. Other corpora (incl. Dynamic EarthNet, the
+    # report's primary analysed dataset) are selectable + sorted best-first in the UI.
+    dataset: str = "levir_mci"
     encoder: str = "georsclip"
-    # patch = localised per-patch Delta scoring, the best DEN configuration
-    # (REPORT Appendix B.10, CV mAP 0.193 vs ~0.10 for global zero-shot). The
-    # first query lazily encodes per-patch embeddings for the loaded corpus.
-    approach: str = "patch"
-    root: str = str(_PROJECT_ROOT / "data" / "DynamicEarthNet")
+    approach: str = "zero_shot"
+    root: str = str(_PROJECT_ROOT / "data" / "_levir_mci" / "extracted" / "LEVIR-MCI-dataset")
     pairing: str = "bimonthly"
-    split: Optional[str] = "test"    # 110 held-out DEN pairs (not the PEFT-fit train corpus)
+    split: Optional[str] = "test"
     cache_dir: str = str(_PROJECT_ROOT / "data" / "cache")
     feature_mode: str = "difference"
     top_k: int = 5
     # Spectral / encoder options (require Apply to reload embeddings)
-    color_mode: str = "nrg"         # rgb | nrg | ndvi
+    color_mode: str = "rgb"         # rgb | nrg | ndvi (nrg/ndvi only apply to DEN)
     use_lora: bool = False          # load LoRA-adapted embeddings (must be pre-cached)
     # Extension toggles (take effect on next Search; no Apply needed)
     geo_filter: bool = False        # enable geographic region filtering
@@ -526,19 +525,20 @@ class SemanticChangeSearch:
                     "the returned set (min–max normalised), **not** a calibrated probability. The "
                     "**change heatmap** (jet) overlays the After image: warm = where the query's "
                     "presence grew most from Before→After; cool = little/no change.\n\n"
-                    "**Corpora.** Dynamic EarthNet (default), QFabric (construction), LEVIR-CC/MCI "
-                    "(building/road + masks) and SECOND-CC (six land-cover classes + masks) are all "
-                    "selectable under **Settings** — switching reloads embeddings, so press "
-                    "**Apply Settings** afterwards. The example queries are curated for the default "
-                    "Dynamic EarthNet corpus."
+                    "**Corpora (Settings → pick → Apply), sorted by best result:** LEVIR-CC "
+                    "(building/road, default — strongest), SECOND-CC (six land-cover classes), "
+                    "QFabric change-type (construction), Dynamic EarthNet (the report's primary "
+                    "analysed corpus; subtle spectral change, weakest absolute results), and QFabric "
+                    "construction-status (a distinct task, but retrieval is ≈ random — included for "
+                    "completeness). Switching reloads embeddings, so press **Apply Settings**."
                 )
 
             # ---- Query first — most important ----
             with gr.Row():
                 q = gr.Textbox(
                     label="Change query", scale=5,
-                    value="agricultural land converted to wetland or marsh",
-                    placeholder="e.g. agricultural land converted to wetland",
+                    value="new buildings or houses constructed",
+                    placeholder="e.g. a new road or street; a new water body",
                     info=QUERY_HELP,
                 )
                 a_dd = gr.Dropdown(
@@ -564,17 +564,18 @@ class SemanticChangeSearch:
             # same click-to-fill UX without the Dataset component.
             gr.Markdown(
                 "**Example queries — click to fill.** *Research demo: open-vocabulary change "
-                "retrieval with frozen encoders is approximate (best honest config ≈ 0.20 mAP). "
-                "These are curated for the default **Dynamic EarthNet** corpus — its only robustly "
-                "above-chance signal is wetland-formation, with construction recoverable via "
-                "patch scoring; they retrieve best. Switch corpus in Settings (then Apply).*"
+                "retrieval with frozen encoders is approximate. These generic change types retrieve "
+                "well on the default **LEVIR-CC** corpus (salient building/road change) and work "
+                "reasonably across the others. For Dynamic EarthNet, its one robustly above-chance "
+                "signal is wetland-formation (e.g. “agricultural land converted to wetland”). "
+                "Switch corpus in Settings (then Apply).*"
             )
             with gr.Row():
                 for _ex in [
-                    "agricultural land converted to wetland or marsh",
-                    "land turning into wetland",
-                    "new buildings constructed on former agricultural land",
-                    "urban expansion replacing vegetation",
+                    "new buildings or houses constructed",
+                    "a new road or street built",
+                    "a new water body or flooding",
+                    "trees or vegetation cleared or grown",
                 ]:
                     gr.Button(_ex, size="sm").click(lambda v=_ex: v, None, q)
 
@@ -755,25 +756,23 @@ class SemanticChangeSearch:
 def parse_args():
     p = argparse.ArgumentParser(description="Semantic Change Search Engine")
     from src.encoders import list_encoders
-    p.add_argument("--dataset", default="dynamic_earthnet",
+    p.add_argument("--dataset", default="levir_mci",
                    choices=_app_dataset_choices())
     p.add_argument("--encoder", default="georsclip",
                    choices=list_encoders())
-    p.add_argument("--approach", default="patch",
+    p.add_argument("--approach", default="zero_shot",
                    choices=list(APPROACHES) + ["patch"])
-    p.add_argument("--root", default=str(_PROJECT_ROOT / "data" / "DynamicEarthNet"))
+    p.add_argument("--root", default=None,
+                   help="dataset directory; default = the selected dataset's profile root")
     p.add_argument("--pairing", default="bimonthly")
-    p.add_argument("--split", default="test",
-                   help="DEN preprocessed split: train|val|test|all. Default test "
-                        "(110 held-out pairs); train (605) is the corpus the PEFT "
-                        "adapter was fit on, so avoid it for an honest PEFT demo.")
+    p.add_argument("--split", default=None,
+                   help="split (train|val|test|all); default = the dataset's profile split")
     p.add_argument("--cache-dir", default=str(_PROJECT_ROOT / "data" / "cache"))
     p.add_argument("--port", type=int, default=7860)
     # Spectral / encoder options. Default nrg + georsclip = the REPORT headline config.
-    p.add_argument("--color-mode", default="nrg", choices=["rgb", "nrg", "ndvi"],
-                   help="Image colour mode passed to dataset loader. "
-                        "nrg = NIR-Red-Green (best zero-shot with GeoRSCLIP); "
-                        "ndvi = vegetation index. Change in-app via Settings.")
+    p.add_argument("--color-mode", default=None, choices=["rgb", "nrg", "ndvi"],
+                   help="Image colour mode; default = the dataset's profile colour "
+                        "(rgb for all but DEN, which defaults to nrg).")
     p.add_argument("--lora", action="store_true", default=False,
                    help="Load LoRA-adapted embeddings (must be pre-cached by run_pipeline --lora). "
                         "Toggle in-app via Settings.")
@@ -789,16 +788,25 @@ def parse_args():
                    choices=list(RERANK_STRATEGIES),
                    help="Re-ranking strategy: diversity (default) or coherence.")
     a = p.parse_args()
+    # Resolve root / split / colour / loader-extras from the dataset's launch
+    # profile when not explicitly overridden, so `python -m src.app` (default
+    # dataset) loads from the right directory and the HF Space's explicit
+    # --root/--dataset still win.
+    prof = DATASET_PROFILES.get(a.dataset, {})
+    root = a.root or prof.get("root") or str(_PROJECT_ROOT / "data" / "DynamicEarthNet")
+    split = a.split if a.split is not None else prof.get("split", "test")
+    color = a.color_mode or prof.get("color_mode") or "nrg"
     return RunConfig(
         dataset=a.dataset, encoder=a.encoder, approach=a.approach,
-        root=a.root, pairing=a.pairing,
-        split=None if a.split == "all" else a.split,
+        root=root, pairing=a.pairing,
+        split=None if split == "all" else split,
         cache_dir=a.cache_dir,
-        color_mode=a.color_mode,
+        color_mode=color,
         use_lora=a.lora,
         geo_filter=a.geo_filter,
         rerank=a.rerank,
         rerank_strategy=a.rerank_strategy,
+        loader_extra=prof.get("loader_extra", {}),
     ), a.port
 
 

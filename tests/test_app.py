@@ -93,9 +93,12 @@ def test_dataset_profiles_contract():
         assert get_queries(ds), f"{ds} has no query set"
         assert os.path.isabs(prof["root"]), f"{ds} root not absolute"
         assert ds in DATASET_RANK, f"{ds} has no rank for sorting"
-    # DEN honours the colour dropdown (no pinned colour); other corpora are rgb-only
+    # DEN honours the colour dropdown (no pinned colour); other corpora are rgb-only.
+    # LEVIR is represented by the MCI superset only (levir_cc dropped from the app
+    # dropdown — identical in-app retrieval).
     assert "color_mode" not in DATASET_PROFILES["dynamic_earthnet"]
-    for ds in ("levir_cc", "levir_mci", "second_cc", "qfabric_teo", "qfabric_status"):
+    assert "levir_cc" not in DATASET_PROFILES
+    for ds in ("levir_mci", "second_cc", "qfabric_teo", "qfabric_status"):
         assert DATASET_PROFILES[ds]["color_mode"] == "rgb"
     # QFabric loaders need their label paths threaded as loader_extra
     for ds in ("qfabric_teo", "qfabric_status"):
