@@ -53,8 +53,9 @@ heatmap, a confidence, and a seasonal-vs-permanent flag. The system uses
 frozen CLIP-variant vision-language backbones and compares three
 scoring approaches --- a naive image baseline, a zero-shot $\Delta$-similarity,
 and a parameter-efficient fine-tuned (PEFT) adapter --- across three encoders
-on Dynamic EarthNet (DEN), with two further datasets (QFabric and LEVIR-CC)
-validating the dataset-agnostic design. The findings are reported under a strict statistical audit (random-ranking
+on Dynamic EarthNet (DEN), with three further datasets (QFabric, LEVIR-CC/MCI,
+and SECOND-CC) validating the dataset-agnostic design and extending it to
+open-vocabulary breadth and pixel-level change localisation. The findings are reported under a strict statistical audit (random-ranking
 baselines, FDR correction, and leave-one-AOI-out cross-validation), which
 materially changes them. Frozen zero-shot beats the PEFT/LoRA adapters on
 held-out data: the adapters' high in-distribution scores
@@ -72,7 +73,12 @@ borderline --- retrievable above chance for the first time. On LEVIR-CC the same
 frozen engine retrieves salient building and road change strongly (per-query AP
 $\approx$0.6--0.8) but subtle vegetation and sparse water change only near their
 prevalence floors, so the open-vocabulary signal scales sharply with change
-salience. The
+salience. SECOND-CC extends this to a seven-class open vocabulary --- every change
+type clears its prevalence floor but only modestly (zero-shot macro $\approx$0.33
+vs a 0.30 floor). Using the LEVIR-MCI and SECOND-CC pixel masks we also score the
+change heatmap quantitatively: it is a weak localiser (pointing-game lift within
+$\pm$0.04--0.10 of a random-patch floor), so localising change is harder than
+retrieving it. The
 recurring lesson is that spectral physics and spatial locality carry the signal,
 while global embeddings and learned visual priors dilute or memorise it, and that
 naive single-split numbers must not be trusted without cross-validation.
@@ -279,6 +285,25 @@ that free-text queries map directly to caption-grounded relevance, exposed
 through the same protocol (\texttt{src/datasets/levir\_cc.py}). It tests the
 engine on salient, well-described change described in genuine human language,
 complementing DEN's subtle spectral transitions and QFabric's categorical types.
+The five caption tags include vegetation and water, broadening the original
+three-query (building/road/demolition) evaluation to five.
+
+\paragraph{LEVIR-MCI (localisation masks on the LEVIR pairs).}
+LEVIR-MCI (Liu et al., 2024) is a strict superset of LEVIR-CC --- the same
+10{,}077 pairs and captions, plus a pixel-level building/road change mask per
+pair. We store it once and serve both \texttt{levir\_cc} and \texttt{levir\_mci}
+from it (\texttt{src/datasets/levir\_mci.py}); the masks make the change-heatmap
+deliverable quantitatively measurable (Section~\ref{sec:localization}).
+
+\paragraph{SECOND-CC (fourth dataset, open-vocabulary breadth + semantic masks).}
+SECOND-CC (Robust Change Captioning in Remote Sensing, 2025) pairs 6{,}041
+bi-temporal scenes with 30{,}205 human change captions \emph{and} six-class
+SECOND semantic maps for both phases (ground, tree, low-vegetation, water,
+building, playground). It is the breadth counterpart to LEVIR-CC, whose change is
+almost entirely building/road: SECOND-CC's captions span a far wider land-cover
+vocabulary, and its per-phase semantic maps give both retrieval relevance
+(caption tags) and localisation ground truth (per-class and directed-transition
+change masks), through the same protocol (\texttt{src/datasets/second\_cc.py}).
 
 \paragraph{Encoders.}
 Table~\ref{tab:encoders} lists the three frozen CLIP-variant encoders. All
@@ -927,9 +952,9 @@ stay near random. The RS-pre-trained encoders still gain from the directional
 $\Delta$ on the strong queries (RemoteCLIP and GeoRSCLIP zero-shot beat their
 naive scores on buildings) --- the same type-versus-transition split seen on
 QFabric (Sections~\ref{sec:qfabric}, \ref{sec:qfabricstatus}). The lesson holds
-across all three datasets: the open-vocabulary engine recovers the change signal
-in proportion to its spatial and semantic salience --- strongly on salient
-construction, weakly on subtle or sparse change.
+across every dataset (DEN, QFabric, LEVIR-CC and SECOND-CC): the open-vocabulary
+engine recovers the change signal in proportion to its spatial and semantic
+salience --- strongly on salient construction, weakly on subtle or sparse change.
 
 \subsection{Quantitative change localization (LEVIR-MCI)}
 \label{sec:localization}
@@ -975,8 +1000,54 @@ is the spatial counterpart of the retrieval result: frozen CLIP-variant embeddin
 recover change weakly, and localizing it --- a harder task than retrieving it ---
 is weaker still, with only RS pre-training buying a modest road signal. The overlay
 stays useful for a human in the loop, but it is not a quantitatively reliable
-detector. DEN carries no instance masks, so this metric is LEVIR-MCI-specific by
-design.
+detector. DEN carries no instance masks, so this metric is available only on the
+mask datasets (LEVIR-MCI here, SECOND-CC next).
+
+\subsection{SECOND-CC --- open-vocabulary breadth and localisation}
+\label{sec:secondcc}
+
+LEVIR-CC's change is almost entirely building/road. SECOND-CC (Robust Change
+Captioning in Remote Sensing, 2025) is the breadth counterpart: 6{,}041 pairs with
+human captions \emph{and} six-class semantic maps for both phases. Seven free-text
+queries cover the six SECOND classes plus road (heavily captioned, no semantic
+class). Test split, 1{,}227 pairs, frozen encoders, RGB; macro random-ranking
+floor 0.255.
+
+\begin{table}[H]
+    \centering
+    \caption{SECOND-CC zero-shot per-query AP (test split). Buildings dominate;
+    every type clears its prevalence floor but only modestly.}
+    \label{tab:secondcc}
+    \begin{tabular}{lccc}
+        \toprule
+        \textbf{Query (positives)} & \textbf{GeoRSCLIP} & \textbf{CLIP ViT-L/14} & \textbf{RemoteCLIP} \\
+        \midrule
+        new buildings/structures (809) & 0.698 & 0.652 & \textbf{0.702} \\
+        a new road or street (460)     & \textbf{0.418} & 0.377 & 0.372 \\
+        bare ground or land cleared (401) & 0.355 & \textbf{0.372} & 0.362 \\
+        trees appeared/cleared (370)   & \textbf{0.341} & 0.313 & 0.334 \\
+        low vegetation/grassland (311) & 0.275 & \textbf{0.280} & 0.273 \\
+        a water body (167)             & \textbf{0.168} & 0.152 & 0.159 \\
+        a playground/sports field (33) & 0.085 & 0.035 & \textbf{0.164} \\
+        \midrule
+        \textbf{macro mAP (zero-shot)} & 0.334 & 0.312 & \textbf{0.338} \\
+        \textbf{macro mAP (naive)}     & \textbf{0.453} & 0.430 & 0.441 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Across seven change types every query clears its prevalence floor --- broader
+recovery than DEN, where most queries sat at random --- but only modestly: the
+zero-shot macro ($\approx$0.33) is $\approx$+0.04 over the 0.255 floor, buildings
+($\approx$0.70) dominate, and water/playground are weak. As on QFabric, naive
+$>$ zero-shot (macro 0.45 vs 0.33): end-state appearance carries more of these
+land-cover categories than the temporal $\Delta$. Localisation on the SECOND-CC
+semantic masks matches the LEVIR-MCI verdict --- every reliably-sampled class sits
+within $\pm$0.04 of its random-patch floor (the lone large value, playground
+$+0.30$ on GeoRSCLIP, rests on 22 pairs and does not replicate). SECOND-CC thus
+extends the project's central law to a wide open vocabulary: recovery scales with
+the visual salience and prevalence of the change type, and is weak in absolute
+terms with frozen CLIP-variant encoders.
 
 \subsection{Error analysis --- seasonal vs permanent}
 \label{sec:erroranalysis}
@@ -1231,9 +1302,13 @@ The deliverable's value is the motivated, honestly-audited comparison, not
 a single best number: spectral physics and spatial locality carry the
 weak signal that exists, global embeddings and learned visual priors dilute or
 memorise it, and single-split scores must be cross-validated before they are
-believed. Across the three datasets the recovered signal tracks change salience:
-weak on DEN's subtle spectral transitions, dataset-dependent on QFabric, and ---
-within LEVIR-CC itself --- strong on salient building and road change (per-query
-AP $\approx$0.6--0.8) yet near-random on subtle vegetation and sparse water.
+believed. Across all four datasets the recovered signal tracks change salience:
+weak on DEN's subtle spectral transitions, dataset-dependent on QFabric, strong on
+LEVIR-CC's salient building/road change (per-query AP $\approx$0.6--0.8) yet
+near-random on its subtle vegetation and sparse water, and --- on SECOND-CC's
+seven-class open vocabulary --- above every prevalence floor but only modestly
+(zero-shot macro $\approx$0.33). Localising the change (LEVIR-MCI/SECOND-CC masks)
+is weaker still: the heatmap clears its random-patch floor by at most
+$\approx$0.04--0.10.
 
 \end{document}

@@ -22,8 +22,11 @@ class-specific detector.
 
 Frozen vision-language backbones (CLIP / GeoRSCLIP / RemoteCLIP) encode each
 timestep; a bi-temporal *change feature* is matched against the query text.
-Primary dataset: **Dynamic EarthNet (DEN)**; the abstraction is
-dataset-agnostic (QFabric / fMoW slot in via the registry).
+Primary dataset: **Dynamic EarthNet (DEN)**; the dataset-agnostic registry also
+runs **QFabric** (construction change-types), **LEVIR-CC/MCI** (human-captioned
+building/road change + masks) and **SECOND-CC** (a seven-class open vocabulary +
+semantic masks), with LEVIR-MCI and SECOND-CC masks driving quantitative change
+localisation.
 
 > **Just want to run the app?** Jump to [Run / install / use](#run--install--use) —
 > install, then a 30-second synthetic demo or the real dataset.
@@ -152,7 +155,7 @@ in-distribution wins are memorisation; held-out, frozen zero-shot is the stronge
 | File | Role |
 |------|------|
 | `src/datasets/` | `TemporalDataset` protocol, `DENDataset` (raster), `DENNpyDataset` (DynNet `.npy` + `color_mode` rgb/nrg/ndvi via NIR infrared frames), `QFabricDataset` (`images_only` parquet), `TEOChatlasQFabricDataset` (`qfabric_teo` — QFabric crops + RQA2 change-type labels), `StatusQFabricDataset` (`qfabric_status` — RQA5 status transitions), `LevirCCDataset` (`levir_cc` — building-change pairs + human captions), `LevirMCIDataset` (`levir_mci` — LEVIR-CC + building/road change masks), `SecondCCDataset` (`second_cc` — captioned six-class land-cover change + per-phase semantic masks), layout-detecting registry + opts adapters |
-| `src/queries/` | Per-dataset query sets (`den.py`, `qfabric.py`, `qfabric_status.py`, `levir_cc.py`); registry resolved by `dataset.name` |
+| `src/queries/` | Per-dataset query sets (`den.py`, `qfabric.py`, `qfabric_status.py`, `levir_cc.py`, `levir_mci.py`, `second_cc.py`); registry resolved by `dataset.name` |
 | `src/results_io.py` | serialize `BenchmarkReport` to JSON/CSV (torch-free); consumed by the figure scripts |
 | `src/error_analysis.py` | per-query confusion matrix + precision/recall (seasonal-vs-permanent error analysis) |
 | `src/encoders/` | `ImageTextEncoder` protocol; `clip_vitl14` (768-d), `georsclip` (512-d), `remoteclip` (768-d) |
@@ -171,6 +174,10 @@ in-distribution wins are memorisation; held-out, frozen zero-shot is the stronge
 | `scripts/download_den.py` | fetch + extract DEN subset, build label index |
 | `scripts/build_qfabric_labels.py` | TEOChatlas RQA2 → `qfabric_teo_labels.json` (27,879 real crop→change-type labels) |
 | `scripts/benchmark_qfabric.py` | extract QFabric crops + encode + label-grounded change-type mAP (`qfabric_teo`) |
+| `scripts/benchmark_levir_cc.py` | LEVIR-CC 5-query open-vocab retrieval, per-query AP (reads the shared LEVIR-MCI dir) |
+| `scripts/benchmark_second_cc.py` | SECOND-CC 7-query open-vocab breadth retrieval, per-query AP |
+| `scripts/eval_localization.py` | quantitative change localisation (pointing-game + patch-AP vs mask) — `--dataset levir_mci\|second_cc` |
+| `scripts/peft_augment_eval.py` | Track-4 anti-memorization check: frozen / PEFT / PEFT+feature-noise on the same leakage-free folds |
 | `scripts/make_den_fixture.py` | tiny synthetic DEN tree for fast tests |
 | `scripts/run_pipeline.py` | one-command run with `--train-split` / `--eval-splits` / `--color-mode` / `--mode` / `--lora` / `--results-dir`; cross-split mAP table |
 | `scripts/export_results.py` | regenerate benchmarks from cache → `results/*.json` + `macro_summary.csv` (`--confusion` for error analysis) |
