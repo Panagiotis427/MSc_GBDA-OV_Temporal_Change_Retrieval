@@ -168,10 +168,15 @@ class SemanticChangeSearch:
         .top-card {border: 1px solid var(--border-color-primary, #d0d0d0);
                    border-radius: 12px; padding: 14px 18px;
                    background: var(--background-fill-secondary, #fafafa);}
+        /* Single-hue intensity ramp, NOT a traffic light: the pill shows a
+           relative match rank within the candidate set, not absolute quality,
+           so deep->pale blue = stronger->weaker *position* (no green=good /
+           red=bad signal that would oversell a weak retrieval). Hue matches
+           the #1565c0 stats accent. */
         .conf-pill {display:inline-block; padding:4px 12px; border-radius:999px;
-                    background:#2e7d32; color:white; font-weight:600;}
-        .conf-pill.mid {background:#f9a825; color:#222;}
-        .conf-pill.low {background:#c62828;}
+                    background:#1565c0; color:white; font-weight:600;}
+        .conf-pill.mid {background:#6fa8dc; color:#10243a;}
+        .conf-pill.low {background:#cfe0f2; color:#10243a;}
         #search-btn { min-height: 3.5rem !important; font-size: 1.1rem !important;
                       letter-spacing: 0.03em; }
         .stats-card {border:1px solid var(--border-color-primary,#d0d0d0);
@@ -470,9 +475,14 @@ class SemanticChangeSearch:
         from src.encoders import list_encoders
 
         APPROACH_HELP = (
-            "Naive = cos(text, After) — image retrieval baseline.  "
-            "Zero-shot = cos(text, After) − cos(text, Before) — no training needed.  "
-            "PEFT adapter = cos(text, adapter(Δf)) — trained projection head, best quality."
+            "How a pair is scored against your query. "
+            "Naive = cos(text, After) — an image-retrieval baseline (ignores Before).  "
+            "Zero-shot = cos(text, After) − cos(text, Before) — the temporal change Δ, no training.  "
+            "Patch (localised) = the top-3 per-patch change Δ — scores small, localised change a "
+            "whole-image embedding would average away; best on Dynamic EarthNet (first query on a "
+            "corpus encodes its patches, a few seconds).  "
+            "PEFT adapter = cos(text, adapter(Δf)) — a small trained projection head (used only if a "
+            "matching adapter exists for the encoder + colour)."
         )
         ENCODER_HELP = (
             "clip_vitl14 (general purpose, 768-d)  ·  georsclip (RS-pretrained ViT-B/32, 512-d)  "
@@ -496,12 +506,12 @@ class SemanticChangeSearch:
             "Changing requires Apply Settings."
         )
 
-        with gr.Blocks(title="Semantic Change Search Engine",
+        with gr.Blocks(title="Open Vocabulary Temporal Change Retrieval",
                        analytics_enabled=False) as demo:
             gr.Markdown(
-                "# Semantic Change Search Engine\n"
-                "Describe a land-cover change in plain language — "
-                "the engine finds the satellite image pairs where it happened. "
+                "# Open Vocabulary Temporal Change Retrieval\n"
+                "Describe a land-cover change in plain language — the semantic change search "
+                "engine finds the satellite image pairs (and the timestep) where it happened. "
                 "*Research demo — results are approximate (see **About** below).*"
             )
 
@@ -530,7 +540,11 @@ class SemanticChangeSearch:
                     "QFabric change-type (construction), Dynamic EarthNet (the report's primary "
                     "analysed corpus; subtle spectral change, weakest absolute results), and QFabric "
                     "construction-status (a distinct task, but retrieval is ≈ random — included for "
-                    "completeness). Switching reloads embeddings, so press **Apply Settings**."
+                    "completeness). Switching reloads embeddings, so press **Apply Settings**.\n\n"
+                    "**Note on QFabric here:** this is the reduced *2-date* TEOChatlas crop subset "
+                    "(change-type / status retrieval only). The full *5-date* QFabric with polygon "
+                    "change-masks (for temporal pinpointing + pixel localization) is committed future "
+                    "work, pending dataset access — it is **not** the same as the 2-date subset shown here."
                 )
 
             # ---- Query first — most important ----
@@ -543,10 +557,10 @@ class SemanticChangeSearch:
                 )
                 a_dd = gr.Dropdown(
                     choices=[
-                        ("Naive (baseline)", "naive"),
-                        ("Zero-shot (no training)", "zero_shot"),
-                        ("Patch / localised (best on DEN)", "patch"),
-                        ("PEFT adapter (trained)", "peft"),
+                        ("Naive — match the After image", "naive"),
+                        ("Zero-shot — temporal Δ (no training)", "zero_shot"),
+                        ("Patch — localised Δ (best on DEN)", "patch"),
+                        ("PEFT adapter — trained head", "peft"),
                     ],
                     value=engine.cfg.approach,
                     label="Approach",
@@ -579,9 +593,18 @@ class SemanticChangeSearch:
                 ]:
                     gr.Button(_ex, size="sm").click(lambda v=_ex: v, None, q)
 
-            # ---- Settings (power-user, collapsed) ----
-            with gr.Accordion("Settings", open=False):
+            # ---- Settings — one comprehensive menu (corpus · model · filters) ----
+            _geo_available = engine._geo_filter is not None
+            _regions = engine._geo_filter.regions if _geo_available else ["All"]
+            _rerank_available = engine._reranker is not None
+
+            with gr.Accordion("⚙  Settings — corpus · model · filters", open=False):
                 stats_md = gr.Markdown(engine.stats_markdown())
+
+                gr.Markdown(
+                    "**Corpus & model** — pick the dataset, encoder, colour mode or adapter, "
+                    "then press **Apply settings** to (re)load embeddings."
+                )
                 with gr.Row():
                     d_dd = gr.Dropdown(_labeled(_app_dataset_choices(), DATASET_LABELS),
                                        value=engine.cfg.dataset,
@@ -600,26 +623,18 @@ class SemanticChangeSearch:
                         info=LORA_HELP,
                     )
                 with gr.Row():
-                    apply = gr.Button("Apply Settings", variant="secondary")
+                    apply = gr.Button("Apply settings", variant="secondary")
                     status = gr.Textbox(
                         label="Engine status", interactive=False, scale=4,
                         value=f"{engine.cfg.dataset} + {engine.cfg.encoder} | "
                               f"color={engine.cfg.color_mode} | "
                               f"{len(engine.store)} pairs | "
                               f"approach={engine.cfg.approach}")
-                apply.click(engine.reload,
-                            [d_dd, e_dd, a_dd, color_dd, lora_chk],
-                            [status, stats_md])
 
-            # ---- Filters & Re-ranking (per-query, no Apply Settings needed) ----
-            _geo_available = engine._geo_filter is not None
-            _regions = engine._geo_filter.regions if _geo_available else ["All"]
-            _rerank_available = engine._reranker is not None
-
-            with gr.Accordion("Filters & Re-ranking", open=False):
                 gr.Markdown(
-                    "These options take effect on the **next Search** — "
-                    "no Apply Settings needed."
+                    "---\n**Filters & re-ranking** — applied on the **next Search** (no Apply "
+                    "needed). Both require `aoi_metadata.json` in the dataset root (present for "
+                    "Dynamic EarthNet); otherwise they are greyed out."
                 )
                 with gr.Row():
                     geo_chk = gr.Checkbox(
@@ -628,12 +643,10 @@ class SemanticChangeSearch:
                         interactive=_geo_available,
                         info="Restrict results to one continental region."
                         if _geo_available
-                        else "Requires aoi_metadata.json in --root.",
+                        else "Requires aoi_metadata.json in the dataset root.",
                     )
                     geo_dd = gr.Dropdown(
-                        _regions,
-                        value="All",
-                        label="Region",
+                        _regions, value="All", label="Region",
                         interactive=_geo_available,
                     )
                 with gr.Row():
@@ -643,7 +656,7 @@ class SemanticChangeSearch:
                         interactive=_rerank_available,
                         info="Post-process ranking for spatial quality."
                         if _rerank_available
-                        else "Requires aoi_metadata.json in --root.",
+                        else "Requires aoi_metadata.json in the dataset root.",
                     )
                     rerank_dd = gr.Dropdown(
                         list(RERANK_STRATEGIES),
@@ -655,6 +668,10 @@ class SemanticChangeSearch:
                             "coherence = cluster near top-1 location"
                         ),
                     )
+
+                apply.click(engine.reload,
+                            [d_dd, e_dd, a_dd, color_dd, lora_chk],
+                            [status, stats_md])
 
             # ---- Results ----
             gr.Markdown("## Top match")
