@@ -10,7 +10,7 @@ Extensions ranked by effort. Implemented extensions marked ✅.
 Fine-tune GeoRSCLIP's attention weights via `peft` library.
 
 - **Status:** `src/lora_train.py`. Benchmarked: test mAP 0.071 (vs frozen zero-shot — single-split 0.426 / CV 0.100 ± 0.139, see REPORT.md §7.4 / Appendix B.8). In-app toggle: Settings → **Use LoRA embeddings** (requires pre-cached run). CLI: `--lora / --no-lora`.
-- **Finding:** every learned adapter collapses out-of-distribution — LoRA test ≈0.071, ProjectionHead ≈0.041, both ≪ frozen NRG zero-shot. Spectral physics generalises; learned priors do not. (Earlier 0.159/0.246 readings were a since-fixed LoRA loss-bug + stale-cache artifact — REPORT §7.4.)
+- **Finding:** learned adapters show no out-of-distribution gain. On a single train/val/test split they collapse (LoRA test ≈0.071, ProjectionHead ≈0.041, both ≪ the single-split 0.426); under leakage-free 5-fold CV the ProjectionHead (NRG 0.196 ± 0.049) merely *overlaps* frozen zero-shot (0.139 ± 0.024) within fold variance — it matches, never beats, frozen, and feature-space augmentation doesn't change this (REPORT §7.4 / B.5 / B.9 / B.14). The high in-distribution train-fit is memorisation. (Earlier 0.159/0.246 readings were a since-fixed LoRA loss-bug + stale-cache artifact — REPORT §7.4.)
 
 ### NDVI ablation ✅
 Color mode `ndvi` benchmarked across all 3 encoders × 3 splits.
