@@ -21,6 +21,31 @@ deployed as a HuggingFace Space). Goal: a sharp, public-facing demo.*
 - **Sharper first-query progress message** — the existing `gr.Progress` now flags that
   the first query on a dataset/approach encodes the corpus (a few seconds).
 
+## Done (offline, 2026-06-13 round) — build-verified (full Gradio tree constructs; app tests green)
+- **Dataset labels completed** — `DATASET_LABELS` was missing the datasets added this expansion;
+  `second_cc` and `levir_mci` showed raw registry keys in the dropdown. Added friendly,
+  role-bearing labels for all six corpora (e.g. "SECOND-CC — 6-class land cover (+ masks)").
+- **Curated examples that actually retrieve** — the example fill-buttons were DEN-generic and
+  included **zero-positive** queries (seasonal snow = 0 positives → always noise) and at-chance
+  ones. Replaced with DEN's honest signals (wetland-formation, the only robustly above-chance
+  signal, + construction which patch scoring recovers); default query set to a wetland one so the
+  **first impression actually works**. Caption states the honesty up front.
+- **Honest-expectation note** — header + examples caption + About now state this is a research demo
+  and retrieval is approximate (≈0.20 mAP ceiling). (Pairs with the match-score reframing.)
+- **"About / How it works" disclosure (Idea 1, partial)** — a collapsed accordion at the top
+  consolidates: what it is, honest expectations, the four approaches, how to read the match score +
+  heatmap, and the corpus selector note. Default view stays clean (collapsed); the verbose
+  explanation no longer clutters the query area.
+- **Dataset switching actually works now (functional fix, was broken).** The Dataset dropdown
+  listed every corpus but `reload()` reused the DEN root, so picking LEVIR-CC / LEVIR-MCI / SECOND-CC
+  / QFabric **errored on select**. Added `DATASET_PROFILES` (per-corpus root / split / colour) and
+  resolved it in `reload()`; verified DEN (110), LEVIR-CC (1929), SECOND-CC (1227), LEVIR-MCI (1929)
+  all load + return query results in-app. The session's new datasets (SECOND-CC, LEVIR-MCI) are now
+  genuinely usable, not just labelled. **QFabric (`qfabric_teo`/`qfabric_status`) is dropped from the
+  app dropdown** — its loader needs extra args (`labels_path`, `max_per_class`) and a custom-tagged
+  cache the app path doesn't supply, so it errored on select; it stays fully usable via
+  `scripts/benchmark_qfabric.py`. (`_app_dataset_choices()` = query-set ∩ profile.)
+
 ## Idea 1 — progressive disclosure (default view stays clean) · needs render
 Default view = **query box → ranked results**, nothing else. Everything verbose moves
 behind disclosure:

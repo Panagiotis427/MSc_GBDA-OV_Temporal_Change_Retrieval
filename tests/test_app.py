@@ -80,3 +80,23 @@ def test_seasonal_pair_flagged(engine):
 def test_peft_without_adapter_errors(engine):
     with pytest.raises(RuntimeError, match="no adapter"):
         engine.query("anything", approach="peft", top_k=2)
+
+
+def test_dataset_profiles_contract():
+    """The in-app Dataset dropdown must only offer corpora that actually load
+    (a launch profile + a registered query set), with colour pinned correctly."""
+    import os
+    from src.app import DATASET_PROFILES, _app_dataset_choices
+    from src.queries import get_queries
+
+    for ds, prof in DATASET_PROFILES.items():
+        assert get_queries(ds), f"{ds} has no query set"
+        assert os.path.isabs(prof["root"]), f"{ds} root not absolute"
+    # DEN honours the colour dropdown (no pinned colour); other corpora are rgb-only
+    assert "color_mode" not in DATASET_PROFILES["dynamic_earthnet"]
+    for ds in ("levir_cc", "levir_mci", "second_cc"):
+        assert DATASET_PROFILES[ds]["color_mode"] == "rgb"
+    # dropdown = query-set ∩ profile; QFabric (needs extra loader args) is excluded
+    choices = set(_app_dataset_choices())
+    assert choices == set(DATASET_PROFILES)
+    assert "qfabric_teo" not in choices and "qfabric_status" not in choices

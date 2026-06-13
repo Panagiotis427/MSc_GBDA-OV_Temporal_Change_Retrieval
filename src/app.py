@@ -19,7 +19,6 @@ CLI:
 from __future__ import annotations
 
 import argparse
-import os
 import traceback
 from dataclasses import dataclass
 from pathlib import Path
@@ -54,8 +53,10 @@ def _app_datasets() -> list:
 # the callbacks stays the registry key; only the shown label changes. Unknown
 # keys fall back to the raw key so a newly-registered dataset/encoder still appears.
 DATASET_LABELS = {
-    "dynamic_earthnet": "Dynamic EarthNet",
-    "levir_cc": "LEVIR-CC",
+    "dynamic_earthnet": "Dynamic EarthNet — land-cover transitions",
+    "levir_cc": "LEVIR-CC — building/road (captions)",
+    "levir_mci": "LEVIR-MCI — building/road (+ masks)",
+    "second_cc": "SECOND-CC — 6-class land cover (+ masks)",
     "qfabric_teo": "QFabric — change type",
     "qfabric_status": "QFabric — construction status",
 }
@@ -69,6 +70,32 @@ ENCODER_LABELS = {
 def _labeled(choices, labels):
     """``[(display_label, value)]`` for a Dropdown; value stays the registry key."""
     return [(labels.get(c, c), c) for c in choices]
+
+
+# Per-dataset launch profile so the in-app Dataset dropdown actually *works* when
+# switched (each corpus lives in its own directory with its own split/colour).
+# Without this, switching datasets reused the DEN root and failed. ``color_mode``
+# is omitted for DEN so its dropdown still selects rgb/nrg/ndvi; the others are
+# RGB-only (their loaders ignore colour) and pin the cache tag to the committed
+# ``__test`` caches. Datasets *not* listed here are excluded from the app dropdown
+# (e.g. QFabric needs extra loader args + a custom-tagged cache — use its
+# benchmark scripts). Paths are repo-relative.
+DATASET_PROFILES = {
+    "dynamic_earthnet": {"root": str(_PROJECT_ROOT / "data" / "DynamicEarthNet"),
+                         "split": "test", "pairing": "bimonthly"},
+    "levir_cc":  {"root": str(_PROJECT_ROOT / "data" / "_levir_mci" / "extracted" / "LEVIR-MCI-dataset"),
+                  "split": "test", "color_mode": "rgb"},
+    "levir_mci": {"root": str(_PROJECT_ROOT / "data" / "_levir_mci" / "extracted" / "LEVIR-MCI-dataset"),
+                  "split": "test", "color_mode": "rgb"},
+    "second_cc": {"root": str(_PROJECT_ROOT / "data" / "_second_cc" / "extracted" / "SECOND-CC-AUG"),
+                  "split": "test", "color_mode": "rgb"},
+}
+
+
+def _app_dataset_choices() -> list:
+    """Datasets offered in the app dropdown: those with a query set AND a launch
+    profile (so switching to them in the UI actually loads them)."""
+    return [d for d in _app_datasets() if d in DATASET_PROFILES]
 
 
 @dataclass
@@ -368,6 +395,7 @@ class SemanticChangeSearch:
             f"<b>Dataset:</b> <code>{self.cfg.dataset}</code> &nbsp;|&nbsp; "
             f"<b>Split:</b> <code>{self.cfg.split or 'all'}</code> &nbsp;|&nbsp; "
             f"<b>Pairing:</b> <code>{self.cfg.pairing}</code> &nbsp;|&nbsp; "
+            f"<b>Color:</b> <code>{self.cfg.color_mode}</code> &nbsp;|&nbsp; "
             f"<b>Locations:</b> <code>{n_locs}</code> &nbsp;|&nbsp; "
             f"<b>Image pairs:</b> <code>{n_pairs}</code> "
             f"({per_loc:.0f}/location) &nbsp;|&nbsp; "
@@ -382,18 +410,26 @@ class SemanticChangeSearch:
     def reload(self, dataset: str, encoder: str, approach: str,
                color_mode: str = "rgb", use_lora: bool = False):
         try:
+            # Resolve the per-dataset launch profile so switching datasets loads
+            # the right directory/split/colour. DEN honours the colour dropdown;
+            # other corpora pin colour (rgb) via the profile.
+            prof = DATASET_PROFILES.get(dataset, {})
+            root = prof.get("root", self.cfg.root)
+            split = prof.get("split", self.cfg.split)
+            pairing = prof.get("pairing", self.cfg.pairing)
+            color = prof.get("color_mode", color_mode)
             self.cfg = RunConfig(
                 dataset=dataset, encoder=encoder, approach=approach,
-                root=self.cfg.root, pairing=self.cfg.pairing,
-                split=self.cfg.split, cache_dir=self.cfg.cache_dir,
-                color_mode=color_mode, use_lora=use_lora,
+                root=root, pairing=pairing,
+                split=split, cache_dir=self.cfg.cache_dir,
+                color_mode=color, use_lora=use_lora,
                 geo_filter=self.cfg.geo_filter, rerank=self.cfg.rerank,
                 rerank_strategy=self.cfg.rerank_strategy,
             )
             self._build(self.cfg)
             lora_note = " + LoRA" if use_lora else ""
             status = (f"Loaded {dataset} + {encoder}{lora_note} | "
-                      f"color={color_mode} | approach={approach} | "
+                      f"color={self.cfg.color_mode} | approach={approach} | "
                       f"{len(self.store)} pairs")
             return status, self.stats_markdown()
         except Exception as exc:
@@ -437,14 +473,42 @@ class SemanticChangeSearch:
             gr.Markdown(
                 "# Semantic Change Search Engine\n"
                 "Describe a land-cover change in plain language — "
-                "the engine finds the satellite image pairs where it happened."
+                "the engine finds the satellite image pairs where it happened. "
+                "*Research demo — results are approximate (see **About** below).*"
             )
+
+            with gr.Accordion("About / How it works", open=False):
+                gr.Markdown(
+                    "**What it is.** A frozen vision–language model (CLIP / GeoRSCLIP / "
+                    "RemoteCLIP) encodes each timestep of a bi-temporal satellite pair; the "
+                    "**change** between them is matched against your text query by cosine "
+                    "similarity. No per-query training — it is *open-vocabulary*.\n\n"
+                    "**Honest expectations.** This is a research demo, not a product. With frozen "
+                    "encoders, open-vocabulary change retrieval is **weak in absolute terms** — the "
+                    "best honestly-audited configuration reaches only **≈ 0.20 mAP** (5-fold "
+                    "cross-validated), and recovery scales with how *visually salient* the change "
+                    "is. Use the curated example queries for results that actually work.\n\n"
+                    "**Approaches.** *Naive* = cos(text, After) — an image-retrieval baseline. "
+                    "*Zero-shot* = cos(text, After) − cos(text, Before) — the temporal Δ, no "
+                    "training. *Patch / localised* = top-3 per-patch Δ — the best configuration on "
+                    "Dynamic EarthNet. *PEFT adapter* = a small trained projection head (loaded only "
+                    "if a matching adapter exists).\n\n"
+                    "**Reading the results.** The **match score (0–1)** is a *relative* rank within "
+                    "the returned set (min–max normalised), **not** a calibrated probability. The "
+                    "**change heatmap** (jet) overlays the After image: warm = where the query's "
+                    "presence grew most from Before→After; cool = little/no change.\n\n"
+                    "**Corpora.** Dynamic EarthNet (default), QFabric (construction), LEVIR-CC/MCI "
+                    "(building/road + masks) and SECOND-CC (six land-cover classes + masks) are all "
+                    "selectable under **Settings** — switching reloads embeddings, so press "
+                    "**Apply Settings** afterwards. The example queries are curated for the default "
+                    "Dynamic EarthNet corpus."
+                )
 
             # ---- Query first — most important ----
             with gr.Row():
                 q = gr.Textbox(
                     label="Change query", scale=5,
-                    value="new buildings on former farmland",
+                    value="agricultural land converted to wetland or marsh",
                     placeholder="e.g. agricultural land converted to wetland",
                     info=QUERY_HELP,
                 )
@@ -469,13 +533,19 @@ class SemanticChangeSearch:
             # gradio 6.14 when combined with the full component tree — page sticks on
             # "Loading..." and Firefox flags "slowing down". Plain fill-buttons give the
             # same click-to-fill UX without the Dataset component.
-            gr.Markdown("Example queries — click to fill")
+            gr.Markdown(
+                "**Example queries — click to fill.** *Research demo: open-vocabulary change "
+                "retrieval with frozen encoders is approximate (best honest config ≈ 0.20 mAP). "
+                "These are curated for the default **Dynamic EarthNet** corpus — its only robustly "
+                "above-chance signal is wetland-formation, with construction recoverable via "
+                "patch scoring; they retrieve best. Switch corpus in Settings (then Apply).*"
+            )
             with gr.Row():
                 for _ex in [
-                    "new buildings on former farmland",
-                    "forest cleared to bare soil",
-                    "agricultural land converted to wetland",
-                    "seasonal snow melting away",
+                    "agricultural land converted to wetland or marsh",
+                    "land turning into wetland",
+                    "new buildings constructed on former agricultural land",
+                    "urban expansion replacing vegetation",
                 ]:
                     gr.Button(_ex, size="sm").click(lambda v=_ex: v, None, q)
 
@@ -483,7 +553,7 @@ class SemanticChangeSearch:
             with gr.Accordion("Settings", open=False):
                 stats_md = gr.Markdown(engine.stats_markdown())
                 with gr.Row():
-                    d_dd = gr.Dropdown(_labeled(_app_datasets(), DATASET_LABELS),
+                    d_dd = gr.Dropdown(_labeled(_app_dataset_choices(), DATASET_LABELS),
                                        value=engine.cfg.dataset,
                                        label="Dataset", info=DATASET_HELP)
                     e_dd = gr.Dropdown(_labeled(list_encoders(), ENCODER_LABELS),
@@ -608,9 +678,14 @@ class SemanticChangeSearch:
                         rerank_strategy=active_rerank,
                     )
                 except Exception as exc:
-                    return None, None, None, f"**Error:** {exc}", [], []
+                    return None, None, None, (
+                        f"**Error:** {exc}\n\n*If you just changed Dataset / Encoder / Color mode, "
+                        "press **Apply Settings** first. For PEFT, an adapter must exist for the "
+                        "selected encoder + colour mode.*"), [], []
                 if not evs:
-                    return None, None, None, "*No results.*", [], []
+                    return None, None, None, (
+                        "*No results for this query. Try a curated example above, or a different "
+                        "**Approach** (patch / zero-shot).*"), [], []
                 progress(0.9, desc="Rendering results…")
                 top = evs[0]
                 rows = [[e.rank, e.location, e.t1_key, e.t2_key,
@@ -652,7 +727,7 @@ def parse_args():
     p = argparse.ArgumentParser(description="Semantic Change Search Engine")
     from src.encoders import list_encoders
     p.add_argument("--dataset", default="dynamic_earthnet",
-                   choices=_app_datasets())
+                   choices=_app_dataset_choices())
     p.add_argument("--encoder", default="georsclip",
                    choices=list_encoders())
     p.add_argument("--approach", default="patch",
