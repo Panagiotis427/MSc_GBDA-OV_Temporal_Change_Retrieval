@@ -95,12 +95,16 @@ different taxonomy (6 construction change-types) and temporal axis.
   `python -m scripts.benchmark_qfabric --extract-from <eval tar> --crops-root data/QFabric/teochat_crops --extract-only`
   then `python -m scripts.benchmark_qfabric --crops-root data/QFabric/teochat_crops --max-per-class 120`.
 
-### fMoW-Sentinel pipeline
+### fMoW-Sentinel pipeline — ASSESSED AND REJECTED
 Multi-temporal Sentinel-2 imagery, 63 land-use categories, worldwide coverage.
 
-- **Why:** Entirely different sensor (10m Sentinel-2 vs 3m Planet) and scale; stress-tests encoder generalisation.
-- **How:** Download via HuggingFace `jonathan-roberts1/fMoW-Sentinel`; implement `FMoWDataset(TemporalDataset)` in `src/datasets/fmow.py`; register; add query set.
-- **Effort:** ~3–5 days.
+- **Verdict (do not implement):** fMoW is a **functional-classification** dataset with **no change
+  labels** — its temporal sequences are repeat views of a static functional category. Repurposing it
+  for change retrieval means manufacturing pseudo-change pairs, reintroducing the exact weak-label
+  noise that already sank DEN PEFT. Full rationale: [`DATA_EXPANSION_PLAN.md`](DATA_EXPANSION_PLAN.md)
+  §2. The change-captioning family (LEVIR-MCI, SECOND-CC) was implemented instead.
+- *Original (superseded) idea:* download `jonathan-roberts1/fMoW-Sentinel`, implement
+  `FMoWDataset(TemporalDataset)`, add a query set — left here only to record why it was not pursued.
 
 ---
 

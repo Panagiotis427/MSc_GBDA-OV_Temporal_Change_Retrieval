@@ -1,10 +1,16 @@
 # Data Expansion & Honest-Reframe Plan
 
-*Created 2026-06-12. **Planning document — pre-implementation.** Captures the dataset
-reassessment, the disk budget, and the work tracks agreed before any edits or downloads.
-Single source of repo status remains [`STATUS.md`](../STATUS.md); canonical results remain
-[`REPORT.md`](../REPORT.md). This plan is cited from `STATUS.md §4`. When a track lands, its
-outcome moves into `STATUS.md` / `REPORT.md` and this doc is updated, not duplicated.*
+> **STATUS (2026-06-13): Tracks 0–4 COMPLETE.** Disk audit + cleanup, honest reframe, LEVIR-CC
+> 5-query broadening, LEVIR-MCI localization, DEN-monthly, SECOND-CC, and the Track-4 PEFT
+> augmentation check are all done and landed in `REPORT.md` / `STATUS.md`. The **only** remaining
+> item is **QFabric** (pentatemporal + polygon masks), blocked on dataset access — its full
+> pickup-cold spec is [`QFABRIC_FUTURE_WORK.md`](QFABRIC_FUTURE_WORK.md). The per-track notes below
+> are retained as the implementation record; §3's disk budget is the original pre-implementation
+> estimate (superseded by actuals in [`../INVENTORY.md`](../INVENTORY.md) and `STATUS.md`).
+
+*Created 2026-06-12 as a **pre-implementation** planning document — dataset reassessment, disk
+budget, and work tracks. Single source of repo status remains [`STATUS.md`](../STATUS.md);
+canonical results remain [`REPORT.md`](../REPORT.md).*
 
 ---
 
