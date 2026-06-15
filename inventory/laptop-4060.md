@@ -4,15 +4,15 @@
 
 | field | value |
 |---|---|
-| scanned | 2026-06-10 19:37 |
+| scanned | 2026-06-15 09:07 |
 | repo | MSc_GBDA-OV_Temporal_Change_Retrieval |
 | os | Microsoft Windows NT 10.0.26200.0 (Windows) |
 | ram | 32 GB |
 | gpu | NVIDIA GeForce RTX 4060 Laptop GPU, 8188 MiB |
-| disk free (repo drive) | 57 GB |
+| disk free (repo drive) | 54 GB |
 | repo path | D:\Code Projects\MSc_GBDA-OV_Temporal_Change_Retrieval |
-| branch @ scan | main @ 2136164 |
-| dirty files @ scan | 5 |
+| branch @ scan | main @ f879e50 |
+| dirty files @ scan | 0 |
 
 ## Gitignored payloads present on this machine
 
@@ -20,17 +20,16 @@ What git cannot show other machines. Dir-level only.
 
 | path (repo-relative) | size MB | files |
 |---|---|---|
-| data | 32733.3 | 271860 |
+| data | 42137.2 | 332781 |
 | .model_cache | 3844.4 | 30 |
-| tests/__pycache__ | 0.6 | 39 |
-| legacy | 0.4 | 12 |
+| tests/__pycache__ | 0.6 | 42 |
+| scripts/__pycache__ | 0.2 | 21 |
 | src/__pycache__ | 0.2 | 19 |
-| scripts/__pycache__ | 0.2 | 18 |
-| src/datasets/__pycache__ | 0.1 | 10 |
-| src/queries/__pycache__ | 0 | 5 |
-| .pytest_cache | 0 | 5 |
-| src/project.egg-info | 0 | 5 |
+| src/datasets/__pycache__ | 0.1 | 12 |
+| src/queries/__pycache__ | 0 | 7 |
 | open_vocabulary_temporal_change_retrieval.egg-info | 0 | 5 |
+| src/project.egg-info | 0 | 5 |
+| .pytest_cache | 0 | 5 |
 | src/encoders/__pycache__ | 0 | 6 |
 
 ## Python environments
@@ -39,10 +38,13 @@ What git cannot show other machines. Dir-level only.
 
 ## HuggingFace cache (shared across repos on this machine)
 
+- models--unsloth--Qwen2.5-7B-Instruct-bnb-4bit - 5305.4 MB
 - models--Zilun--GeoRSCLIP - 1154.4 MB
 - datasets--danielz01--fMoW - 379.5 MB
 - .locks - 0 MB
 - models--openai--clip-vit-large-patch14 - 0 MB
+- datasets--labaerien--qfabric - 0 MB
+- datasets--lcybuaa--LEVIR-MCI - 0 MB
 
 ## Config presence (never contents)
 
