@@ -683,6 +683,63 @@ this encoder scale. A learned query-to-patch attention head was deliberately
 not pursued, since every trained head on this data memorises the training AOIs
 with no held-out gain (Section~\ref{sec:crosssplit}).
 
+\subsection{Native 3\,m raster source --- robustness of the data-source choice}
+\label{sec:nativeraster}
+
+Section~\ref{sec:data} excluded the $\sim$525\,GB raw TUM mirror in favour of the
+$\sim$7\,GB preprocessed RGB/NIR-JPEG subset. To check that this pragmatic choice
+does not cost retrieval performance --- i.e.\ that the conclusions survive at full
+radiometric depth --- we ran an independent replication directly on the excluded
+source: the native Planet-Fusion surface-reflectance rasters
+($1024\times1024\times4$ \texttt{int16}, Blue/Green/Red/NIR, 3\,m), read in-memory
+from the per-zone \texttt{planet.<UTM>.zip} archives with no lossy re-encoding. The
+full mirror was made tractable by cherry-picking only the UTM zones needed via
+\texttt{rsync} \texttt{--include}/\texttt{--exclude} and decoding tiles straight
+from the zips, yielding 23 labelled AOIs (552 bimonthly change pairs) spanning all
+seven DEN land-cover classes.
+
+The adapter (frozen CLIP ViT-L/14, \texttt{difference} change feature) was scored
+under the same held-out protocol as Section~\ref{sec:audit}: a 5-seed stratified
+\emph{AOI}-level hold-out (split on real cube id to prevent leakage, stratified by
+dominant change class), reporting mean $\pm$ std across seeds.
+Table~\ref{tab:nativeraster} reports the result.
+
+\begin{table}[H]
+    \centering
+    \caption{Native 3\,m raster source (CLIP ViT-L/14, adapter, \texttt{difference};
+    23 AOIs, 5-seed stratified AOI cross-validation). NIR here is the
+    NIR-Red-Green false colour (matching \texttt{nrg} elsewhere).}
+    \label{tab:nativeraster}
+    \begin{tabular}{llc}
+        \toprule
+        \textbf{Configuration} & \textbf{colour} & \textbf{mAP (mean $\pm$ std)} \\
+        \midrule
+        Adapter                & RGB  & 0.236 $\pm$ 0.030 \\
+        Adapter                & NIR (NRG)  & 0.253 $\pm$ 0.040 \\
+        Adapter, class-weighted & RGB & 0.265 $\pm$ 0.029 \\
+        Adapter, $2\times2$ patch tiling & RGB & 0.202 $\pm$ 0.022 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+Two readings follow, both consistent with the JPEG-subset audit. First, the native
+rasters land in the \emph{same band} as the preprocessed subset under
+cross-validation (cf.\ the audited CV figures in Section~\ref{sec:audit}): full
+\texttt{int16} radiometric depth and the intact NIR channel buy no material
+retrieval gain over the $\sim$7\,GB RGB/NIR-JPEG subset, so the data-source choice
+in Section~\ref{sec:data} is vindicated --- the bottleneck is the frozen
+web-pretrained features and the small labelled AOI set, not imagery compression.
+Second, no full-tile configuration is statistically separable from another: RGB
+($0.236\pm0.030$), NRG ($0.253\pm0.040$) and per-class loss weighting
+($0.265\pm0.029$) all overlap within one standard deviation, and the $+0.017$
+NRG-over-RGB margin sits well inside that noise --- the same null result as
+Section~\ref{sec:nir}, where the large single-split NRG lift collapses under
+cross-validation, confirming it is a fold artefact rather than a spectral effect.
+Only $2\times2$ patch tiling separates, and downward ($0.202\pm0.022$): splitting
+the 1024-px tile discards the CLIP global spatial context. RGB at the native tile
+scale is the simplest configuration in the indistinguishable top group and remains
+our reference.
+
 \subsection{Re-ranking quantification}
 \label{sec:rerank}
 
