@@ -1,8 +1,6 @@
 """
-Behavioural tests for the *real* PEFT training loss `_masked_infonce` (train.py).
-
-The heavily-tested `InfoNCELoss` in model.py is unused; this exercises the loss
-that actually trains the ProjectionHead adapter behind the §7 PEFT numbers.
+Behavioural tests for the PEFT training loss `_masked_infonce` (train.py) — the
+loss that actually trains the ProjectionHead adapter behind the §7 PEFT numbers.
 
 These assert robust properties (finite, non-negative, lower when aligned), not
 exact values, so they don't depend on the temperature constant.
