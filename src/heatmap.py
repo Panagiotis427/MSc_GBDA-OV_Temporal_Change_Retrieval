@@ -61,6 +61,9 @@ def generate_change_heatmap(
     text: str,
     encoder: "ImageTextEncoder",
     alpha: float = 0.5,
+    *,
+    precomputed_p1: Optional[np.ndarray] = None,
+    precomputed_p2: Optional[np.ndarray] = None,
 ) -> Tuple[Optional[np.ndarray], Optional[Image.Image]]:
     """Query-conditioned **change** heatmap (the honest localiser for this engine).
 
@@ -69,14 +72,21 @@ def generate_change_heatmap(
     patch-level scorer, REPORT Appendix B.10) — unlike ``generate_heatmap`` which
     only matches the query against the After image and ignores T1.
 
+    Pass ``precomputed_p1``/``precomputed_p2`` (``[n_patch, D]`` L2-normed patch
+    embeddings, as ``encode_image_patches`` returns) to skip re-encoding when the
+    caller already has them cached (the ``patch`` approach caches the whole corpus).
+
     Returns ``(grid [0,1], blended PIL)`` or ``(None, None)`` if the encoder
     exposes no patch tokens (caller should fall back to ``generate_heatmap``).
     """
-    patches_fn = getattr(encoder, "encode_image_patches", None)
-    if patches_fn is None:
-        return None, None
-    pil_t1, pil_t2 = _to_pil(image_t1), _to_pil(image_t2)
-    P1, P2 = patches_fn(pil_t1), patches_fn(pil_t2)
+    if precomputed_p1 is not None and precomputed_p2 is not None:
+        P1, P2 = precomputed_p1, precomputed_p2
+    else:
+        patches_fn = getattr(encoder, "encode_image_patches", None)
+        if patches_fn is None:
+            return None, None
+        pil_t1, pil_t2 = _to_pil(image_t1), _to_pil(image_t2)
+        P1, P2 = patches_fn(pil_t1), patches_fn(pil_t2)
     if P1 is None or P2 is None:
         return None, None
 

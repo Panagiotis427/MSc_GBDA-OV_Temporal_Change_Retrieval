@@ -10,7 +10,7 @@ tile, a relative match score, and a seasonal-vs-permanent note grounded in the d
 labels.
 
 Selectors: Dataset, Encoder (CLIP / GeoRSCLIP / RemoteCLIP), Approach
-(naive / zero_shot Δ-similarity / peft adapter).
+(naive / zero_shot Δ-similarity / patch (localised per-patch Δ) / peft adapter).
 
 CLI:
     python -m src.app --dataset dynamic_earthnet --root data/DynamicEarthNet \
@@ -19,6 +19,7 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import os
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -293,19 +294,28 @@ class SemanticChangeSearch:
         from src.benchmark import encode_query
         from src.retrieval import top_patch_change_scores
         if getattr(self, "_patch_t1", None) is None:
+            # Encode the corpus's per-patch embeddings in GPU batches (a chunk of
+            # pairs at a time) instead of one image per forward pass; chunking keeps
+            # peak host memory bounded rather than holding every PIL image at once.
+            BATCH = 32
+            pairs = self.store.pairs
             p1, p2 = [], []
-            for pk in self.store.pairs:
-                im1, im2 = self.dataset.load_pair_images(pk)
-                a = self.encoder.encode_image_patches(im1)
-                b = self.encoder.encode_image_patches(im2)
+            for s in range(0, len(pairs), BATCH):
+                imgs1, imgs2 = [], []
+                for pk in pairs[s:s + BATCH]:
+                    im1, im2 = self.dataset.load_pair_images(pk)
+                    imgs1.append(im1)
+                    imgs2.append(im2)
+                a = self.encoder.encode_image_patches(imgs1)
+                b = self.encoder.encode_image_patches(imgs2)
                 if a is None or b is None:
                     raise RuntimeError(
                         f"{self.encoder.name} exposes no patch tokens; "
                         "pick zero_shot/naive/peft.")
-                p1.append(a)
-                p2.append(b)
-            self._patch_t1 = np.stack(p1)
-            self._patch_t2 = np.stack(p2)
+                p1.append(np.asarray(a))
+                p2.append(np.asarray(b))
+            self._patch_t1 = np.concatenate(p1, axis=0)
+            self._patch_t2 = np.concatenate(p2, axis=0)
         t = encode_query(self.encoder, text)
         return top_patch_change_scores(self._patch_t1, self._patch_t2, t)
 
@@ -362,6 +372,12 @@ class SemanticChangeSearch:
         else:
             order = np.argsort(-scores, kind="stable")[:top_k]
 
+        # For the patch approach the whole corpus's per-patch embeddings are already
+        # cached (in _patch_scores), so reuse them for the change-heatmap instead of
+        # re-encoding each shown pair's patches a second time.
+        patches_cached = (approach == "patch"
+                          and getattr(self, "_patch_t1", None) is not None)
+
         events: List[ChangeEvent] = []
         for rank, i in enumerate(order):
             pair = self.store.pairs[i]
@@ -374,8 +390,11 @@ class SemanticChangeSearch:
                 try:
                     # Real query-conditioned CHANGE heatmap (per-patch Δ T1->T2);
                     # fall back to query-vs-After match if no patch tokens.
+                    pp1 = self._patch_t1[i] if patches_cached else None
+                    pp2 = self._patch_t2[i] if patches_cached else None
                     _, hm = generate_change_heatmap(np.array(t1), np.array(t2),
-                                                    text, self.encoder, alpha=0.5)
+                                                    text, self.encoder, alpha=0.5,
+                                                    precomputed_p1=pp1, precomputed_p2=pp2)
                     if hm is None:
                         _, hm = generate_heatmap(np.array(t1), np.array(t2),
                                                  text, self.encoder, alpha=0.5)
@@ -786,6 +805,9 @@ def parse_args():
                    help="split (train|val|test|all); default = the dataset's profile split")
     p.add_argument("--cache-dir", default=str(_PROJECT_ROOT / "data" / "cache"))
     p.add_argument("--port", type=int, default=7860)
+    p.add_argument("--host", default="127.0.0.1",
+                   help="Bind address. Default 127.0.0.1 (local only). Use 0.0.0.0 to "
+                        "expose on the LAN; on a HuggingFace Space 0.0.0.0 is auto-selected.")
     # Spectral / encoder options. Default nrg + georsclip = the REPORT headline config.
     p.add_argument("--color-mode", default=None, choices=["rgb", "nrg", "ndvi"],
                    help="Image colour mode; default = the dataset's profile colour "
@@ -813,6 +835,12 @@ def parse_args():
     root = a.root or prof.get("root") or str(_PROJECT_ROOT / "data" / "DynamicEarthNet")
     split = a.split if a.split is not None else prof.get("split", "test")
     color = a.color_mode or prof.get("color_mode") or "nrg"
+    # Bind to localhost by default so the app + its error tracebacks are not exposed
+    # on the LAN. A HuggingFace Space must bind 0.0.0.0 to be reachable, so detect it.
+    on_space = bool(os.environ.get("SPACE_ID") or os.environ.get("SPACE_HOST"))
+    server_name = "0.0.0.0" if on_space else a.host
+    # Only surface full Python tracebacks in the browser when bound to localhost.
+    show_error = server_name in ("127.0.0.1", "localhost")
     return RunConfig(
         dataset=a.dataset, encoder=a.encoder, approach=a.approach,
         root=root, pairing=a.pairing,
@@ -824,14 +852,14 @@ def parse_args():
         rerank=a.rerank,
         rerank_strategy=a.rerank_strategy,
         loader_extra=prof.get("loader_extra", {}),
-    ), a.port
+    ), a.port, server_name, show_error
 
 
 def main():
     import gradio as gr
-    cfg, port = parse_args()
+    cfg, port, server_name, show_error = parse_args()
     print(f"Starting engine: dataset={cfg.dataset} encoder={cfg.encoder} "
-          f"approach={cfg.approach}")
+          f"approach={cfg.approach}  bind={server_name}:{port}")
     engine = SemanticChangeSearch(cfg)
     demo = engine.build_interface()
     # Local system fonts only — no remote Google-font fetch (blocks render on slow net).
@@ -839,7 +867,7 @@ def main():
         font=["system-ui", "-apple-system", "Segoe UI", "Arial", "sans-serif"],
         font_mono=["Consolas", "Monaco", "monospace"],
     )
-    demo.launch(server_name="0.0.0.0", server_port=port, show_error=True,
+    demo.launch(server_name=server_name, server_port=port, show_error=show_error,
                 theme=theme, css=SemanticChangeSearch._CSS)
 
 
