@@ -23,7 +23,7 @@ import numpy as np
 
 from src.datasets.base import PairLabel, TemporalDataset
 from src.datasets.registry import get_dataset
-from src.embeddings import load_or_compute
+from src.embeddings import cache_tag_for, load_or_compute
 from src.encoders import get_encoder
 from src.retrieval import APPROACHES, ChangeRetriever
 from src.stats import rank_order
@@ -332,13 +332,22 @@ def main() -> None:
     ap.add_argument("--cache-dir", default="data/cache")
     ap.add_argument("--split", default="test",
                     help="DEN preprocessed split: train|val|test|all")
+    ap.add_argument("--color-mode", default="rgb",
+                    choices=["rgb", "nrg", "ndvi"],
+                    help="Image colour mode (must match the cached embeddings).")
     args = ap.parse_args()
 
     from src.datasets.registry import build_dataset
-    ds = build_dataset(args.dataset, root=args.root,
-                       pairing=args.pairing, split=args.split)
+    ds = build_dataset(args.dataset, root=args.root, pairing=args.pairing,
+                       split=None if args.split == "all" else args.split,
+                       color_mode=args.color_mode)
     enc = get_encoder(args.encoder)
-    store = load_or_compute(ds, enc, cache_dir=args.cache_dir)
+    # Key the embedding cache by split + colour via the canonical helper, matching
+    # train.py / run_pipeline.py. Without a tag this loaded the un-split-tagged
+    # ("empty tag") cache regardless of --split, so a stale legacy cache could
+    # silently feed the wrong split's pairs into the benchmark.
+    store = load_or_compute(ds, enc, cache_dir=args.cache_dir,
+                            cache_tag=cache_tag_for(args.split, args.color_mode))
     retriever = ChangeRetriever(store, enc)
 
     approaches = ["naive", "zero_shot"] if args.approach == "all" else [args.approach]

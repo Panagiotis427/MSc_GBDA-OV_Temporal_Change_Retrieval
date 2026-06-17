@@ -87,13 +87,39 @@ def main() -> None:
     ap.add_argument("--results-dir", default=None,
                     help="If set, also dump each benchmark to "
                          "results/<...>.json + a macro_summary.csv (re-plottable).")
+    ap.add_argument("--force", action="store_true",
+                    help="Recompute embeddings even if a valid cache exists "
+                         "(default = skip-if-done: reuse a valid cache and log the reuse).")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="Print the planned steps (encoder, splits, training) and exit "
+                         "without computing anything.")
     args = ap.parse_args()
 
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
 
+    eval_splits_plan = ["train", "val", "test"] if args.eval_splits == ["all"] else args.eval_splits
+    if args.dry_run:
+        steps = [f"embed+benchmark train split '{args.train_split}' "
+                 f"(naive, zero_shot){'' if args.skip_train else ' + train PEFT adapter + peft benchmark'}"]
+        if args.lora:
+            steps.append(f"train LoRA (rank={args.lora_rank}, alpha={args.lora_alpha}, "
+                         f"{args.lora_epochs} epochs) + re-cache + benchmark")
+        for esplit in eval_splits_plan:
+            steps.append(f"embed+benchmark eval split '{esplit}'")
+        print(f"[dry-run] encoder={args.encoder}  dataset={args.dataset}  "
+              f"mode={args.mode}  color={args.color_mode}  force={args.force}")
+        for i, s in enumerate(steps, 1):
+            print(f"[dry-run]  {i}. {s}")
+        print("[dry-run] no embeddings/adapters computed or written.")
+        return
+
     enc = get_encoder(args.encoder)
     color_tag = f"_{args.color_mode}" if args.color_mode != "rgb" else ""
+    # Tag artefacts trained on a non-default split so a `--train-split val` run never
+    # overwrites the committed train-split adapter/LoRA (default 'train' -> no suffix,
+    # back-compat with the committed `<ds>__<enc>[_<color>]__adapter.pt` names).
+    split_tag = "" if args.train_split == "train" else f"_{args.train_split}"
 
     written: list = []
 
@@ -118,6 +144,7 @@ def main() -> None:
         ds_train, enc,
         cache_dir=args.cache_dir,
         cache_tag=cache_tag_for(args.train_split, args.color_mode),
+        force=args.force,
     )
 
     retr_train = ChangeRetriever(store_train, enc, feature_mode=args.mode)
@@ -138,7 +165,7 @@ def main() -> None:
         # committed difference adapters (difference -> no suffix, back-compat).
         mode_tag = "" if args.mode == "difference" else f"_{args.mode}"
         adapter_path = (
-            f"models/{ds_train.name}__{enc.name}{color_tag}{mode_tag}__adapter.pt"
+            f"models/{ds_train.name}__{enc.name}{color_tag}{split_tag}{mode_tag}__adapter.pt"
         )
         save_adapter(adapter_path, adapter, {
             "input_dim": adapter.input_dim,
@@ -170,7 +197,7 @@ def main() -> None:
             seed=args.seed,
         )
         visual_lora, lora_history = train_lora(ds_train, enc, lora_cfg, verbose=True)
-        lora_dir = f"models/{ds_train.name}__{enc.name}{color_tag}__lora"
+        lora_dir = f"models/{ds_train.name}__{enc.name}{color_tag}{split_tag}__lora"
         save_lora(visual_lora, lora_dir)
         print(f"Saved LoRA weights -> {lora_dir}/")
 
@@ -211,6 +238,7 @@ def main() -> None:
             ds_eval, enc,
             cache_dir=args.cache_dir,
             cache_tag=cache_tag_for(esplit, args.color_mode),
+            force=args.force,
         )
         retr_eval = ChangeRetriever(store_eval, enc, feature_mode=args.mode)
 
