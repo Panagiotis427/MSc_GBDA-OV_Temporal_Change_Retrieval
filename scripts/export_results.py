@@ -36,7 +36,7 @@ import json
 
 from src.benchmark import run_benchmark
 from src.datasets.registry import build_dataset
-from src.embeddings import PairEmbeddingStore, cache_path, cache_tag_for
+from src.embeddings import PairEmbeddingStore, cache_path, cache_tag_for, color_tag
 from src.encoders import get_encoder
 from src.error_analysis import build_confusion
 from src.model import load_adapter
@@ -44,13 +44,9 @@ from src.results_io import append_macro_csv, load_all, result_path, write_report
 from src.retrieval import ChangeRetriever
 
 
-def _color_tag(color: str) -> str:
-    return f"_{color}" if color != "rgb" else ""
-
-
 def adapter_path(dataset: str, encoder: str, color: str) -> Path:
     """Where ``run_pipeline`` saves the ProjectionHead adapter for this combo."""
-    return Path("models") / f"{dataset}__{encoder}{_color_tag(color)}__adapter.pt"
+    return Path("models") / f"{dataset}__{encoder}{color_tag(color)}__adapter.pt"
 
 
 def export_one(

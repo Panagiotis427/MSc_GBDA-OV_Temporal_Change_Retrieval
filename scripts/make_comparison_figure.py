@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 from src.datasets.registry import build_dataset  # noqa: E402
-from src.embeddings import cache_tag_for, load_or_compute  # noqa: E402
+from src.embeddings import cache_tag_for, color_tag, load_or_compute  # noqa: E402
 from src.encoders import get_encoder  # noqa: E402
 from src.model import load_adapter  # noqa: E402
 from src.queries import get_queries  # noqa: E402
@@ -36,10 +36,6 @@ from src.retrieval import ChangeRetriever  # noqa: E402
 
 # Substrings matched against src/queries/den.py texts -> representative queries.
 _REPRESENTATIVE = ["buildings", "deforestation", "snow"]
-
-
-def _color_tag(color: str) -> str:
-    return f"_{color}" if color != "rgb" else ""
 
 
 def representative_queries(all_queries, wanted=None) -> List:
@@ -119,7 +115,7 @@ def load_engine(encoder: str, split: str, color: str, *, root: str, cache_dir: s
     store = load_or_compute(ds, enc, cache_dir=cache_dir,
                             cache_tag=cache_tag_for(split, color))
     retr = ChangeRetriever(store, enc)
-    apath = Path("models") / f"dynamic_earthnet__{encoder}{_color_tag(color)}__adapter.pt"
+    apath = Path("models") / f"dynamic_earthnet__{encoder}{color_tag(color)}__adapter.pt"
     adapter = None
     if apath.exists():
         adapter, _ = load_adapter(str(apath))
