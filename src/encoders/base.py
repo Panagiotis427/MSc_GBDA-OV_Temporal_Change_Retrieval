@@ -10,11 +10,41 @@ Two concrete implementations:
 """
 from __future__ import annotations
 
-from typing import List, Protocol, Union, runtime_checkable
+from dataclasses import dataclass
+from typing import Callable, List, Protocol, Union, runtime_checkable
 
 import numpy as np
 import torch
 from PIL import Image
+
+
+@dataclass
+class LoRAVisualSpec:
+    """Encoder-agnostic description of how to LoRA-fine-tune a visual tower.
+
+    ``src.lora_train`` consumes this instead of reaching into encoder-family
+    internals (open_clip's ``_model.visual`` vs HF-transformers' ``vision_model``
+    + ``visual_projection``). An encoder advertises support by implementing
+    ``lora_visual_spec(self) -> LoRAVisualSpec``; encoders without it cannot be
+    LoRA-trained and the trainer fails with a clear message.
+
+    Fields:
+        module: the trainable visual sub-module that ``peft`` wraps.
+        target_modules: LoRA target module-name suffixes for *this* architecture
+            (open_clip FFN = ``c_fc``/``c_proj``; HF-CLIP FFN = ``fc1``/``fc2``).
+        preprocess: PIL image → ``[C, H, W]`` pixel tensor (no batch dim).
+        forward: ``(wrapped_module, [B, C, H, W]) → [B, D]`` L2-normalised image
+            embeddings in the shared space — hides the per-family forward recipe.
+        set_module: install a (merged) module back onto the encoder.
+        to_device: move the backing model to a device.
+    """
+
+    module: "torch.nn.Module"
+    target_modules: List[str]
+    preprocess: Callable[[Image.Image], "torch.Tensor"]
+    forward: Callable[["torch.nn.Module", "torch.Tensor"], "torch.Tensor"]
+    set_module: Callable[["torch.nn.Module"], None]
+    to_device: Callable[[torch.device], None]
 
 
 @runtime_checkable

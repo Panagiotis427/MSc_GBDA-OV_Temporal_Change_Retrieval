@@ -44,7 +44,15 @@ def _silence_open_clip_random_init() -> Iterator[None]:
 def _load_state_dict_flexible(model, ckpt_path: str) -> None:
     """Tolerant load: handles ``{'state_dict': ...}`` wrappers, ``module.``
     prefixes, and partial matches (strict=False)."""
-    ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
+    try:
+        ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=True)
+    except Exception as exc:  # noqa: BLE001 — fall back loudly, never silently
+        # The domain checkpoint is pulled from a pinned HF repo and is normally a
+        # pure state dict; if one bundles non-tensor objects the safe loader fails,
+        # so we warn (rather than defaulting to the unsafe path unconditionally).
+        print(f"  [security] {ckpt_path}: weights_only load failed ({exc}); "
+              "retrying with weights_only=False.")
+        ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     sd = ckpt.get("state_dict", ckpt) if isinstance(ckpt, dict) else ckpt
     sd = {(k[7:] if k.startswith("module.") else k): v for k, v in sd.items()}
     missing, unexpected = model.load_state_dict(sd, strict=False)
@@ -154,18 +162,57 @@ class OpenClipHFEncoder:
         except Exception:
             return None
 
-    def encode_image_patches(self, image: Image.Image) -> Optional[np.ndarray]:
+    def encode_image_patches(
+        self,
+        image: Union[Image.Image, List[Image.Image]],
+        batch_size: int = 32,
+    ) -> Optional[np.ndarray]:
         """Per-patch embeddings projected into the shared space, L2-normalised,
         as a ``[n_patches, D]`` float32 array (raw cosine-comparable — no per-image
         min-max, unlike ``compute_patch_text_similarity``). ``None`` if the visual
-        tower is not a standard open_clip ViT. Used by patch-level retrieval."""
+        tower is not a standard open_clip ViT. Used by patch-level retrieval.
+
+        Accepts a single image (returns ``[n_patches, D]``) or a list (returns
+        ``[N, n_patches, D]``), encoding lists in GPU batches of ``batch_size``."""
+        single = isinstance(image, Image.Image)
+        images = [image] if single else list(image)
+        out: List[np.ndarray] = []
         with torch.no_grad():
-            px = self._preprocess(image).unsqueeze(0).to(self.device)
-            patches = self._patch_tokens(px)
-            if patches is None:
-                return None
-            pf = F.normalize(patches, dim=-1).squeeze(0)   # [N, D]
-            return pf.cpu().numpy().astype(np.float32)
+            for i in range(0, len(images), batch_size):
+                px = torch.stack(
+                    [self._preprocess(im) for im in images[i:i + batch_size]]
+                ).to(self.device)
+                patches = self._patch_tokens(px)               # [B, N, D] or None
+                if patches is None:
+                    return None
+                pf = F.normalize(patches, dim=-1)
+                out.append(pf.cpu().numpy().astype(np.float32))
+        arr = np.concatenate(out, axis=0)                      # [len(images), N, D]
+        return arr[0] if single else arr
+
+    # ------------------------------------------------------------------
+    def lora_visual_spec(self):
+        """LoRA seam for open_clip-architecture visual towers (see
+        :class:`src.encoders.base.LoRAVisualSpec`). The visual tower is a single
+        callable returning projected image features, so ``forward`` is a one-liner;
+        LoRA targets the ResBlock FFN (``c_fc``/``c_proj``) — adapting attention
+        would be a silent no-op (see :mod:`src.lora_train`)."""
+        from .base import LoRAVisualSpec
+
+        def _set(module) -> None:
+            self._model.visual = module
+
+        def _forward(module, px: torch.Tensor) -> torch.Tensor:
+            return F.normalize(module(px), dim=-1)
+
+        return LoRAVisualSpec(
+            module=self._model.visual,
+            target_modules=["c_fc", "c_proj"],
+            preprocess=self._preprocess,          # torchvision transform: PIL -> [C,H,W]
+            forward=_forward,
+            set_module=_set,
+            to_device=lambda dev: self._model.to(dev),
+        )
 
     def compute_patch_text_similarity(
         self, image: Image.Image, text: str

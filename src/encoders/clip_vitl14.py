@@ -88,26 +88,72 @@ class CLIPViTL14Encoder:
                 embs.append(feats.cpu().numpy())
         return np.concatenate(embs, axis=0)
 
-    def encode_image_patches(self, image: Image.Image) -> np.ndarray:
+    def encode_image_patches(
+        self,
+        image: Union[Image.Image, List[Image.Image]],
+        batch_size: int = 32,
+    ) -> np.ndarray:
         """Per-patch embeddings projected into the shared CLIP space, L2-normalised,
         as a ``[n_patches, D]`` float32 array (raw cosine-comparable — no per-image
-        min-max). ViT-L/14 @224 → 256 patches. Used by patch-level retrieval."""
+        min-max). ViT-L/14 @224 → 256 patches. Used by patch-level retrieval.
+
+        Accepts a single image (returns ``[n_patches, D]``) or a list (returns
+        ``[N, n_patches, D]``), encoding lists in GPU batches of ``batch_size``."""
+        single = isinstance(image, Image.Image)
+        images = [image] if single else list(image)
+        out: List[np.ndarray] = []
         with torch.no_grad():
-            pixel_values = self._processor(images=image, return_tensors="pt").pixel_values.to(self.device)
-            vision_outputs = self._clip_model.vision_model(pixel_values=pixel_values)
-            # Deliberately read the raw patch tokens (last_hidden_state) without
-            # the vision tower's post_layernorm — HF CLIP applies that LN only to
-            # the pooled CLS token, so dense per-patch features conventionally
-            # skip it (the MaskCLIP-style recipe). NOTE: the open_clip encoders
-            # (_openclip_base._patch_tokens) DO apply ln_post to patches, so the
-            # two encoder families normalise patches slightly differently. This
-            # is harmless for patch-level retrieval because every comparison is
-            # within a single encoder (patch_eval never mixes encoders); it would
-            # only matter if patch embeddings were ever compared across families.
-            patch_tokens = vision_outputs.last_hidden_state[:, 1:, :]
-            projected = self._clip_model.visual_projection(patch_tokens)
-            projected = F.normalize(projected, dim=-1).squeeze(0)   # [N, D]
-            return projected.cpu().numpy().astype(np.float32)
+            for i in range(0, len(images), batch_size):
+                batch = images[i:i + batch_size]
+                pixel_values = self._processor(images=batch, return_tensors="pt").pixel_values.to(self.device)
+                vision_outputs = self._clip_model.vision_model(pixel_values=pixel_values)
+                # Deliberately read the raw patch tokens (last_hidden_state) without
+                # the vision tower's post_layernorm — HF CLIP applies that LN only to
+                # the pooled CLS token, so dense per-patch features conventionally
+                # skip it (the MaskCLIP-style recipe). NOTE: the open_clip encoders
+                # (_openclip_base._patch_tokens) DO apply ln_post to patches, so the
+                # two encoder families normalise patches slightly differently. This
+                # is harmless for patch-level retrieval because every comparison is
+                # within a single encoder (patch_eval never mixes encoders); it would
+                # only matter if patch embeddings were ever compared across families.
+                patch_tokens = vision_outputs.last_hidden_state[:, 1:, :]
+                projected = self._clip_model.visual_projection(patch_tokens)
+                projected = F.normalize(projected, dim=-1)             # [B, N, D]
+                out.append(projected.cpu().numpy().astype(np.float32))
+        arr = np.concatenate(out, axis=0)                              # [len(images), N, D]
+        return arr[0] if single else arr
+
+    def lora_visual_spec(self):
+        """LoRA seam for the HF-transformers CLIP vision tower (see
+        :class:`src.encoders.base.LoRAVisualSpec`).
+
+        The trainable module is ``vision_model``; producing a shared-space
+        embedding is a two-step (``vision_model`` pooled output → ``visual_projection``),
+        wrapped here so the trainer sees the same ``forward`` contract as the
+        open_clip family. LoRA targets the HF CLIP encoder-layer MLP
+        (``fc1``/``fc2``) — the transformers analogue of open_clip's ``c_fc``/``c_proj``.
+        """
+        from .base import LoRAVisualSpec
+
+        def _set(module) -> None:
+            self._clip_model.vision_model = module
+
+        def _preprocess(image: Image.Image) -> torch.Tensor:
+            return self._processor(images=image, return_tensors="pt").pixel_values[0]
+
+        def _forward(module, px: torch.Tensor) -> torch.Tensor:
+            vision_out = module(pixel_values=px)
+            feats = self._clip_model.visual_projection(vision_out.pooler_output)
+            return F.normalize(feats, dim=-1)
+
+        return LoRAVisualSpec(
+            module=self._clip_model.vision_model,
+            target_modules=["fc1", "fc2"],
+            preprocess=_preprocess,
+            forward=_forward,
+            set_module=_set,
+            to_device=lambda dev: self._clip_model.to(dev),
+        )
 
     def compute_patch_text_similarity(
         self,

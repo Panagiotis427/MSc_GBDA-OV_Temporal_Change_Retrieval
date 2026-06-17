@@ -2,12 +2,23 @@
 LoRA fine-tuning of the visual encoder for temporal change retrieval.
 
 Unlike the ProjectionHead adapter (which trains on pre-cached frozen embeddings),
-LoRA modifies the visual encoder's attention weights in-place. This requires
-loading images on-the-fly during training and re-caching embeddings afterwards.
+LoRA modifies the visual encoder's **FFN weights** in-place. This requires loading
+images on-the-fly during training and re-caching embeddings afterwards.
+
+Encoder-agnostic
+----------------
+The trainer touches no encoder-family internals: each encoder advertises a
+``lora_visual_spec()`` (``src.encoders.base.LoRAVisualSpec``) that supplies the
+trainable visual module, its LoRA target-module names, the PIL→tensor preprocess,
+and a unified ``forward`` returning shared-space embeddings. Supported families:
+open_clip (``georsclip``, ``remoteclip``) and HF-transformers CLIP (``clip_vitl14``).
+An encoder without ``lora_visual_spec()`` cannot be LoRA-trained and the trainer
+fails with a clear message rather than an obscure ``AttributeError``.
 
 Architecture
 ------------
-- LoRA applied to: ``c_fc``, ``c_proj`` in each ViT ResBlock (the MLP / FFN).
+- LoRA applied to the ViT FFN only: ``c_fc``/``c_proj`` (open_clip ResBlock MLP)
+  or ``fc1``/``fc2`` (HF-CLIP encoder-layer MLP) — chosen per-encoder by the spec.
   The attention projections are NOT adapted: open_clip's attention is an
   ``nn.MultiheadAttention`` whose forward calls ``F.multi_head_attention_forward``
   and reads ``out_proj.weight`` / ``in_proj_weight`` as raw tensors — it never
@@ -34,7 +45,7 @@ from __future__ import annotations
 
 import argparse
 import random
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -43,7 +54,7 @@ import torch
 import torch.nn.functional as F
 
 from src.datasets.base import TemporalDataset
-from src.datasets.registry import get_dataset
+from src.datasets.registry import build_dataset
 from src.encoders import get_encoder
 
 
@@ -56,12 +67,10 @@ class LoRAConfig:
     rank: int = 4
     alpha: int = 8
     dropout: float = 0.1
-    # FFN only: out_proj is an nn.MultiheadAttention sub-module whose forward is
-    # never called (F.multi_head_attention_forward reads its weight directly), so
-    # a LoRA wrapper there is a no-op. See module docstring.
-    target_modules: List[str] = field(
-        default_factory=lambda: ["c_fc", "c_proj"]
-    )
+    # None => use the encoder's own LoRA target modules (``lora_visual_spec().target_modules``):
+    # ``c_fc``/``c_proj`` for open_clip, ``fc1``/``fc2`` for HF-CLIP. Set explicitly only
+    # to override. FFN only — see module docstring for why attention is left out.
+    target_modules: Optional[List[str]] = None
     epochs: int = 20
     lr: float = 1e-4
     batch_size: int = 8
@@ -82,21 +91,6 @@ def _build_train_pairs(
         for p in pairs
     ]
     return pairs, captions
-
-
-def _encode_image_tensor(
-    encoder: Any,
-    image: Any,
-) -> torch.Tensor:
-    """Preprocess a PIL image → [1, C, H, W] tensor on encoder.device."""
-    px = encoder._preprocess(image).unsqueeze(0).to(encoder.device)
-    return px
-
-
-def _visual_forward(visual_lora: Any, px: torch.Tensor) -> torch.Tensor:
-    """Forward through LoRA-wrapped visual encoder → L2-normed [B, D]."""
-    f = visual_lora(px)
-    return F.normalize(f, dim=-1)
 
 
 def _infonce_loss(
@@ -128,6 +122,19 @@ def _infonce_loss(
     return 0.5 * (_dir(logits) + _dir(logits.t()))
 
 
+def _require_lora_spec(encoder: Any):
+    """Return the encoder's :class:`~src.encoders.base.LoRAVisualSpec`, or raise a
+    clear error if the encoder does not support visual LoRA."""
+    spec_fn = getattr(encoder, "lora_visual_spec", None)
+    if spec_fn is None:
+        raise TypeError(
+            f"Encoder {getattr(encoder, 'name', type(encoder).__name__)!r} does not "
+            "support visual LoRA (no lora_visual_spec()). Supported encoders: "
+            "clip_vitl14, georsclip, remoteclip."
+        )
+    return spec_fn()
+
+
 # ---------------------------------------------------------------------------
 # Main training function
 # ---------------------------------------------------------------------------
@@ -140,7 +147,8 @@ def train_lora(
     verbose: bool = True,
 ) -> Tuple[Any, Dict]:
     """
-    Apply LoRA to ``encoder._model.visual`` and train on ``dataset`` pairs.
+    Apply LoRA to the encoder's visual tower (via ``encoder.lora_visual_spec()``)
+    and train on ``dataset`` pairs.
 
     Returns
     -------
@@ -154,33 +162,32 @@ def train_lora(
     except ImportError as exc:
         raise ImportError("peft required: pip install peft") from exc
 
+    spec = _require_lora_spec(encoder)
+
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
     random.seed(cfg.seed)
 
     device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    # Keep the encoder's own device attribute in sync: _encode_image_tensor places
-    # input tensors on encoder.device, so an explicit `device` arg that differs from
-    # the encoder's construction-time device would otherwise cause a device mismatch.
+    # Keep the encoder's own device attribute in sync: spec.preprocess output is
+    # moved to `device` below, and other encoder calls (encode_text) read
+    # encoder.device, so an explicit `device` differing from construction time
+    # would otherwise cause a mismatch.
     encoder.device = device
 
-    # ---- Apply LoRA to visual encoder ----
-    visual_base = encoder._model.visual
+    # ---- Apply LoRA to the visual tower (encoder-family-agnostic) ----
+    spec.to_device(device)
     lora_cfg = LoraConfig(
         r=cfg.rank,
         lora_alpha=cfg.alpha,
-        target_modules=cfg.target_modules,
+        target_modules=cfg.target_modules or spec.target_modules,
         lora_dropout=cfg.dropout,
         bias="none",
     )
-    visual_lora = get_peft_model(visual_base, lora_cfg)
-    # peft.get_peft_model already calls mark_only_lora_as_trainable():
-    # base weights → requires_grad=False, LoRA deltas → requires_grad=True.
-    # Only freeze the text side of the CLIP model (visual handled by peft).
-    encoder._model.to(device)
-    for name, p in encoder._model.named_parameters():
-        if not name.startswith("visual."):
-            p.requires_grad = False
+    # The whole encoder is frozen at construction (requires_grad=False); peft's
+    # get_peft_model then marks only the LoRA deltas trainable. The optimizer below
+    # filters on requires_grad, so non-visual towers never receive updates.
+    visual_lora = get_peft_model(spec.module, lora_cfg)
     visual_lora.to(device).train()
     if verbose:
         visual_lora.print_trainable_parameters()
@@ -224,21 +231,21 @@ def train_lora(
                     im1, im2 = dataset.load_pair_images(pair)
                 except Exception:
                     continue
-                px_t1_list.append(_encode_image_tensor(encoder, im1))
-                px_t2_list.append(_encode_image_tensor(encoder, im2))
+                px_t1_list.append(spec.preprocess(im1))   # [C, H, W]
+                px_t2_list.append(spec.preprocess(im2))
                 text_batch.append(text_all[i])
                 cid_batch.append(cid_all[i])
 
             if len(px_t1_list) < 2:
                 continue
 
-            px_t1 = torch.cat(px_t1_list, dim=0)   # [B, C, H, W]
-            px_t2 = torch.cat(px_t2_list, dim=0)
+            px_t1 = torch.stack(px_t1_list).to(device)   # [B, C, H, W]
+            px_t2 = torch.stack(px_t2_list).to(device)
             T = torch.stack(text_batch)              # [B, D]
             cid = torch.stack(cid_batch)
 
-            f1 = _visual_forward(visual_lora, px_t1)
-            f2 = _visual_forward(visual_lora, px_t2)
+            f1 = spec.forward(visual_lora, px_t1)
+            f2 = spec.forward(visual_lora, px_t2)
             delta = F.normalize(f2 - f1, dim=-1)    # [B, D]
 
             pos_mask = (cid[:, None] == cid[None, :])
@@ -271,8 +278,9 @@ def save_lora(visual_lora: Any, path: str | Path) -> None:
 def merge_lora_into_encoder(encoder: Any, visual_lora: Any) -> None:
     """Merge trained LoRA weights into encoder in-place, unload peft wrapper."""
     merged = visual_lora.merge_and_unload()
-    encoder._model.visual = merged
-    for p in encoder._model.parameters():
+    spec = _require_lora_spec(encoder)
+    spec.set_module(merged)
+    for p in merged.parameters():
         p.requires_grad = False
 
 
@@ -283,7 +291,8 @@ def load_lora_into_encoder(encoder: Any, path: str | Path) -> None:
     except ImportError as exc:
         raise ImportError("peft required: pip install peft") from exc
 
-    visual_lora = PeftModel.from_pretrained(encoder._model.visual, str(path))
+    spec = _require_lora_spec(encoder)
+    visual_lora = PeftModel.from_pretrained(spec.module, str(path))
     merge_lora_into_encoder(encoder, visual_lora)
 
 
@@ -310,10 +319,13 @@ def _main() -> None:
     ap.add_argument("--cache-dir", default="data/cache")
     args = ap.parse_args()
 
-    from src.embeddings import load_or_compute
+    from src.embeddings import cache_tag_for, load_or_compute
 
     enc = get_encoder(args.encoder)
-    ds = get_dataset(
+    # build_dataset (not get_dataset) so the dataset's opts-adapter runs — it drops
+    # kwargs a loader can't accept and normalises split="all" → None, exactly like
+    # every other pipeline entry point.
+    ds = build_dataset(
         args.dataset,
         root=args.root,
         split=args.split,
@@ -336,7 +348,10 @@ def _main() -> None:
 
     print("Merging LoRA into encoder and re-computing embeddings ...")
     merge_lora_into_encoder(enc, visual_lora)
-    cache_tag = f"{args.split}{color_tag}_lora"
+    # Canonical LoRA cache tag (split + colour + _lora suffix) via the single-source
+    # helper, instead of re-deriving the string here (which bypassed its guard
+    # assertions and would drift if the tag format changed).
+    cache_tag = cache_tag_for(args.split, args.color_mode, lora=True)
     # force=True: the just-merged adapter changes embeddings without changing the
     # pair-set, so a stale LoRA cache must not be reused.
     store = load_or_compute(ds, enc, cache_dir=args.cache_dir, cache_tag=cache_tag, force=True)
