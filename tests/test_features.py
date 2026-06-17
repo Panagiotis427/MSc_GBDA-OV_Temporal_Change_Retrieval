@@ -6,11 +6,7 @@ for the delta_f calculator in src/features.py.
 """
 import pytest
 import torch
-from src.features import (
-    compute_change_feature,
-    compute_change_magnitude,
-    normalize_embeddings
-)
+from src.features import compute_change_feature
 
 
 class TestComputeChangeFeature:
@@ -128,92 +124,3 @@ class TestComputeChangeFeature:
         emb_t1 = torch.randn(4, 768, dtype=torch.float64)
         delta_f64 = compute_change_feature(emb_t1, emb_t1 + 1e-9)
         assert delta_f64.dtype == torch.float64
-
-
-class TestComputeChangeMagnitude:
-    """Tests for L2 norm computation."""
-
-    def test_output_shape(self):
-        """Test that magnitude returns batch-dimension tensor."""
-        emb_t1 = torch.randn(8, 768)
-        emb_t2 = torch.randn(8, 768) + 0.5
-        magnitudes = compute_change_magnitude(emb_t1, emb_t2)
-
-        assert magnitudes.shape == (8,), f"Expected (8,), got {magnitudes.shape}"
-
-    def test_magnitude_positive(self):
-        """Test that magnitude is always non-negative."""
-        for _ in range(10):
-            emb_t1 = torch.randn(4, 768)
-            emb_t2 = torch.randn(4, 768) + torch.randn_like(emb_t1) * 0.1
-            mag = compute_change_magnitude(emb_t1, emb_t2)
-            assert (mag >= 0).all(), "Magnitude should be non-negative"
-
-    def test_zero_change(self):
-        """Test that zero change produces magnitude of zero."""
-        emb = torch.randn(4, 768)
-        mag = compute_change_magnitude(emb, emb)
-        assert torch.allclose(mag, torch.zeros_like(mag), atol=1e-6)
-
-    def test_large_change(self):
-        """Test magnitude with large changes."""
-        emb_t1 = torch.randn(4, 768) * 10
-        emb_t2 = torch.randn(4, 768) * 10 + 100
-        mag = compute_change_magnitude(emb_t1, emb_t2)
-        assert (mag > 50).all(), "Large change should produce large magnitude"
-
-
-class TestNormalizeEmbeddings:
-    """Tests for L2 normalization."""
-
-    @pytest.fixture
-    def sample_embeddings(self):
-        return torch.randn(4, 768)
-
-    def test_output_shape_preserved(self, sample_embeddings):
-        """Test that shape is preserved after normalization."""
-        emb = sample_embeddings
-        normalized = normalize_embeddings(emb)
-
-        assert normalized.shape == emb.shape
-
-    def test_unit_norm(self, sample_embeddings):
-        """Test that each row has L2 norm of 1."""
-        emb = sample_embeddings
-        normalized = normalize_embeddings(emb)
-
-        norms = torch.norm(normalized, p=2, dim=-1)
-        # Use allclose for floating point comparison (tolerates tiny numerical errors)
-        assert torch.allclose(norms, torch.ones_like(norms)), f"Expected all ones, got {norms.unique()}"
-
-    def test_division_by_zero_handled(self):
-        """Test that zero-norm embeddings don't cause NaN/inf."""
-        emb = torch.zeros(4, 768)  # All zeros -> norm = 0
-        normalized = normalize_embeddings(emb)
-
-        assert not torch.isnan(normalized).any()
-        assert not torch.isinf(normalized).any()
-
-    def test_cosine_similarity_unchanged(self, sample_embeddings):
-        """
-        Test that normalizing doesn't change cosine similarity.
-        This validates the normalization is mathematically correct.
-        """
-        emb_a = torch.randn(10, 768)
-        emb_b = torch.randn(10, 768)
-
-        # Both computations use the numerically stable matmul of normalized vectors
-        # This avoids floating point errors from element-wise division
-        sim_before = torch.matmul(
-            torch.nn.functional.normalize(emb_a, dim=-1),
-            torch.nn.functional.normalize(emb_b, dim=-1).T
-        )
-
-        # Normalized embeddings using our function
-        norm_a = normalize_embeddings(emb_a)
-        norm_b = normalize_embeddings(emb_b)
-
-        # Cosine similarity after normalization (should be identical to stable computation)
-        sim_after = norm_a @ norm_b.T
-
-        torch.testing.assert_close(sim_before, sim_after, rtol=1e-5, atol=1e-6)

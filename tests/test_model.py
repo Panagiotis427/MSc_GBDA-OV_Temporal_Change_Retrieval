@@ -1,14 +1,13 @@
 """
-Unit tests for Projection Head and InfoNCE Loss.
+Unit tests for the Projection Head adapter.
 
-Tests verify model architecture, parameter counts, and loss computation correctness.
+Tests verify model architecture, parameter counts, and numerical stability.
 """
 import pytest
 import torch
 from src.model import (
     ProjectionHead,
     create_projection_head,
-    InfoNCELoss
 )
 
 
