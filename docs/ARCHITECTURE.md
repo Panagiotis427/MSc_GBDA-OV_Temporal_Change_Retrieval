@@ -81,6 +81,7 @@ registry:
 
 ## Dependencies
 
-`pyproject.toml` is the full dev install (`pip install -e .`: runtime + pytest/coverage/
-mlflow/faiss + `opencv-python`); `requirements.txt` is the lightweight HuggingFace-Space
-subset (no dev tools, `opencv-python-headless`). See the README "Dependencies" section.
+`pyproject.toml` is the full dev install (`pip install -e .`: runtime + the test/figure/data
+extras the app never imports — pytest/coverage/matplotlib/gdown — plus `opencv-python`);
+`requirements.txt` is the lightweight HuggingFace-Space subset (runtime only,
+`opencv-python-headless`). See the README "Dependencies" section.

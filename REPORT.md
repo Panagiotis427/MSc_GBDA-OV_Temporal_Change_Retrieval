@@ -836,9 +836,9 @@ that any nonzero Δ trips a zero threshold; it is not a failure mode.
 
 ### Software
 
-torch, torchvision, transformers, open-clip-torch, faiss-cpu, gradio,
+torch, torchvision, transformers, huggingface-hub, open-clip-torch, gradio,
 rasterio, pandas[parquet], pyarrow, pillow, opencv-python, numpy, gdown,
-pytest (all pinned in `pyproject.toml`; installed in editable mode — see the §9 command below).
+matplotlib, pytest (all pinned in `pyproject.toml`; installed in editable mode — see the §9 command below).
 
 ### Dataset size
 
