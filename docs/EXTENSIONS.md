@@ -7,7 +7,10 @@ Extensions ranked by effort. Implemented extensions marked ✅.
 ## Low effort / high value (all implemented ✅)
 
 ### LoRA adapter ✅
-Fine-tune GeoRSCLIP's attention weights via `peft` library.
+Fine-tune the visual encoder's **FFN** weights (ViT MLP — `c_fc`/`c_proj` for
+open_clip, `fc1`/`fc2` for HF-CLIP; attention is left out — see `src/lora_train.py`)
+via the `peft` library. Encoder-agnostic through each encoder's `lora_visual_spec()`,
+so `georsclip`, `remoteclip`, and `clip_vitl14` are all supported.
 
 - **Status:** `src/lora_train.py`. Benchmarked: test mAP 0.071 (vs frozen zero-shot — single-split 0.426 / CV 0.100 ± 0.139, see REPORT.md §7.4 / Appendix B.8). In-app toggle: Settings → **Use LoRA embeddings** (requires pre-cached run). CLI: `--lora / --no-lora`.
 - **Finding:** learned adapters show no out-of-distribution gain. On a single train/val/test split they collapse (LoRA test ≈0.071, ProjectionHead ≈0.041, both ≪ the single-split 0.426); under leakage-free 5-fold CV the ProjectionHead (NRG 0.196 ± 0.049) merely *overlaps* frozen zero-shot (0.139 ± 0.024) within fold variance — it matches, never beats, frozen, and feature-space augmentation doesn't change this (REPORT §7.4 / B.5 / B.9 / B.14). The high in-distribution train-fit is memorisation. (Earlier 0.159/0.246 readings were a since-fixed LoRA loss-bug + stale-cache artifact — REPORT §7.4.)

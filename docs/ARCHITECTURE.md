@@ -47,14 +47,16 @@ an existing extension point already covers it.
 ## Cache and artefact paths
 
 - Embeddings: `data/cache/<dataset>__<encoder>[__<tag>]__pair_embeddings.npz`
-  where `<tag>` = `{split}[_{color_mode}]` (e.g. `train`, `test_nrg`).
-  Pass `cache_tag` to `load_or_compute()` to isolate caches per split/color.
-  Without a tag the legacy `<dataset>__<encoder>__pair_embeddings.npz` path
-  is used (backwards-compatible with old test-split caches).
-- Adapters: `models/<dataset>__<encoder>[__<color>][__<mode>]__adapter.pt`
-  — the committed `difference` feature mode takes **no** `<mode>` suffix
-  (back-compat); any other feature mode appends `_<mode>`. `train.py` and
-  `run_pipeline.py` share this convention.
+  where `<tag>` = `{split}[_{color_mode}][_lora]` (e.g. `train`, `test_nrg`,
+  `train_nrg_lora`) — built by `cache_tag_for()`. Pass `cache_tag` to
+  `load_or_compute()` to isolate caches per split/colour/LoRA. Without a tag the
+  legacy `<dataset>__<encoder>__pair_embeddings.npz` path is used
+  (backwards-compatible with old test-split caches).
+- Adapters: `models/<dataset>__<encoder>[__<color>][__<split>][__<mode>]__adapter.pt`
+  — the committed `train` split and `difference` feature mode take **no** suffix
+  (back-compat); a non-default `--train-split` appends `_<split>` and any other
+  feature mode appends `_<mode>`. `train.py` and `run_pipeline.py` share this
+  convention.
 - Keyed by `(dataset, encoder, split, color_mode)` — no collision across splits or colour modes.
 - The pair-set is validated on cache load; a stale pair-set triggers automatic recompute and overwrites the cache at the same path.
 

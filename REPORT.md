@@ -22,8 +22,8 @@ label-grounded benchmark, implemented PEFT training, finished/added the three
 encoders, rewired the Gradio app, and validated everything on a deterministic
 fixture and on real Dynamic EarthNet. The dataset-agnostic design was then
 exercised on three further datasets — QFabric (construction change-types),
-LEVIR-CC/MCI (human-captioned building/road change) and SECOND-CC (a seven-class
-open vocabulary) — and the change-heatmap deliverable was made quantitative using
+LEVIR-CC/MCI (human-captioned building/road change) and SECOND-CC (a six-class
+land-cover open vocabulary) — and the change-heatmap deliverable was made quantitative using
 the LEVIR-MCI and SECOND-CC pixel masks (§7.8–§7.13).
 
 Training-set fit (real DEN, train split, 605 pairs — the **PEFT column is the adapter scored on
@@ -83,7 +83,7 @@ Dynamic EarthNet (DEN); architecture open to QFabric/fMoW.
 For each bi-temporal pair `(T1, T2)`:
 
 1. A frozen VLM encodes both timesteps → `f_T1, f_T2` (L2-normalised); cached
-   to disk per (dataset, encoder).
+   to disk keyed by (dataset, encoder, split, color_mode) — see `cache_tag_for`.
 2. Change feature `Δf = f_T2 − f_T1` (or concatenation).
 3. The query text is encoded by the same model's text tower → `t`.
 4. The pair is scored by one of three approaches:
