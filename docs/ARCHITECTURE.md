@@ -78,3 +78,9 @@ registry:
   to avoid perturbing its committed RNG-dependent results.
 - `src/embeddings.py::cache_tag_for(split, color_mode, lora)` — the single source
   of truth for split/colour/LoRA cache tags; import it rather than re-deriving tags.
+
+## Dependencies
+
+`pyproject.toml` is the full dev install (`pip install -e .`: runtime + pytest/coverage/
+mlflow/faiss + `opencv-python`); `requirements.txt` is the lightweight HuggingFace-Space
+subset (no dev tools, `opencv-python-headless`). See the README "Dependencies" section.

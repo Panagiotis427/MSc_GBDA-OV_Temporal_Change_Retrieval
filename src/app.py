@@ -517,7 +517,8 @@ class SemanticChangeSearch:
         COLOR_MODE_HELP = (
             "rgb = standard optical (R-G-B)  ·  nrg = NIR-Red-Green false colour "
             "(best zero-shot with GeoRSCLIP)  ·  ndvi = vegetation index (single channel × 3). "
-            "Changing requires Apply Settings."
+            "NRG/NDVI need the NIR band and apply to Dynamic EarthNet only — other corpora "
+            "are RGB-only (nrg/ndvi are greyed out and ignored). Changing requires Apply Settings."
         )
         LORA_HELP = (
             "Load LoRA-adapted embeddings pre-cached by run_pipeline --lora. "
@@ -540,6 +541,9 @@ class SemanticChangeSearch:
                     "RemoteCLIP) encodes each timestep of a bi-temporal satellite pair; the "
                     "**change** between them is matched against your text query by cosine "
                     "similarity. No per-query training — it is *open-vocabulary*.\n\n"
+                    "**Open-vocabulary** means you can search for *any* change in free text — the "
+                    "engine is never trained on the specific change types of a corpus. That is the "
+                    "advantage over supervised models; the trade-off is lower absolute accuracy.\n\n"
                     "**Honest expectations.** This is a research demo, not a product. With frozen "
                     "encoders, open-vocabulary change retrieval is **weak in absolute terms** — the "
                     "best honestly-audited configuration reaches only **≈ 0.20 mAP** (5-fold "
@@ -547,13 +551,21 @@ class SemanticChangeSearch:
                     "is. Use the curated example queries for results that actually work.\n\n"
                     "**Approaches.** *Naive* = cos(text, After) — an image-retrieval baseline. "
                     "*Zero-shot* = cos(text, After) − cos(text, Before) — the temporal Δ, no "
-                    "training. *Patch / localised* = top-3 per-patch Δ — the best configuration on "
-                    "Dynamic EarthNet. *PEFT adapter* = a small trained projection head (loaded only "
-                    "if a matching adapter exists).\n\n"
+                    "training. *Patch / localised* = top-3 per-patch Δ — it averages the three "
+                    "most-changed patches, catching small localised change a whole-image embedding "
+                    "would wash out; the best configuration on Dynamic EarthNet. *PEFT adapter* = a "
+                    "small trained projection head (loaded only if a matching adapter exists).\n\n"
+                    "**On PEFT/LoRA (honest note).** Light fine-tuning was trained and evaluated on "
+                    "Dynamic EarthNet and QFabric only; on held-out data it does **not** beat the "
+                    "frozen zero-shot encoders (it overfits the training scenes). Frozen "
+                    "encoders + NRG + patch scoring is the strongest honestly-audited setup.\n\n"
                     "**Reading the results.** The **match score (0–1)** is a *relative* rank within "
                     "the returned set (min–max normalised), **not** a calibrated probability. The "
                     "**change heatmap** (jet) overlays the After image: warm = where the query's "
-                    "presence grew most from Before→After; cool = little/no change.\n\n"
+                    "presence grew most from Before→After; cool = little/no change. The **land-cover "
+                    "change note** classes each result from its dataset label: *permanent* land-cover "
+                    "change, *likely seasonal* (e.g. snow/ice, which recurs annually), or *stable* "
+                    "(labelled weak/no change); *no label* on unlabelled corpora.\n\n"
                     "**Corpora (Settings → pick → Apply), sorted by best result:** LEVIR-CC "
                     "(building/road, default — strongest), SECOND-CC (six land-cover classes), "
                     "QFabric change-type (construction), Dynamic EarthNet (the report's primary "
@@ -617,7 +629,7 @@ class SemanticChangeSearch:
             _regions = engine._geo_filter.regions if _geo_available else ["All"]
             _rerank_available = engine._reranker is not None
 
-            with gr.Accordion("⚙  Settings — corpus · model · filters", open=False):
+            with gr.Accordion("Settings — corpus · model · filters", open=False):
                 stats_md = gr.Markdown(engine.stats_markdown())
 
                 gr.Markdown(
@@ -635,6 +647,8 @@ class SemanticChangeSearch:
                     color_dd = gr.Dropdown(
                         ["rgb", "nrg", "ndvi"], value=engine.cfg.color_mode,
                         label="Color mode", info=COLOR_MODE_HELP,
+                        # nrg/ndvi only apply to Dynamic EarthNet; greyed out otherwise.
+                        interactive=(engine.cfg.dataset == "dynamic_earthnet"),
                     )
                     lora_chk = gr.Checkbox(
                         label="Use LoRA embeddings",
@@ -683,10 +697,21 @@ class SemanticChangeSearch:
                         label="Strategy",
                         interactive=_rerank_available,
                         info=(
-                            "diversity = prefer unique AOIs per result  ·  "
-                            "coherence = cluster near top-1 location"
+                            "diversity = prefer unique locations per result  ·  "
+                            "coherence = cluster near the top-1 location"
                         ),
                     )
+
+                # Colour mode only affects Dynamic EarthNet (the others have no NIR
+                # band and pin rgb). Grey out nrg/ndvi for non-DEN corpora so the
+                # control reflects what the engine actually does, instead of silently
+                # falling back to rgb.
+                def _color_for_dataset(dataset: str):
+                    if dataset == "dynamic_earthnet":
+                        return gr.update(interactive=True)
+                    return gr.update(value="rgb", interactive=False)
+
+                d_dd.change(_color_for_dataset, d_dd, color_dd)
 
                 apply.click(engine.reload,
                             [d_dd, e_dd, a_dd, color_dd, lora_chk],
@@ -722,6 +747,13 @@ class SemanticChangeSearch:
                     headers=["rank", "location", "Before", "After", "score",
                              "match (0–1)", "caption", "land cover change"],
                     interactive=False, wrap=True,
+                )
+                gr.Markdown(
+                    "_Columns: **score** = raw change Δ-similarity (model units); "
+                    "**match (0–1)** = relative rank within this query (min–max normalised, "
+                    "not a probability); **caption** = the pair's dataset caption; "
+                    "**land cover change** = permanent / likely-seasonal / stable note "
+                    "(see About). Before/After are the two timesteps._"
                 )
 
             def _pill(c: float) -> str:

@@ -5,7 +5,7 @@ Machine-independent: read after `git pull` on any machine. What physically exist
 [`INVENTORY.md`](INVENTORY.md). Supersedes `NEXT_GBDA_STEPS.md` (folded here 2026-06-10;
 completed work lives in git history + [`REPORT.md`](REPORT.md)).*
 
-*Last meaningful update: **2026-06-13**.*
+*Last meaningful update: **2026-06-17**.*
 
 ---
 
@@ -37,7 +37,15 @@ Honest, audited numbers (random baseline + permutation p + BH-FDR + leakage-free
 
 ## 3. Running now
 
-Nothing executing. **Status (2026-06-13):** the data-expansion + honest-reframe plan
+Nothing executing. **Engineering (2026-06-17):** merged `fix/gbda-audit` into `main` (FF) —
+security hardening (path-traversal-safe archive extraction M2; app binds `127.0.0.1` by default,
+auto `0.0.0.0` on a HF Space M3), encoder-agnostic LoRA seam + HF-CLIP LoRA support (H2),
+batch/reuse patch embeddings (M15/M16), split/colour-keyed embedding caches, dead-code removal
+(`InfoNCELoss` + unused feature helpers), and `QUICKSTART.md`. Suite green; re-run `pytest -q` to
+confirm the count. App UX pass: collapsible About now covers open-vocabulary, the PEFT honesty
+note, and the seasonal/permanent result note; NRG/NDVI greyed out on non-DEN corpora.
+
+**Status (2026-06-13):** the data-expansion + honest-reframe plan
 ([`docs/DATA_EXPANSION_PLAN.md`](docs/DATA_EXPANSION_PLAN.md)) is **complete through Tracks 0–4**;
 the only remaining item, QFabric, is blocked on external access (below). **Done:**
 Track 0 (disk audit + cleanup — ~14 GB reclaimed across both repos, now ~55 GB free), Track 1
