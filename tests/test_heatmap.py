@@ -209,7 +209,12 @@ class TestExtractAttentionWeights:
         create_mock_model._vision_features_cache.clear()
         result_target = extract_attention_weights(image, text, model=create_mock_model, target_patch=0)
 
-        # Both should return numpy arrays (target_patch returns single value as array)
+        # Both should return numpy arrays (target_patch returns a single value as array,
+        # the full call returns the whole patch grid).
+        assert isinstance(result_normal, np.ndarray)
+        assert isinstance(result_target, np.ndarray)
+        assert result_target.size >= 1
+        assert result_normal.size >= result_target.size
 
 
 class TestExtractPatchAttention:
