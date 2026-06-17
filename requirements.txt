@@ -4,6 +4,7 @@ numpy<2
 gradio>=6.14.0
 open-clip-torch>=2.24.0
 transformers
+huggingface-hub
 pillow>=10.0.0
 pandas
 pyarrow

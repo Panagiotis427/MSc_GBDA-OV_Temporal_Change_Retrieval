@@ -194,6 +194,7 @@ in-distribution wins are memorisation; held-out, frozen zero-shot is the stronge
 | `ops/` | fleet bookkeeping scripts: `make_inventory.ps1` / `make_inventory.sh` generate the per-machine manifests in `inventory/` |
 | `inventory/` | generated per-machine manifests (`laptop-4060.md`, `macbook.md`, `cloud.md`); machine-independent index is `INVENTORY.md` |
 | `legacy/` | gitignored local archive of superseded first-attempt material + the Case-11 assignment brief (not used by the pipeline) |
+| `.github/workflows/` | CI: `gitleaks.yml` secret-scanning on push/PR |
 
 ## Run / install / use
 
@@ -299,14 +300,15 @@ pytest -q --ignore=tests/test_text_encoder.py   # skip the real-CLIP-weights tes
 Two dependency files, two purposes:
 
 - **`pyproject.toml`** — the full development install (`pip install -e .`). It is the source of
-  truth for local work: the runtime stack **plus** dev tools (`pytest`, `coverage`, `mlflow`,
-  `faiss-cpu`) and `opencv-python`. `pip` ignores the `[tool.uv.sources]` CUDA index, so a bare
+  truth for local work: the runtime stack **plus** the test/figure/data extras the app itself
+  never imports (`pytest`, `coverage`, `matplotlib` for the report figures, `gdown` for dataset
+  download) and `opencv-python`. `pip` ignores the `[tool.uv.sources]` CUDA index, so a bare
   editable install pulls CPU Torch — install the matching CUDA wheel afterwards if you want GPU.
-- **`requirements.txt`** — the lightweight **HuggingFace Space** deployment subset. It drops the
-  dev tools and uses headless `opencv-python-headless` (no display libs) to keep the Space image
-  small. `app.py` + `requirements.txt` are what the Space builds from.
+- **`requirements.txt`** — the lightweight **HuggingFace Space** deployment subset: just the
+  runtime the `app.py` import path needs. It drops the test/figure/data extras and uses
+  `opencv-python-headless` (no display libs) to keep the Space image small.
 
-Keep the runtime packages consistent between the two; only dev-only extras and the
+Keep the runtime packages consistent between the two; only the test/figure/data extras and the
 `opencv-python` → `opencv-python-headless` swap should differ.
 
 ## Extending
