@@ -493,16 +493,9 @@ class SemanticChangeSearch:
         engine = self
         from src.encoders import list_encoders
 
-        APPROACH_HELP = (
-            "How a pair is scored against your query. "
-            "Naive = cos(text, After) — an image-retrieval baseline (ignores Before).  "
-            "Zero-shot = cos(text, After) − cos(text, Before) — the temporal change Δ, no training.  "
-            "Patch (localised) = the top-3 per-patch change Δ — scores small, localised change a "
-            "whole-image embedding would average away; best on Dynamic EarthNet (first query on a "
-            "corpus encodes its patches, a few seconds).  "
-            "PEFT adapter = cos(text, adapter(Δf)) — a small trained projection head (used only if a "
-            "matching adapter exists for the encoder + colour)."
-        )
+        # Kept short so it doesn't dominate the first view; the dropdown choice
+        # labels carry a one-line hint and the full explanation lives in About.
+        APPROACH_HELP = "How each pair is scored. See **About** for what each option means."
         ENCODER_HELP = (
             "clip_vitl14 (general purpose, 768-d)  ·  georsclip (RS-pretrained ViT-B/32, 512-d)  "
             "·  remoteclip (RS-pretrained ViT-L/14, 768-d). Weights download on first use."
@@ -608,12 +601,8 @@ class SemanticChangeSearch:
             # "Loading..." and Firefox flags "slowing down". Plain fill-buttons give the
             # same click-to-fill UX without the Dataset component.
             gr.Markdown(
-                "**Example queries — click to fill.** *Research demo: open-vocabulary change "
-                "retrieval with frozen encoders is approximate. These generic change types retrieve "
-                "well on the default **LEVIR-CC** corpus (salient building/road change) and work "
-                "reasonably across the others. For Dynamic EarthNet, its one robustly above-chance "
-                "signal is wetland-formation (e.g. “agricultural land converted to wetland”). "
-                "Switch corpus in Settings (then Apply).*"
+                "**Example queries — click to fill.** *Work best on the default LEVIR-CC corpus; "
+                "see About for per-corpus tips.*"
             )
             with gr.Row():
                 for _ex in [
@@ -726,11 +715,8 @@ class SemanticChangeSearch:
                     hmi = gr.Image(label="Change heatmap (Δ T1→T2)", height=300,
                                    interactive=False)
                 gr.Markdown(
-                    "_Heatmap (jet colormap) overlays the **After** image and shows the "
-                    "per-patch **change** in similarity to your query from Before→After — "
-                    "**warm red/yellow = query presence grew most**, **cool blue = little/no "
-                    "change**. (Falls back to a query-vs-After match map if the encoder "
-                    "exposes no patch tokens.)_"
+                    "_Jet heatmap over the **After** image: warm = query-change grew, "
+                    "cool = little/none. See About for details._"
                 )
                 summary = gr.Markdown("*Press Search to retrieve.*")
 
@@ -896,6 +882,9 @@ def main():
     demo = engine.build_interface()
     # Local system fonts only — no remote Google-font fetch (blocks render on slow net).
     theme = gr.themes.Ocean(
+        # Bump the whole coordinated type scale up one notch (md -> lg) so every
+        # font grows slightly while keeping the same relative ratios.
+        text_size=gr.themes.sizes.text_lg,
         font=["system-ui", "-apple-system", "Segoe UI", "Arial", "sans-serif"],
         font_mono=["Consolas", "Monaco", "monospace"],
     )
