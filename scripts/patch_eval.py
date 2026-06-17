@@ -55,7 +55,7 @@ def _encode_patches(ds, enc, cache_dir, enc_name, color, pairing="bimonthly"):
     cache = Path(cache_dir) / f"patch__{enc_name}__{color}{tag}.npz"
     pairs = ds.list_pairs()
     if cache.exists():
-        d = np.load(cache)
+        d = np.load(cache, allow_pickle=False)
         if int(d["n"]) == len(pairs):
             print(f"loaded patch cache {cache} (N={int(d['n'])})")
             return d["p1"], d["p2"], pairs

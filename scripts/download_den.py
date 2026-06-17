@@ -37,16 +37,27 @@ def _gdown_download(gdrive_id: str, dest_file: Path) -> None:
     gdown.download(url, str(dest_file), quiet=False)
 
 
+def _safe_zip_extractall(zf: "zipfile.ZipFile", dest_dir: Path) -> None:
+    """Reject any member that would resolve outside ``dest_dir`` (Zip-Slip /
+    path traversal) before extracting — ``ZipFile`` has no ``filter=`` option."""
+    dest = Path(dest_dir).resolve()
+    for member in zf.namelist():
+        target = (dest / member).resolve()
+        if target != dest and dest not in target.parents:
+            raise ValueError(f"Unsafe path in zip archive (path traversal): {member!r}")
+    zf.extractall(dest)
+
+
 def _extract(archive: Path, dest_dir: Path) -> None:
     # Sniff the real format (the gdown file is a .zip mislabelled .tar.gz),
     # so dispatch on content, not the extension.
     print(f"Extracting {archive.name} -> {dest_dir} ...")
     if zipfile.is_zipfile(archive):
         with zipfile.ZipFile(archive, "r") as zf:
-            zf.extractall(dest_dir)
+            _safe_zip_extractall(zf, dest_dir)
     elif tarfile.is_tarfile(archive):
         with tarfile.open(archive, "r:*") as tf:   # auto-detects gz/bz2/xz/plain
-            tf.extractall(dest_dir)
+            tf.extractall(dest_dir, filter="data")  # 3.12+ traversal-safe member filter
     else:
         raise ValueError(
             f"Unrecognised archive format for {archive} "

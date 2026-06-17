@@ -236,7 +236,8 @@ class DENNpyDataset:
 
     def _labels(self, aoi: str) -> np.ndarray:
         if aoi not in self._label_cache:
-            self._label_cache[aoi] = np.load(self._labels_dir / f"{aoi}.npy")
+            self._label_cache[aoi] = np.load(self._labels_dir / f"{aoi}.npy",
+                                             allow_pickle=False)
         return self._label_cache[aoi]
 
     def get_pair_label(self, pair: PairKey) -> Optional[PairLabel]:
