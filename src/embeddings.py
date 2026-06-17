@@ -21,7 +21,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 
 import numpy as np
 import torch
@@ -39,6 +39,13 @@ def cache_path(cache_dir: str | Path, dataset_name: str, encoder_name: str,
 
 
 _KNOWN_COLORS = ("rgb", "nrg", "ndvi")
+
+
+def color_tag(color_mode: str = "rgb") -> str:
+    """Canonical colour suffix for cache/artefact names: ``_<color>`` (empty for
+    the rgb default). Single source of truth shared by ``cache_tag_for`` and the
+    figure/export scripts so the suffix can never drift between them."""
+    return f"_{color_mode}" if color_mode != "rgb" else ""
 
 
 def cache_tag_for(split: str, color_mode: str = "rgb", lora: bool = False) -> str:
@@ -66,9 +73,8 @@ def cache_tag_for(split: str, color_mode: str = "rgb", lora: bool = False) -> st
             f"split {split!r} ends with a colour/lora suffix and would alias another "
             "cache tag; rename the split."
         )
-    color_tag = f"_{color_mode}" if color_mode != "rgb" else ""
     lora_tag = "_lora" if lora else ""
-    return f"{split}{color_tag}{lora_tag}"
+    return f"{split}{color_tag(color_mode)}{lora_tag}"
 
 
 @dataclass
@@ -172,22 +178,20 @@ def load_or_compute(
     if path.exists() and not force:
         store = PairEmbeddingStore.load(path)
         expected = [tuple(p) for p in dataset.list_pairs()]
+        # Order-sensitive list equality is intentional: f_t1/f_t2 rows are aligned
+        # positionally to this pair list, so a reordered-but-equal pair set is NOT
+        # safely reusable and must be recomputed (the worst case here is a redundant
+        # recompute, never silent row/label misalignment).
         if [tuple(p) for p in store.pairs] == expected:
-            print(f"Loaded {len(store)} pair embeddings from cache: {path}")
+            print(f"Loaded {len(store)} pair embeddings (mode=reused) from cache: {path}")
             return store
         print(f"Cache {path} stale (pair set changed: "
               f"{len(store.pairs)} cached vs {len(expected)} expected) "
               "-- recomputing.")
     store = compute_pair_embeddings(dataset, encoder, batch_size=batch_size)
     store.save(path)
-    print(f"Saved {len(store)} pair embeddings -> {path}")
+    print(f"Saved {len(store)} pair embeddings (mode=recomputed) -> {path}")
     return store
-
-
-def _build_dataset(name: str, root: Optional[str], pairing: str,
-                   split: Optional[str] = "test") -> TemporalDataset:
-    from src.datasets.registry import build_dataset
-    return build_dataset(name, root=root, pairing=pairing, split=split)
 
 
 def main() -> None:

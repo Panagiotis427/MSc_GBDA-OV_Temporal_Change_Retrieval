@@ -33,7 +33,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from src.datasets.base import TemporalDataset
-from src.datasets.registry import get_dataset
+from src.datasets.registry import build_dataset
 from src.embeddings import PairEmbeddingStore, cache_tag_for, load_or_compute
 from src.encoders import get_encoder
 from src.model import ProjectionHead, create_projection_head, save_adapter
@@ -154,12 +154,6 @@ def train_adapter(
     return adapter, history
 
 
-def _build_den(name: str, root: str, pairing: str,
-               split: Optional[str] = "test") -> TemporalDataset:
-    from src.datasets.registry import build_dataset
-    return build_dataset(name, root=root, pairing=pairing, split=split)
-
-
 def main() -> None:
     ap = argparse.ArgumentParser(description="Train PEFT change-retrieval adapter")
     ap.add_argument("--dataset", default="dynamic_earthnet")
@@ -178,8 +172,8 @@ def main() -> None:
     ap.add_argument("--out", default=None)
     args = ap.parse_args()
 
-    ds = _build_den(args.dataset, args.root, args.pairing,
-                    None if args.split == "all" else args.split)
+    ds = build_dataset(args.dataset, root=args.root, pairing=args.pairing,
+                       split=None if args.split == "all" else args.split)
     enc = get_encoder(args.encoder)
     # Key the embedding cache by split (this CLI is rgb-only) via the canonical
     # tag helper, matching scripts.run_pipeline. Without a tag this read/wrote
