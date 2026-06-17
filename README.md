@@ -191,6 +191,9 @@ in-distribution wins are memorisation; held-out, frozen zero-shot is the stronge
 | `scripts/significance_audit.py` | random-ranking baseline + permutation p + BH-FDR over every result cell → `results/results_audit_summary.csv` (REPORT Appendix B) |
 | `scripts/cv_eval.py` | full-corpus + k-fold AOI cross-validation with bootstrap CIs; `--relevance fraction` swaps dominant-class-flip relevance for pixel-fraction (REPORT Appendix B.8–B.9); merges cached split embeddings, no re-encode |
 | `scripts/patch_eval.py` | patch-level (localised) Δ-similarity change retrieval vs the global baseline (REPORT Appendix B.10, "S3"); caches per-patch embeddings via `encoder.encode_image_patches`. `--approach hybrid` fuses global+patch (B.11), `patch_softattn`/`patch_spatial` are training-free change-attention variants (B.12), `--prompt-ensemble` averages query templates (B.11) |
+| `ops/` | fleet bookkeeping scripts: `make_inventory.ps1` / `make_inventory.sh` generate the per-machine manifests in `inventory/` |
+| `inventory/` | generated per-machine manifests (`laptop-4060.md`, `macbook.md`, `cloud.md`); machine-independent index is `INVENTORY.md` |
+| `legacy/` | gitignored local archive of superseded first-attempt material + the Case-11 assignment brief (not used by the pipeline) |
 
 ## Run / install / use
 
@@ -257,7 +260,7 @@ naive / zero-shot / **patch** (localised, best on DEN) / PEFT — / Color Mode /
 | `--lora` / `--no-lora` | off | Load LoRA-adapted embeddings (pre-cache via `run_pipeline --lora`). |
 | `--geo-filter` / `--no-geo-filter` | off | Geographic region filter. |
 | `--rerank` / `--no-rerank` | off | Post-retrieval re-ranking. |
-| `--rerank-strategy` | `diversity` | `diversity` = unique AOIs; `coherence` = cluster near top-1. |
+| `--rerank-strategy` | `diversity` | `diversity` = unique locations; `coherence` = cluster near top-1. |
 
 > `peft` errors "no adapter" → adapter missing from `models/`; train with `run_pipeline` (below)
 > or switch to `zero_shot`. **Hosted demo (no install):** push the repo to a HuggingFace Space —
@@ -290,6 +293,21 @@ share the split-tagged embedding cache.
 pytest -q                              # full suite (1 skipped: real-CLIP test_text_encoder, needs weights, ~45 s)
 pytest -q --ignore=tests/test_text_encoder.py   # skip the real-CLIP-weights test (~45 s) for the fast CPU loop
 ```
+
+## Dependencies — `pyproject.toml` vs `requirements.txt`
+
+Two dependency files, two purposes:
+
+- **`pyproject.toml`** — the full development install (`pip install -e .`). It is the source of
+  truth for local work: the runtime stack **plus** dev tools (`pytest`, `coverage`, `mlflow`,
+  `faiss-cpu`) and `opencv-python`. `pip` ignores the `[tool.uv.sources]` CUDA index, so a bare
+  editable install pulls CPU Torch — install the matching CUDA wheel afterwards if you want GPU.
+- **`requirements.txt`** — the lightweight **HuggingFace Space** deployment subset. It drops the
+  dev tools and uses headless `opencv-python-headless` (no display libs) to keep the Space image
+  small. `app.py` + `requirements.txt` are what the Space builds from.
+
+Keep the runtime packages consistent between the two; only dev-only extras and the
+`opencv-python` → `opencv-python-headless` swap should differ.
 
 ## Extending
 
