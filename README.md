@@ -24,9 +24,9 @@ Frozen vision-language backbones (CLIP / GeoRSCLIP / RemoteCLIP) encode each
 timestep; a bi-temporal *change feature* is matched against the query text.
 Primary dataset: **Dynamic EarthNet (DEN)**; the dataset-agnostic registry also
 runs **QFabric** (construction change-types), **LEVIR-CC/MCI** (human-captioned
-building/road change + masks) and **SECOND-CC** (a seven-class open vocabulary +
-semantic masks), with LEVIR-MCI and SECOND-CC masks driving quantitative change
-localisation.
+building/road change + masks) and **SECOND-CC** (a six-class land-cover open
+vocabulary + semantic masks), with LEVIR-MCI and SECOND-CC masks driving
+quantitative change localisation.
 
 > **Just want to run the app?** Jump to [Run / install / use](#run--install--use) —
 > install, then a 30-second synthetic demo or the real dataset.
@@ -228,9 +228,9 @@ python -m src.app --root tests/fixtures/den_tiny --split all --encoder clip_vitl
 python -m scripts.download_den --dest data/DynamicEarthNet
 # ~7 GB ZIP via gdown; extracted; idempotent (_done.marker guards re-runs).
 
-python -m src.app --root data/DynamicEarthNet --encoder clip_vitl14
-# Defaults: --split train (55 AOIs, 605 pairs), --approach zero_shot.
-# Switch to --approach peft in the UI for the trained-adapter scoring.
+python -m src.app --dataset dynamic_earthnet --root data/DynamicEarthNet --encoder clip_vitl14
+# DEN's launch profile supplies split/colour; --approach defaults to zero_shot.
+# Switch to --approach peft (or patch) in the UI for the other scorings.
 ```
 
 ### App usage
@@ -245,11 +245,15 @@ naive / zero-shot / **patch** (localised, best on DEN) / PEFT — / Color Mode /
 
 | Flag | Default | Notes |
 |---|---|---|
-| `--root` | `data/DynamicEarthNet` | Path to dataset; DEN layout auto-detected. |
-| `--split` | `train` | DEN AOI split: `train` (605 pairs), `val`/`test` (110 each), `all` (825). |
+| `--dataset` | `levir_mci` | Corpus to load (must have a query set + launch profile). |
+| `--encoder` | `georsclip` | `clip_vitl14` / `georsclip` / `remoteclip`. |
+| `--approach` | `zero_shot` | `naive` / `zero_shot` / `patch` / `peft` (switchable in the UI). |
+| `--root` | dataset profile | Dataset dir; defaults to the selected dataset's launch-profile root. |
+| `--split` | dataset profile | `train`/`val`/`test`/`all`; defaults to the dataset's profile split. |
+| `--color-mode` | dataset profile | `rgb`/`nrg`/`ndvi`; DEN profile defaults to `nrg`, other corpora to `rgb`. |
 | `--pairing` | `bimonthly` | How DEN's 24 monthly timesteps pair into (T1, T2). |
+| `--host` | `127.0.0.1` | Bind address; `0.0.0.0` exposes on the LAN (auto-selected on a HF Space). |
 | `--port` | `7860` | Gradio HTTP port (in use? add `--port 7861`). |
-| `--color-mode` | `rgb` | `rgb` / `nrg` (NIR-Red-Green, best zero-shot with GeoRSCLIP) / `ndvi`. |
 | `--lora` / `--no-lora` | off | Load LoRA-adapted embeddings (pre-cache via `run_pipeline --lora`). |
 | `--geo-filter` / `--no-geo-filter` | off | Geographic region filter. |
 | `--rerank` / `--no-rerank` | off | Post-retrieval re-ranking. |
@@ -283,7 +287,7 @@ convenience entry points — pass the same `--split` / `--color-mode` to every s
 share the split-tagged embedding cache.
 
 ```bash
-pytest -q                              # full suite: 240 passed, 1 skipped (incl. real-CLIP test_text_encoder, needs weights, ~45 s)
+pytest -q                              # full suite (1 skipped: real-CLIP test_text_encoder, needs weights, ~45 s)
 pytest -q --ignore=tests/test_text_encoder.py   # skip the real-CLIP-weights test (~45 s) for the fast CPU loop
 ```
 
