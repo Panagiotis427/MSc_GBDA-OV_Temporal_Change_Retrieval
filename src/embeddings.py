@@ -38,6 +38,15 @@ def cache_path(cache_dir: str | Path, dataset_name: str, encoder_name: str,
     return Path(cache_dir) / f"{dataset_name}__{encoder_name}{suffix}__pair_embeddings.npz"
 
 
+def patch_cache_path(cache_dir: str | Path, dataset_name: str, encoder_name: str,
+                     tag: str = "") -> Path:
+    """Path of the per-patch embedding cache (sibling of :func:`cache_path`),
+    keyed by the same ``<split>[_<color>][_lora]`` tag so it never aliases another
+    split/colour combination."""
+    suffix = f"__{tag}" if tag else ""
+    return Path(cache_dir) / f"{dataset_name}__{encoder_name}{suffix}__patch_embeddings.npz"
+
+
 _KNOWN_COLORS = ("rgb", "nrg", "ndvi")
 
 
@@ -191,6 +200,136 @@ def load_or_compute(
     store = compute_pair_embeddings(dataset, encoder, batch_size=batch_size)
     store.save(path)
     print(f"Saved {len(store)} pair embeddings (mode=recomputed) -> {path}")
+    return store
+
+
+# ---------------------------------------------------------------------------
+# Per-patch embedding cache (localised / patch-level retrieval, REPORT B.10)
+# ---------------------------------------------------------------------------
+# Patch-level Δ-similarity needs per-patch embeddings for the *whole* corpus.
+# Encoding them at first ``approach="patch"`` query stalls the UI for the length
+# of a full GPU pass over every pair. This store decouples that encode (slow,
+# GPU) from the scoring pass (fast, CPU) exactly as the pair store does — a warm
+# cache makes the first patch query instant (docs/UX_DESIGN.md instant-search).
+# Rows are aligned positionally to an ordered pair list; the pair list is the
+# pair store's (so engine code can index ``patch_t1[i]`` with the same ``i`` it
+# uses on ``store.pairs[i]``).
+
+
+@dataclass
+class PatchEmbeddingStore:
+    """Ordered pair list + aligned per-patch ``patch_t1`` / ``patch_t2`` tensors
+    (shape ``[N, P, D]`` each)."""
+
+    dataset_name: str
+    encoder_name: str
+    pairs: List[PairKey]
+    patch_t1: np.ndarray  # [N, P, D] float32
+    patch_t2: np.ndarray  # [N, P, D] float32
+
+    def __len__(self) -> int:
+        return len(self.pairs)
+
+    def save(self, path: str | Path) -> None:
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        np.savez(
+            path,
+            patch_t1=self.patch_t1.astype(np.float32),
+            patch_t2=self.patch_t2.astype(np.float32),
+            loc=np.array([p.location_id for p in self.pairs]),
+            t1=np.array([p.t1_key for p in self.pairs]),
+            t2=np.array([p.t2_key for p in self.pairs]),
+            dataset_name=np.array(self.dataset_name),
+            encoder_name=np.array(self.encoder_name),
+        )
+
+    @classmethod
+    def load(cls, path: str | Path) -> "PatchEmbeddingStore":
+        d = np.load(path, allow_pickle=False)
+        pairs = [
+            PairKey(str(l), str(a), str(b))
+            for l, a, b in zip(d["loc"], d["t1"], d["t2"])
+        ]
+        return cls(
+            dataset_name=str(d["dataset_name"]),
+            encoder_name=str(d["encoder_name"]),
+            pairs=pairs,
+            patch_t1=d["patch_t1"].astype(np.float32),
+            patch_t2=d["patch_t2"].astype(np.float32),
+        )
+
+
+def compute_patch_embeddings(
+    dataset: TemporalDataset,
+    encoder,
+    pairs: List[PairKey],
+    batch_size: int = 32,
+    progress: bool = False,
+) -> PatchEmbeddingStore:
+    """Encode per-patch embeddings for every pair in *pairs* (kept in the given
+    order so the result aligns with the pair store). Chunks the GPU passes to
+    bound host memory. Raises if the encoder exposes no patch tokens."""
+    pairs = list(pairs)
+    if not pairs:
+        raise RuntimeError("No pairs to encode patches for.")
+    p1, p2 = [], []
+    chunks = range(0, len(pairs), batch_size)
+    if progress:
+        try:
+            from tqdm import tqdm
+            chunks = tqdm(chunks, desc=f"patch-encode {encoder.name}", unit="batch")
+        except ImportError:
+            pass
+    for s in chunks:
+        imgs1, imgs2 = [], []
+        for pk in pairs[s:s + batch_size]:
+            im1, im2 = dataset.load_pair_images(pk)
+            imgs1.append(im1)
+            imgs2.append(im2)
+        a = encoder.encode_image_patches(imgs1)
+        b = encoder.encode_image_patches(imgs2)
+        if a is None or b is None:
+            raise RuntimeError(
+                f"{encoder.name} exposes no patch tokens; pick zero_shot/naive/peft.")
+        p1.append(np.asarray(a))
+        p2.append(np.asarray(b))
+    return PatchEmbeddingStore(
+        dataset_name=dataset.name,
+        encoder_name=encoder.name,
+        pairs=pairs,
+        patch_t1=np.concatenate(p1, axis=0).astype(np.float32),
+        patch_t2=np.concatenate(p2, axis=0).astype(np.float32),
+    )
+
+
+def load_or_compute_patches(
+    dataset: TemporalDataset,
+    encoder,
+    pairs: List[PairKey],
+    cache_dir: str | Path = "data/cache",
+    force: bool = False,
+    batch_size: int = 32,
+    cache_tag: str = "",
+    progress: bool = False,
+) -> PatchEmbeddingStore:
+    """Reuse the on-disk patch cache when its pair list matches *pairs*, else
+    recompute + save. Mirrors :func:`load_or_compute`'s order-sensitive guard:
+    a reordered-but-equal pair set is recomputed rather than risk row/label
+    misalignment."""
+    path = patch_cache_path(cache_dir, dataset.name, encoder.name, tag=cache_tag)
+    expected = [tuple(p) for p in pairs]
+    if path.exists() and not force:
+        store = PatchEmbeddingStore.load(path)
+        if [tuple(p) for p in store.pairs] == expected:
+            print(f"Loaded {len(store)} patch embeddings (mode=reused) from cache: {path}")
+            return store
+        print(f"Patch cache {path} stale (pair set changed: "
+              f"{len(store.pairs)} cached vs {len(expected)} expected) -- recomputing.")
+    store = compute_patch_embeddings(dataset, encoder, pairs,
+                                     batch_size=batch_size, progress=progress)
+    store.save(path)
+    print(f"Saved {len(store)} patch embeddings (mode=recomputed) -> {path}")
     return store
 
 
