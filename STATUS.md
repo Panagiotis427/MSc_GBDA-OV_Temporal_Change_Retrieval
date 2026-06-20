@@ -107,7 +107,15 @@ Ordered:
 
 *Repo restructure 2026-06-10: inventory tooling moved to `ops/` (`make_inventory.ps1/.sh`);
 all written references repointed.*
-5. `[optional]` UX items (instant search via precomputed embeddings is the highest-leverage one) — [`docs/UX_DESIGN.md`](docs/UX_DESIGN.md).
+5. `[optional]` UX items — [`docs/UX_DESIGN.md`](docs/UX_DESIGN.md). **Instant search via precomputed
+   embeddings DONE 2026-06-20** (the highest-leverage item): per-patch embeddings now persist to an
+   on-disk cache (`PatchEmbeddingStore` + `load_or_compute_patches` in `src/embeddings.py`, keyed by
+   the same `cache_tag_for` (split, colour, lora) as the pair store and pair-order-guarded). `app.py`
+   `_patch_scores` loads the warm cache instead of re-encoding on the first `approach="patch"` query
+   (DEN georsclip/nrg: ~11 s GPU pass → 0.076 s warm load, scores identical); warm the cache offline
+   via `scripts/precompute_patch_embeddings.py`. Tests `tests/test_patch_cache.py` (3, round-trip +
+   reuse + stale-pairset guard); suite 234 green. Remaining optional UX = cross-dataset fusion search
+   (Idea 2).
 
 ## 5. Future path (priors honest — see [`docs/DATA_EXPANSION_PLAN.md`](docs/DATA_EXPANSION_PLAN.md) for the committed set)
 

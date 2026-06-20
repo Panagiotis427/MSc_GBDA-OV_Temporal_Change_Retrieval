@@ -289,33 +289,24 @@ class SemanticChangeSearch:
     # -- patch (localised) scoring --------------------------------------
     def _patch_scores(self, text: str) -> np.ndarray:
         """Localised patch-level Δ-similarity (REPORT Appendix B.10, best DEN
-        config). Encodes per-patch embeddings for the loaded corpus once, lazily,
-        then caches them on the engine for subsequent queries."""
+        config). Per-patch embeddings for the whole corpus are loaded from the
+        on-disk patch cache when warm (instant first query) and only computed +
+        cached on a miss; the result is held on the engine for later queries.
+        The patch rows align with ``self.store.pairs`` (same pair list as the
+        pair store), so ``query()`` can index ``_patch_t1[i]`` by store index."""
         from src.benchmark import encode_query
+        from src.embeddings import cache_tag_for, load_or_compute_patches
         from src.retrieval import top_patch_change_scores
         if getattr(self, "_patch_t1", None) is None:
-            # Encode the corpus's per-patch embeddings in GPU batches (a chunk of
-            # pairs at a time) instead of one image per forward pass; chunking keeps
-            # peak host memory bounded rather than holding every PIL image at once.
-            BATCH = 32
-            pairs = self.store.pairs
-            p1, p2 = [], []
-            for s in range(0, len(pairs), BATCH):
-                imgs1, imgs2 = [], []
-                for pk in pairs[s:s + BATCH]:
-                    im1, im2 = self.dataset.load_pair_images(pk)
-                    imgs1.append(im1)
-                    imgs2.append(im2)
-                a = self.encoder.encode_image_patches(imgs1)
-                b = self.encoder.encode_image_patches(imgs2)
-                if a is None or b is None:
-                    raise RuntimeError(
-                        f"{self.encoder.name} exposes no patch tokens; "
-                        "pick zero_shot/naive/peft.")
-                p1.append(np.asarray(a))
-                p2.append(np.asarray(b))
-            self._patch_t1 = np.concatenate(p1, axis=0)
-            self._patch_t2 = np.concatenate(p2, axis=0)
+            split_str = self.cfg.split or "all"
+            cache_tag = cache_tag_for(split_str, self.cfg.color_mode, self.cfg.use_lora)
+            patch_store = load_or_compute_patches(
+                self.dataset, self.encoder, self.store.pairs,
+                cache_dir=self.cfg.cache_dir, cache_tag=cache_tag,
+                batch_size=32, progress=True,
+            )
+            self._patch_t1 = patch_store.patch_t1
+            self._patch_t2 = patch_store.patch_t2
         t = encode_query(self.encoder, text)
         return top_patch_change_scores(self._patch_t1, self._patch_t2, t)
 
