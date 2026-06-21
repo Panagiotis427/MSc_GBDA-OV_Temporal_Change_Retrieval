@@ -284,7 +284,15 @@ def compute_patch_embeddings(
     for s in chunks:
         imgs1, imgs2 = [], []
         for pk in pairs[s:s + batch_size]:
-            im1, im2 = dataset.load_pair_images(pk)
+            try:
+                im1, im2 = dataset.load_pair_images(pk)
+            except FileNotFoundError as exc:
+                # Do NOT skip (rows must stay positionally aligned to the pair store); fail with a
+                # clear, actionable message instead of an opaque crash deep in the encoder loop.
+                raise RuntimeError(
+                    f"patch encode: tile for pair {pk} is missing ({exc}); the pair set changed since "
+                    "the pair-embedding cache was built — delete the matching *__patch_embeddings.npz "
+                    "(and *__pair_embeddings.npz) and recompute.") from exc
             imgs1.append(im1)
             imgs2.append(im2)
         a = encoder.encode_image_patches(imgs1)
