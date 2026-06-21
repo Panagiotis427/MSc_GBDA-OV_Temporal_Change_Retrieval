@@ -13,6 +13,9 @@
 \usepackage{float}
 \usepackage{hyperref}
 \usepackage{subcaption}  % for subfigures
+\usepackage{tikz}        % scoring-modes schematic
+\usetikzlibrary{arrows.meta, positioning, fit, backgrounds}
+\usepackage{cite}        % numeric IEEE-style citation grouping
 \usepackage[bottom=3cm, right=3cm, left=3cm, top=3cm]{geometry}
 
 % Figures live under assets/figures/ and assets/; the NTUA logo (when added) under images/.
@@ -27,10 +30,12 @@
     {\large SCHOOL OF ELECTRICAL AND COMPUTER ENGINEERING \par \vspace{0.5cm}
     IPPS DATA SCIENCE AND MACHINE LEARNING \par \vspace{0.5cm}
     GEOSPATIAL BIG DATA ANALYTICS  \par \vspace{0.5cm}
-    % TODO: confirm supervisor name (the Case 11 brief lists Vasilis Tsironis).
-    Professors: \textit{[TODO: supervisor name]} \par \vspace{0.5cm}
-    Students: Panagiotis Giannikos, 03400245, panagiotisgiannikos@mail.ntua.gr \par 
-    Placeholder, placeholder, placeholder \par \vspace{0.5cm}}
+    % Supervisor filled from the Case 11 brief; verify before submission.
+    Supervisor: \textit{Vasilis Tsironis} \par \vspace{0.5cm}
+    Students: Panagiotis Giannikos, 03400245, panagiotisgiannikos@mail.ntua.gr \par
+    % TODO: add co-author name, registration number, and e-mail (or delete this
+    % line if this is a single-author submission).
+    \textit{[Co-author name, registration number, e-mail]} \par \vspace{0.5cm}}
     {\Large Open-Vocabulary Temporal Change Retrieval}
     \par \vspace{-1cm}
     }
@@ -89,7 +94,7 @@ naive single-split numbers must not be trusted without cross-validation.
 Traditional change detection is limited to a few predefined categories
 (e.g. ``urban growth'' or ``forest loss''). This project moves toward
 open-vocabulary change retrieval by leveraging Vision-Language Models
-(VLMs): instead of training a class-specific detector, we build a system that
+(VLMs)~\cite{clip}: instead of training a class-specific detector, we build a system that
 identifies semantically defined transitions from natural-language queries
 (e.g. ``new industrial buildings appearing on former agricultural
 land'') and searches across a multitemporal dataset to find the tiles and
@@ -101,11 +106,12 @@ Per the GBDA Case 11 brief, the work is constrained to a low-compute
 budget and must deliver a subset of an appropriate dataset, CLIP-variant
 frozen encoders, both zero-shot inference and light PEFT,
 retrieval metrics (Recall@$K$, mAP), an error analysis of seasonal-vs-permanent
-confusion (``semantic drift''), and a Gradio Semantic Change Search
+confusion (``semantic drift''), and a Gradio~\cite{gradio} Semantic Change Search
 Engine as the product deliverable. The primary dataset is Dynamic
-EarthNet (DEN), which provides daily multi-spectral Planet Fusion data ideal
+EarthNet (DEN)~\cite{dynamicearthnet}, which provides daily multi-spectral Planet
+Fusion~\cite{planetfusion} data ideal
 for pinpointing the exact time-step of change; the architecture is kept open to
-QFabric, LEVIR-CC, and fMoW.
+QFabric~\cite{qfabric}, LEVIR-CC~\cite{levircc}, and fMoW~\cite{fmow}.
 
 The remainder of this report describes the system architecture
 (Section~\ref{sec:arch}), the engineering required to make the supplied
@@ -161,16 +167,19 @@ pipeline --- the abstraction is enforced by the protocol.
 
 \paragraph{Encoders.}
 An \texttt{ImageTextEncoder} protocol (\texttt{src/encoders/base.py}) with three
-implementations: \texttt{clip\_vitl14} (HuggingFace CLIP, 768-d),
-\texttt{georsclip} (\texttt{open\_clip} ViT-B/32 + RS5M checkpoint, 512-d), and
-\texttt{remoteclip} (\texttt{open\_clip} ViT-L/14 + RemoteCLIP checkpoint,
-768-d). The embedding dimension drives cache and index sizing automatically.
+implementations: \texttt{clip\_vitl14} (HuggingFace CLIP~\cite{clip} on a
+ViT~\cite{vit} backbone, 768-d),
+\texttt{georsclip} (\texttt{open\_clip}~\cite{openclip} ViT-B/32 + RS5M
+checkpoint~\cite{georsclip}, 512-d), and
+\texttt{remoteclip} (\texttt{open\_clip} ViT-L/14 + RemoteCLIP
+checkpoint~\cite{remoteclip}, 768-d). The embedding dimension drives cache and
+index sizing automatically.
 
 \paragraph{PEFT training.}
 Only the \texttt{ProjectionHead} adapter trains; the backbones stay frozen.
 Supervision is DEN's weak caption derived from its LULC labels
 (e.g. ``agriculture replaced by wetlands'', ``stable forest
-land cover''). The loss is a masked symmetric InfoNCE: pairs
+land cover''). The loss is a masked symmetric InfoNCE~\cite{infonce}: pairs
 sharing an identical caption are treated as mutual positives, which avoids the
 false-negative problem of plain diagonal InfoNCE (DEN captions repeat heavily).
 
@@ -247,7 +256,49 @@ two modes (\texttt{src/features.py}): \texttt{difference}
 ($\Delta f = f_{T_2} - f_{T_1}$, dimension $D$) or \texttt{concatenate}
 ($[f_{T_1} ; f_{T_2}]$, dimension $2D$, which keeps both endpoints). Unless
 otherwise stated all results use \texttt{difference}; the two modes are compared
-in Section~\ref{sec:concat}.
+in Section~\ref{sec:concat}. Figure~\ref{fig:scoringmodes} contrasts the three
+scoring modes, all of which share the single frozen encoder.
+
+\begin{figure}[H]
+    \centering
+    \begin{tikzpicture}[
+        font=\small,
+        box/.style={draw, rounded corners, minimum height=7mm, align=center, inner sep=3pt},
+        enc/.style={draw, fill=black!6, rounded corners, minimum height=9mm, align=center},
+        score/.style={draw, rounded corners, fill=black!4, minimum height=7mm, align=center},
+        >={Stealth[length=2mm]}, node distance=4mm and 9mm
+        ]
+        % inputs
+        \node[box] (t1) {$T_1$ image};
+        \node[box, below=of t1] (t2) {$T_2$ image};
+        \node[box, below=of t2] (q) {query text};
+        % shared frozen encoder
+        \node[enc, right=14mm of t2] (E) {frozen\\CLIP-variant\\encoder};
+        \draw[->] (t1.east) -- (E.west);
+        \draw[->] (t2.east) -- (E.west);
+        \draw[->] (q.east)  -- (E.west);
+        % embeddings
+        \node[right=10mm of E] (emb) {$f_{T_1},\, f_{T_2},\, t$};
+        \draw[->] (E.east) -- (emb.west);
+        % three scores
+        \node[score, right=12mm of emb, yshift=12mm] (naive) {naive\quad $\cos(t, f_{T_2})$};
+        \node[score, right=12mm of emb] (zs) {zero-shot\quad $\cos(t,f_{T_2})-\cos(t,f_{T_1})$};
+        \node[score, right=12mm of emb, yshift=-12mm] (peft) {PEFT\quad $\cos\!\big(t,\, g(\Delta f)\big)$};
+        \draw[->] (emb.east) |- (naive.west);
+        \draw[->] (emb.east) -- (zs.west);
+        \draw[->] (emb.east) |- (peft.west);
+        % adapter annotation
+        \node[draw, dashed, rounded corners, right=2mm of peft, font=\scriptsize, align=center]
+            (g) {trainable\\adapter $g$\\($\sim$0.5\,M)};
+        \draw[->, dashed] (peft.east) -- (g.west);
+    \end{tikzpicture}
+    \caption{The three retrieval scores share one frozen CLIP-variant encoder. Only
+    the PEFT branch trains a small adapter $g$ over the change feature $\Delta f$;
+    the naive and zero-shot scores require no training. The naive score ignores
+    $T_1$ entirely, whereas the zero-shot $\Delta$-similarity measures how much more
+    present the query becomes from $T_1$ to $T_2$.}
+    \label{fig:scoringmodes}
+\end{figure}
 
 
 \section{Data and encoders}
@@ -265,7 +316,7 @@ raster layout the original loader assumed, so we added \texttt{DENNpyDataset},
 made the extractor sniff the real format, and made the registry auto-detect the
 layout. The 24 monthly label maps form the change timeline; each month is mapped
 to a representative daily RGB frame. These preprocessed label maps were
-cross-validated against the official torchgeo Dynamic EarthNet raster masks
+cross-validated against the official torchgeo~\cite{torchgeo} Dynamic EarthNet raster masks
 (\texttt{torchgeo/dynamic\_earthnet}): on the AOI tiles present in both releases
 (3 AOIs, 75.5\,M valid pixels) the per-pixel class agreement is 99.9999\%,
 confirming the preprocessing preserves the published ground truth. The official
@@ -283,14 +334,15 @@ across three channels). The working corpus is 605 bimonthly pairs on the train
 split, and 110 pairs each on val and test.
 
 \paragraph{QFabric (secondary).}
-QFabric is wired as a second dataset to validate the dataset-agnostic design,
-using the polygon-centred crops from \texttt{jirvin16/TEOChatlas} with the
+QFabric~\cite{qfabric} is wired as a second dataset to validate the
+dataset-agnostic design, using the polygon-centred crops from
+\texttt{jirvin16/TEOChatlas}~\cite{teochat} with the
 real QFabric change-type labels (the TEOChatlas RQA2 answers; 27{,}879
 labelled crops). It contributes a different taxonomy (6 construction
 change-types), sensor, and crop scale.
 
 \paragraph{LEVIR-CC (third dataset, human change captions).}
-LEVIR-CC (Liu et al., 2022) adds a third dataset with a fundamentally different
+LEVIR-CC~\cite{levircc} adds a third dataset with a fundamentally different
 label source: 10{,}077 bi-temporal building-change pairs ($256\times256$,
 0.5\,m), each annotated with five human-written change captions and a binary
 change flag (5{,}038 changed / 5{,}039 unchanged). We parse the captions into
@@ -303,16 +355,16 @@ The five caption tags include vegetation and water, broadening the original
 three-query (building/road/demolition) evaluation to five.
 
 \paragraph{LEVIR-MCI (localisation masks on the LEVIR pairs).}
-LEVIR-MCI (Liu et al., 2024) is a strict superset of LEVIR-CC --- the same
+LEVIR-MCI~\cite{levirmci} is a strict superset of LEVIR-CC --- the same
 10{,}077 pairs and captions, plus a pixel-level building/road change mask per
 pair. We store it once and serve both \texttt{levir\_cc} and \texttt{levir\_mci}
 from it (\texttt{src/datasets/levir\_mci.py}); the masks make the change-heatmap
 deliverable quantitatively measurable (Section~\ref{sec:localization}).
 
 \paragraph{SECOND-CC (fourth dataset, open-vocabulary breadth + semantic masks).}
-SECOND-CC (Robust Change Captioning in Remote Sensing, 2025) pairs 6{,}041
+SECOND-CC~\cite{secondcc} pairs 6{,}041
 bi-temporal scenes with 30{,}205 human change captions \emph{and} six-class
-SECOND semantic maps for both phases (ground, tree, low-vegetation, water,
+SECOND~\cite{second} semantic maps for both phases (ground, tree, low-vegetation, water,
 building, playground). It is the breadth counterpart to LEVIR-CC, whose change is
 almost entirely building/road: SECOND-CC's captions span a far wider land-cover
 vocabulary, and its per-phase semantic maps give both retrieval relevance
@@ -358,7 +410,8 @@ measurements, not the generalisation verdict.
 \label{sec:indist}
 
 Using the \texttt{difference} change feature, Table~\ref{tab:indist} reports mAP
-and macro Recall@10 on the train split. This should be read as a sanity check, not
+and macro Recall@10 on the train split (Figures~\ref{fig:mapbars}
+and~\ref{fig:recall} plot mAP and the full Recall@$K$ curves). This should be read as a sanity check, not
 a result: the PEFT column is the adapter evaluated on the very pairs it was
 trained on, so it measures memorisation capacity, not retrieval. The
 generalisation verdict is the held-out cross-validation in Section~\ref{sec:audit}.
@@ -397,9 +450,45 @@ in-sample (RemoteCLIP 0.057 best).
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\linewidth]{map_bars__train__rgb.png}
-    \caption{mAP by encoder $\times$ approach on the train split (RGB).}
-    \label{fig:mapbars_train}
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{map_bars__train__rgb.png}
+        \caption{train split (in-distribution).}
+        \label{fig:mapbars_train}
+    \end{subfigure}\hfill
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{map_bars__test__rgb.png}
+        \caption{held-out test split.}
+        \label{fig:mapbars_test}
+    \end{subfigure}
+    \caption{mAP by encoder $\times$ approach (RGB). The large PEFT bars on train
+    (\subref{fig:mapbars_train}) collapse on the held-out test split
+    (\subref{fig:mapbars_test}), where frozen zero-shot is competitive --- the
+    memorisation signature quantified in Sections~\ref{sec:crosssplit}
+    and~\ref{sec:audit}.}
+    \label{fig:mapbars}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{recall_curves__train__rgb.png}
+        \caption{train split.}
+        \label{fig:recall_train}
+    \end{subfigure}\hfill
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{recall_curves__test__rgb.png}
+        \caption{held-out test split.}
+        \label{fig:recall_test}
+    \end{subfigure}
+    \caption{Macro Recall@$K$ versus $K$ for every encoder $\times$ approach (RGB),
+    the brief's second retrieval metric alongside mAP. Recall@$K$ is bounded by the
+    large relevant-set sizes, so the curves are read for relative ordering, not
+    absolute height.}
+    \label{fig:recall}
 \end{figure}
 
 \begin{figure}[H]
@@ -460,9 +549,27 @@ train-spike-then-collapse signature is plotted in Figure~\ref{fig:crosssplit}.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\linewidth]{cross_split__clip_vitl14__rgb.png}
-    \caption{Cross-split mAP for CLIP ViT-L/14 (RGB): the PEFT train spike
-    collapses on held-out val/test.}
+    \begin{subfigure}{0.32\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{cross_split__clip_vitl14__rgb.png}
+        \caption{CLIP ViT-L/14.}
+        \label{fig:crosssplit_clip}
+    \end{subfigure}\hfill
+    \begin{subfigure}{0.32\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{cross_split__georsclip__rgb.png}
+        \caption{GeoRSCLIP.}
+        \label{fig:crosssplit_georsclip}
+    \end{subfigure}\hfill
+    \begin{subfigure}{0.32\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{cross_split__remoteclip__rgb.png}
+        \caption{RemoteCLIP.}
+        \label{fig:crosssplit_remoteclip}
+    \end{subfigure}
+    \caption{Cross-split mAP per encoder (RGB): the PEFT train spike collapses on
+    the held-out val/test splits for all three encoders --- the
+    train-spike-then-collapse signature of train-AOI memorisation.}
     \label{fig:crosssplit}
 \end{figure}
 
@@ -515,16 +622,30 @@ absolute 0.426 should not be read as the generalisation result.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.8\linewidth]{color_ablation__zero_shot__test.png}
-    \caption{Colour-mode ablation (zero-shot, test split): NRG dominates,
-    most strongly for GeoRSCLIP.}
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{color_ablation__zero_shot__train.png}
+        \caption{train split.}
+        \label{fig:colorablation_train}
+    \end{subfigure}\hfill
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{color_ablation__zero_shot__test.png}
+        \caption{held-out test split.}
+        \label{fig:colorablation_test}
+    \end{subfigure}
+    \caption{Colour-mode ablation (zero-shot mAP). NRG slightly hurts in-distribution
+    (\subref{fig:colorablation_train}) but dominates on held-out test
+    (\subref{fig:colorablation_test}), most strongly for GeoRSCLIP --- though the
+    absolute test lift is a fold artefact under cross-validation
+    (Section~\ref{sec:audit}).}
     \label{fig:colorablation}
 \end{figure}
 
 \subsection{LoRA adapter --- visual-encoder fine-tuning}
 \label{sec:lora}
 
-LoRA applied to GeoRSCLIP's ViT-B/32 visual encoder targets the FFN projections
+LoRA~\cite{lora} applied to GeoRSCLIP's ViT-B/32 visual encoder targets the FFN projections
 \texttt{c\_fc} and \texttt{c\_proj} in each ResBlock: 368{,}640 trainable params
 out of 88M (0.42\%). The attention output projection \texttt{out\_proj} is
 deliberately not adapted --- open\_clip's attention is an
@@ -601,7 +722,7 @@ a since-fixed LoRA loss bug and a stale-cache reuse.
 
 The per-split tables above are raw single-split measurements. Re-auditing them
 against a Monte-Carlo random-ranking baseline (relevant set fixed, ranking
-shuffled), with Benjamini--Hochberg FDR correction and leave-one-AOI-out
+shuffled), with Benjamini--Hochberg~\cite{benjaminihochberg} FDR correction and leave-one-AOI-out
 cross-validation, materially changes the reading. Two metric caveats first:
 Recall@$K$ on QFabric is ceiling-bounded (with 480 relevant pairs, $R@10 \le
 10/480 = 0.021$), so QFabric is judged by mAP only; and a random ranker scores
@@ -704,7 +825,7 @@ Section~\ref{sec:data} excluded the $\sim$525\,GB raw TUM mirror in favour of th
 $\sim$7\,GB preprocessed RGB/NIR-JPEG subset. To check that this pragmatic choice
 does not cost retrieval performance --- i.e.\ that the conclusions survive at full
 radiometric depth --- we ran an independent replication directly on the excluded
-source: the native Planet-Fusion surface-reflectance rasters
+source: the native Planet-Fusion~\cite{planetfusion} surface-reflectance rasters
 ($1024\times1024\times4$ \texttt{int16}, Blue/Green/Red/NIR, 3\,m), read in-memory
 from the per-zone \texttt{planet.<UTM>.zip} archives with no lossy re-encoding. The
 full mirror was made tractable by cherry-picking only the UTM zones needed via
@@ -976,6 +1097,16 @@ along a temporal axis rather than a categorical one inverts which scoring
 approach wins, which is direct evidence that the naive-versus-$\Delta$ trade-off
 is set by task geometry rather than by the dataset.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.7\linewidth]{qfabric_status_map__eval.png}
+    \caption{QFabric status-transition retrieval (RQA5, RGB): the directional
+    zero-shot score now matches or beats naive on every encoder, inverting the
+    change-type regime of Figure~\ref{fig:qfabric_eval}. Both scores sit only just
+    above the 0.043 macro-prevalence floor (dashed).}
+    \label{fig:qfabricstatus}
+\end{figure}
+
 \subsection{LEVIR-CC --- open-vocabulary retrieval on human-captioned change}
 \label{sec:levircc}
 
@@ -1027,11 +1158,21 @@ across every dataset (DEN, QFabric, LEVIR-CC and SECOND-CC): the open-vocabulary
 engine recovers the change signal in proportion to its spatial and semantic
 salience --- strongly on salient construction, weakly on subtle or sparse change.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\linewidth]{per_query_ap__levir_cc__test.png}
+    \caption{LEVIR-CC per-query zero-shot AP by encoder (test split, RGB), with
+    each query's prevalence floor (dashed). Salient building and road change clears
+    the floor by a wide margin; demolition, vegetation, and the 19-positive water
+    class sit at or only just above it.}
+    \label{fig:levircc_ap}
+\end{figure}
+
 \subsection{Quantitative change localization (LEVIR-MCI)}
 \label{sec:localization}
 
 The brief asks for a heatmap highlighting the spatial region of the change. So far
-that deliverable was qualitative. LEVIR-MCI (Liu et al., 2024) is a strict
+that deliverable was qualitative. LEVIR-MCI~\cite{levirmci} is a strict
 superset of LEVIR-CC --- the same 1929 test pairs and captions, plus a pixel-level
 change mask per pair (building, road) --- which makes the heatmap measurable. For
 the two masked queries, the query-conditioned change heatmap (per-patch
@@ -1077,8 +1218,8 @@ mask datasets (LEVIR-MCI here, SECOND-CC next).
 \subsection{SECOND-CC --- open-vocabulary breadth and localisation}
 \label{sec:secondcc}
 
-LEVIR-CC's change is almost entirely building/road. SECOND-CC (Robust Change
-Captioning in Remote Sensing, 2025) is the breadth counterpart: 6{,}041 pairs with
+LEVIR-CC's change is almost entirely building/road. SECOND-CC~\cite{secondcc}
+is the breadth counterpart: 6{,}041 pairs with
 human captions \emph{and} six-class semantic maps for both phases. Seven free-text
 queries cover the six SECOND classes plus road (heavily captioned, no semantic
 class). Test split, 1{,}227 pairs, frozen encoders, RGB; macro random-ranking
@@ -1120,6 +1261,16 @@ extends the project's central law to a wide open vocabulary: recovery scales wit
 the visual salience and prevalence of the change type, and is weak in absolute
 terms with frozen CLIP-variant encoders.
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\linewidth]{per_query_ap__second_cc__test.png}
+    \caption{SECOND-CC per-query zero-shot AP by encoder (test split, RGB), with
+    each query's prevalence floor (dashed). Across all seven change types every
+    query clears its floor --- broader recovery than DEN --- but only modestly,
+    with buildings dominating and water/playground weakest.}
+    \label{fig:secondcc_ap}
+\end{figure}
+
 \subsection{Error analysis --- seasonal vs permanent}
 \label{sec:erroranalysis}
 
@@ -1149,6 +1300,29 @@ confusion --- i.e. the failure mode is surfacing no-change pairs
     retrievals binned by actual label transition; wetland queries are dominated
     by \texttt{stable} pairs.}
     \label{fig:confusion}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{confusion__clip_vitl14__train__zero_shot.png}
+        \caption{zero-shot.}
+        \label{fig:confusion_train_zs}
+    \end{subfigure}\hfill
+    \begin{subfigure}{0.49\linewidth}
+        \centering
+        \includegraphics[width=\linewidth]{confusion__clip_vitl14__train__peft.png}
+        \caption{PEFT.}
+        \label{fig:confusion_train_peft}
+    \end{subfigure}
+    \caption{In-distribution confusion (CLIP ViT-L/14, train split): top-$K$
+    retrievals binned by actual transition. The PEFT adapter
+    (\subref{fig:confusion_train_peft}) concentrates each query's retrievals on
+    its own positive transition far more sharply than zero-shot
+    (\subref{fig:confusion_train_zs}) --- the visible face of the train-set
+    memorisation reported in Section~\ref{sec:indist}.}
+    \label{fig:confusion_train}
 \end{figure}
 
 \subsection{Direct seasonal-robustness probe --- stable-pair $\Delta$-similarity gate}
@@ -1333,7 +1507,7 @@ yet implemented beyond the patch top-3 scorer of Section~\ref{sec:audit}. On
 QFabric both the change-type and status-transition tasks are benchmarked
 (Sections~\ref{sec:qfabric}--\ref{sec:qfabricstatus}); crop-precise polygon
 grounding for finer localisation remains open. fMoW is wired only at the protocol level; a
-concrete loader has yet to be added. Sentinel-1/2 fusion is likewise
+concrete loader has yet to be added. Sentinel-1/2~\cite{sentinel2} fusion is likewise
 unimplemented: \texttt{aoi\_metadata.json} confirms 51/75 AOIs have full SAR (S1)
 coverage, and feeding SAR $\Delta$-features would be a direct extension of the
 NRG pattern. Re-ranking, as quantified in Section~\ref{sec:rerank}, trades mAP for
@@ -1373,7 +1547,8 @@ The deliverable's value is the motivated, honestly-audited comparison, not
 a single best number: spectral physics and spatial locality carry the
 weak signal that exists, global embeddings and learned visual priors dilute or
 memorise it, and single-split scores must be cross-validated before they are
-believed. Across all four datasets the recovered signal tracks change salience:
+believed. Across all four datasets the recovered signal tracks change salience
+(Figure~\ref{fig:saliencelaw}):
 weak on DEN's subtle spectral transitions, dataset-dependent on QFabric, strong on
 LEVIR-CC's salient building/road change (per-query AP $\approx$0.6--0.8) yet
 near-random on its subtle vegetation and sparse water, and --- on SECOND-CC's
@@ -1381,5 +1556,22 @@ seven-class open vocabulary --- above every prevalence floor but only modestly
 (zero-shot macro $\approx$0.33). Localising the change (LEVIR-MCI/SECOND-CC masks)
 is weaker still: the heatmap clears its random-patch floor by at most
 $\approx$0.04--0.10.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.82\linewidth]{salience_law__summary.png}
+    \caption{The salience law, pooled across the open-vocabulary datasets: each
+    point is a per-query zero-shot AP (GeoRSCLIP) against that query's prevalence,
+    where a random ranker scores $\text{AP}\approx\text{prevalence}$ (dashed
+    diagonal). Salient, well-described construction change (new buildings, roads)
+    sits far above chance; subtle, sparse, or rare transitions (water, vegetation,
+    status changes) collapse onto the diagonal --- the single law this project
+    finds in every dataset.}
+    \label{fig:saliencelaw}
+\end{figure}
+
+
+\bibliographystyle{ieeetr}
+\bibliography{references}
 
 \end{document}
