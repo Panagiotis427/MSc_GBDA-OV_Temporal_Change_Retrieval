@@ -126,7 +126,21 @@ $f_{T_1}, f_{T_2}$, cached to disk per (dataset, encoder, split, colour mode).
 A change feature is then formed, either as a difference
 $\Delta f = f_{T_2} - f_{T_1}$ or as a concatenation $[f_{T_1} ; f_{T_2}]$. The
 query text is encoded by the same model's text tower into $t$, and the pair is
-scored by one of three approaches (Section~\ref{sec:approaches}).
+scored by one of three approaches (Section~\ref{sec:approaches}). Figure~\ref{fig:engine-pipeline}
+summarises the engine end to end.
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{engine_pipeline.png}
+    \caption{Open-vocabulary temporal change-retrieval engine. A frozen CLIP-variant encoder
+    (CLIP ViT-L/14, GeoRSCLIP, or RemoteCLIP; optionally with a light LoRA/PEFT head) embeds the
+    text query and both timesteps; a pair is scored by global $\Delta$-similarity or by the localised
+    \texttt{patch\_top3} change score (the best Dynamic EarthNet configuration); pairs are ranked into
+    the top-$K$ change events, each surfaced in the Gradio app as a $T_1/T_2$ side-by-side with a
+    query-conditioned change heatmap and a confidence score. A seasonal-drift gate filters
+    stable-pair false positives.}
+    \label{fig:engine-pipeline}
+\end{figure}
 
 \paragraph{Dataset-agnostic core.}
 A structural \texttt{TemporalDataset} protocol
