@@ -101,7 +101,7 @@ def fig_per_query_ap(results_dir: Path, out_dir: Path, *, dataset: str,
 # ----------------------------------------------------------------------
 def fig_qfabric_status_map(results_dir: Path, out_dir: Path, *, split: str = "eval",
                            color: str = "rgb", svg: bool = False) -> Optional[Path]:
-    encs, naive, zshot = [], [], []
+    encs, naive, zshot, floor = [], [], [], None
     for enc in _ENCODERS:
         n = _load(results_dir / f"qfabric_status__{enc}__{split}__{color}__naive.json")
         z = _load(results_dir / f"qfabric_status__{enc}__{split}__{color}__zero_shot.json")
@@ -110,6 +110,11 @@ def fig_qfabric_status_map(results_dir: Path, out_dir: Path, *, split: str = "ev
         encs.append(_ENC_LABEL[enc])
         naive.append(n["macro"]["mAP"])
         zshot.append(z["macro"]["mAP"])
+        if floor is None:  # macro prevalence = mean per-query positive fraction
+            npairs = z.get("n_pairs", 0) or 1
+            pq = z.get("per_query", [])
+            if pq:
+                floor = float(np.mean([q.get("n_relevant", 0) / npairs for q in pq]))
     if not encs:
         print("  skip qfabric_status_map: no records")
         return None
@@ -118,8 +123,9 @@ def fig_qfabric_status_map(results_dir: Path, out_dir: Path, *, split: str = "ev
     fig, ax = plt.subplots(figsize=(6.5, 4.5))
     ax.bar(x - w / 2, naive, w, label="naive")
     ax.bar(x + w / 2, zshot, w, label="zero-shot")
-    ax.axhline(0.043, color="black", linestyle="dashed", linewidth=1.1,
-               label="macro-prevalence floor (0.043)")
+    if floor is not None:
+        ax.axhline(floor, color="black", linestyle="dashed", linewidth=1.1,
+                   label=f"macro-prevalence floor ({floor:.3f})")
     ax.set_xticks(x); ax.set_xticklabels(encs, rotation=10, ha="right")
     ax.set_ylabel("mAP")
     ax.set_title("QFabric status-transition retrieval (RQA5, RGB)")
