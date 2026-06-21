@@ -177,7 +177,7 @@ testable in seconds with no network.
 4. **CLIP text sanity** — post-fix `encode_text` returns `[N, 768]`,
    L2-normalised, on CUDA; forest image correctly prefers "forest" over
    "city". Confirms the P1 fix.
-5. **Fast test suite (mock encoders, fixture, no network)** — **225 passed**.
+5. **Fast test suite (mock encoders, fixture, no network)** — **234 passed**.
    Covers embeddings cache + round-trip, retrieval (naive/zero_shot/peft),
    benchmark metrics (exact Recall@1/AP on engineered transitions), PEFT
    training (loss decreases, save/load, PEFT ≥ zero-shot), encoder
@@ -885,7 +885,7 @@ The adapter is < 0.2 % of the backbone parameter count — the PEFT premise.
 | End-to-end query — CLIP text forward + scoring, 605 pairs | **10.5 ms** |
 | Embedding precompute — CLIP L/14, 1024²→224, GPU | **68 ms/tile** → 1210 tiles ≈ **82 s** (one-time, cached) |
 | PEFT training — 605 samples, 40 epochs, adapter only, GPU | **≈29 s** |
-| Fast test suite — 225 tests, mock encoders, CPU (full suite 241: 240 pass, 1 skip) | ≈65 s |
+| Fast test suite — 234 tests, mock encoders, CPU (full suite 250: 249 pass, 1 skip) | ≈65 s |
 
 All GPU figures measured on the RTX 4060 in a dedicated timed pass (run with
 no other GPU job, to avoid contention skew).
