@@ -754,6 +754,43 @@ the 1024-px tile discards the CLIP global spatial context. RGB at the native til
 scale is the simplest configuration in the indistinguishable top group and remains
 our reference.
 
+\paragraph{Cross-check under the repository's own benchmark.}
+The replication above uses the caption-retrieval protocol. As an independent
+second check, we also ran the native rasters through \emph{this repository's own}
+cross-validated benchmark (\texttt{cv\_eval}: 5-fold \emph{AOI} partition,
+dominant-class relevance over the ten DEN queries; Section~\ref{sec:audit}) --- the
+same harness used for the JPEG subset, via the registry-resolved
+\texttt{dynamic\_earthnet\_planet} loader. Table~\ref{tab:native3mcv} reports the
+head-to-head. Under the identical encoder and metric the native 3\,m source
+(zero-shot macro mAP $0.130\pm0.068$) sits \emph{at or above} the JPEG subset
+($0.076$; $0.123$ under fraction relevance), despite covering fewer AOIs. The
+comparison is not fully controlled --- the corpora differ in AOI count (23 vs 75)
+and colour composite (native RGB vs JPEG NRG) --- but for this corpus colour barely
+moves the score (georsclip: RGB $0.085$ vs NRG $0.100$), so the direction is robust:
+the native source is no worse, corroborating the no-loss conclusion of
+Section~\ref{sec:data} with the repository's native dominant-class metric rather than
+the caption-retrieval one.\footnote{The leakage-free $k$-fold PEFT estimate on the
+native rasters is $0.215\pm0.306$; the large variance (one fold at $0.75$, the rest
+$0.03$--$0.19$, driven by few positives per small fold) makes the zero-shot figure
+the reliable point of comparison.}
+
+\begin{table}[H]
+    \centering
+    \caption{Native 3\,m rasters vs the preprocessed JPEG subset under the
+    repository's own \texttt{cv\_eval} benchmark (CLIP ViT-L/14, 5-fold AOI
+    cross-validation, zero-shot, dominant-class relevance unless noted).}
+    \label{tab:native3mcv}
+    \begin{tabular}{llc}
+        \toprule
+        \textbf{Source} & \textbf{colour} & \textbf{macro mAP (mean $\pm$ std)} \\
+        \midrule
+        Native 3\,m raster & RGB & 0.130 $\pm$ 0.068 \\
+        JPEG subset                    & NRG & 0.076 \\
+        JPEG subset (fraction rel.)    & NRG & 0.123 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
 \subsection{Re-ranking quantification}
 \label{sec:rerank}
 
