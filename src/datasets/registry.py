@@ -179,9 +179,46 @@ def _dynamic_earthnet_opts(*, root=None, pairing=None, split=None, **extra) -> D
     return out
 
 
+def _dynamic_earthnet_planet_factory(**kwargs: Any) -> TemporalDataset:
+    from .dynamic_earthnet_planet import DENPlanetDataset
+    return DENPlanetDataset(**kwargs)
+
+
+def _dynamic_earthnet_planet_opts(*, root=None, pairing=None, split=None, **extra) -> Dict[str, Any]:
+    """Native 3 m Planet DEN: ``root`` is the dir of official zips
+    (``labels.zip`` + ``planet.<zone>.zip``). ``color_mode`` maps to Planet band
+    composites (rgb, or nrg|nir -> NIR-Red-Green false colour); ``ndvi`` is not
+    available from the raw rasters. ``split`` selects a deterministic, seeded
+    AOI-level partition (train|val|test|all); the report's numbers come from
+    multi-seed cross-validation over these partitions."""
+    out: Dict[str, Any] = dict(extra)
+    if root is not None:
+        out["root"] = root
+    out["pairing_strategy"] = pairing or "bimonthly"
+    color_mode = out.pop("color_mode", None)
+    if color_mode is not None:
+        if color_mode in ("nir", "nrg"):
+            out["bands"] = "nir"
+        elif color_mode == "rgb":
+            out["bands"] = "rgb"
+        else:
+            raise ValueError(
+                f"dynamic_earthnet_planet supports color_mode rgb|nrg, not {color_mode!r} "
+                "(ndvi needs the preprocessed subset's NDVI frames; use 'dynamic_earthnet')."
+            )
+    if split is not None:
+        out["split"] = split
+    return out
+
+
 register_dataset("qfabric_teo", _qfabric_teo_factory, _qfabric_teo_opts)
 register_dataset("qfabric_status", _qfabric_status_factory, _qfabric_status_opts)
 register_dataset("levir_cc", _levir_cc_factory, _levir_cc_opts)
 register_dataset("levir_mci", _levir_mci_factory, _levir_cc_opts)  # MCI = CC + masks; same opts
 register_dataset("second_cc", _second_cc_factory, _levir_cc_opts)  # captions + sem masks; same opts (root+split)
 register_dataset("dynamic_earthnet", _dynamic_earthnet_factory, _dynamic_earthnet_opts)
+register_dataset(
+    "dynamic_earthnet_planet",
+    _dynamic_earthnet_planet_factory,
+    _dynamic_earthnet_planet_opts,
+)
