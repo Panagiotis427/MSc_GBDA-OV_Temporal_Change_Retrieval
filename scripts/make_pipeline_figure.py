@@ -4,7 +4,7 @@ Self-authored schematic (matplotlib -> clean PNG; no external/web images). Encod
 frozen CLIP-variant encoder -> global or patch-level Delta-similarity scoring -> ranked change events
 with side-by-side pairs, query-conditioned heatmap, and a confidence score.
 
-    python scripts/make_pipeline_figure.py --out assets/figures/engine_pipeline.png
+    python scripts/make_pipeline_figure.py --out figures/engine_pipeline.png
 """
 from __future__ import annotations
 
