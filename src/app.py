@@ -299,7 +299,10 @@ class SemanticChangeSearch:
         from src.retrieval import top_patch_change_scores
         if getattr(self, "_patch_t1", None) is None:
             split_str = self.cfg.split or "all"
-            cache_tag = cache_tag_for(split_str, self.cfg.color_mode, self.cfg.use_lora)
+            # NB: no lora component in the tag — the patch path encodes with the plain
+            # self.encoder (LoRA is never merged into it here), so a "_lora"-tagged patch cache
+            # would mislabel plain-encoder embeddings as adapted. Patch is encoder-LoRA-agnostic.
+            cache_tag = cache_tag_for(split_str, self.cfg.color_mode)
             patch_store = load_or_compute_patches(
                 self.dataset, self.encoder, self.store.pairs,
                 cache_dir=self.cfg.cache_dir, cache_tag=cache_tag,

@@ -39,8 +39,6 @@ def main() -> None:
     ap.add_argument("--split", default="test",
                     help="DEN preprocessed split: train|val|test|all")
     ap.add_argument("--color-mode", default="rgb", choices=["rgb", "nrg", "ndvi"])
-    ap.add_argument("--lora", action="store_true",
-                    help="key the cache for LoRA-adapted embeddings")
     ap.add_argument("--force", action="store_true")
     args = ap.parse_args()
 
@@ -50,7 +48,9 @@ def main() -> None:
         color_mode=args.color_mode,
     )
     enc = get_encoder(args.encoder)
-    cache_tag = cache_tag_for(args.split, args.color_mode, args.lora)
+    # No lora component: the app's patch path encodes with the plain encoder (LoRA is never merged
+    # into it), so the patch cache is encoder-LoRA-agnostic — tagging it "_lora" would mislabel it.
+    cache_tag = cache_tag_for(args.split, args.color_mode)
 
     # The pair store fixes the canonical, load-failure-pruned pair order; patch
     # rows must align to it so the app can index them by store position.
