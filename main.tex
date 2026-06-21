@@ -330,8 +330,8 @@ index sizing.
 \label{sec:results}
 
 All headline experiments use real Dynamic EarthNet. The fast test suite (mock
-encoders, synthetic fixture, no network) passes 225 tests (full suite
-241: 240 passed, 1 skipped) and covers the embeddings cache and round-trip,
+encoders, synthetic fixture, no network) passes 234 tests (full suite
+250: 249 passed, 1 skipped) and covers the embeddings cache and round-trip,
 retrieval (naive/zero\_shot/peft), benchmark metrics, PEFT training
 (loss decreases, save/load), the encoder protocol/registry, and the app's
 \texttt{query()} path (real fixture tiles + heatmap + seasonal note). The
@@ -1246,7 +1246,7 @@ summarise hardware, model sizes, disk footprint and timings.
         End-to-end query --- CLIP text forward + scoring, 605 pairs & 10.5\,ms \\
         Embedding precompute --- CLIP L/14, $1024^2 \rightarrow 224$, GPU & 68\,ms/tile ($\approx$82\,s, one-time) \\
         PEFT training --- 605 samples, 40 epochs, adapter only, GPU & $\approx$29\,s \\
-        Fast test suite --- 225 tests, mock encoders, CPU & $\approx$65\,s \\
+        Fast test suite --- 234 tests, mock encoders, CPU & $\approx$65\,s \\
         \bottomrule
     \end{tabular}
 \end{table}

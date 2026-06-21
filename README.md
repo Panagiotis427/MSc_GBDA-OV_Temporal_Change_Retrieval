@@ -184,6 +184,7 @@ in-distribution wins are memorisation; held-out, frozen zero-shot is the stronge
 | `scripts/peft_augment_eval.py` | Track-4 anti-memorization check: frozen / PEFT / PEFT+feature-noise on the same leakage-free folds |
 | `scripts/make_den_fixture.py` | tiny synthetic DEN tree for fast tests |
 | `scripts/run_pipeline.py` | one-command run with `--train-split` / `--eval-splits` / `--color-mode` / `--mode` / `--lora` / `--results-dir`; cross-split mAP table |
+| `scripts/precompute_patch_embeddings.py` | warm the on-disk per-patch embedding cache (`PatchEmbeddingStore` in `src/embeddings.py`) so the first `approach="patch"` query in the app is instant instead of a full GPU pass |
 | `scripts/export_results.py` | regenerate benchmarks from cache → `results/*.json` + `macro_summary.csv` (`--confusion` for error analysis) |
 | `scripts/make_figures.py` | publication PNGs (recall curves, mAP bars, colour heatmap, seasonal drift, cross-split, confusion) from `results/` |
 | `scripts/make_comparison_figure.py` | static zero-shot-vs-PEFT top-K visual comparison per encoder |
