@@ -1,0 +1,126 @@
+% ============================================================================
+%  references.bib  --  GBDA Case 11: Open-Vocabulary Temporal Change Retrieval
+%  Style: IEEE (ieeetr). Metadata web-verified June 2026 (arXiv / venue / DBLP).
+%  Shared keys (clip, georsclip, remoteclip, lora, second, dynamicearthnet,
+%  levircc, vit, sentinel2, benjaminihochberg) carry the same verified metadata
+%  as the companion MSc thesis bibliography.
+% ============================================================================
+
+% ---------- Contrastive image--text encoders ----------
+@inproceedings{clip,
+  author    = {Alec Radford and Jong Wook Kim and Chris Hallacy and Aditya Ramesh and Gabriel Goh and Sandhini Agarwal and Girish Sastry and Amanda Askell and Pamela Mishkin and Jack Clark and Gretchen Krueger and Ilya Sutskever},
+  title     = {{Learning Transferable Visual Models From Natural Language Supervision}},
+  booktitle = {International Conference on Machine Learning (ICML), PMLR 139},
+  pages     = {8748--8763}, year = {2021}
+}
+@inproceedings{openclip,
+  author    = {Mehdi Cherti and Romain Beaumont and Ross Wightman and Mitchell Wortsman and Gabriel Ilharco and Cade Gordon and Christoph Schuhmann and Ludwig Schmidt and Jenia Jitsev},
+  title     = {{Reproducible Scaling Laws for Contrastive Language-Image Learning}},
+  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)},
+  pages     = {2818--2829}, year = {2023}, doi = {10.1109/CVPR52729.2023.00276}
+}
+@article{georsclip,
+  author  = {Zilun Zhang and Tiancheng Zhao and Yulong Guo and Jianwei Yin},
+  title   = {{RS5M and GeoRSCLIP: A Large-Scale Vision-Language Dataset and a Large Vision-Language Model for Remote Sensing}},
+  journal = {IEEE Transactions on Geoscience and Remote Sensing},
+  volume  = {62}, pages = {1--23}, year = {2024}, doi = {10.1109/TGRS.2024.3449154}
+}
+@article{remoteclip,
+  author  = {Fan Liu and Delong Chen and Zhangqingyun Guan and Xiaocong Zhou and Jiale Zhu and Qiaolin Ye and Liyong Fu and Jun Zhou},
+  title   = {{RemoteCLIP: A Vision Language Foundation Model for Remote Sensing}},
+  journal = {IEEE Transactions on Geoscience and Remote Sensing},
+  volume  = {62}, pages = {1--16}, year = {2024}, doi = {10.1109/TGRS.2024.3390838}
+}
+@inproceedings{vit,
+  author    = {Alexey Dosovitskiy and Lucas Beyer and Alexander Kolesnikov and Dirk Weissenborn and Xiaohua Zhai and Thomas Unterthiner and Mostafa Dehghani and Matthias Minderer and Georg Heigold and Sylvain Gelly and Jakob Uszkoreit and Neil Houlsby},
+  title     = {{An Image is Worth 16x16 Words: Transformers for Image Recognition at Scale}},
+  booktitle = {International Conference on Learning Representations (ICLR)}, year = {2021}
+}
+
+% ---------- Datasets ----------
+@inproceedings{dynamicearthnet,
+  author    = {Aysim Toker and Lukas Kondmann and Mark Weber and Marvin Eisenberger and Andr\'es Camero and Jingliang Hu and Ariadna Pregel Hoderlein and \c{C}a\u{g}lar Senaras and Timothy Davis and Daniel Cremers and Giovanni Marchisio and Xiao Xiang Zhu and Laura Leal-Taix\'e},
+  title     = {{DynamicEarthNet: Daily Multi-Spectral Satellite Dataset for Semantic Change Segmentation}},
+  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, year = {2022}
+}
+@inproceedings{qfabric,
+  author    = {Sagar Verma and Akash Panigrahi and Siddharth Gupta},
+  title     = {{QFabric: Multi-Task Change Detection Dataset}},
+  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition Workshops (CVPRW), EarthVision},
+  pages     = {1052--1061}, year = {2021}
+}
+@inproceedings{teochat,
+  author    = {Jeremy Andrew Irvin and Emily Ruoyu Liu and Joyce Chuyi Chen and Ines Dormoy and Jinyoung Kim and Samar Khanna and Zhuo Zheng and Stefano Ermon},
+  title     = {{TEOChat: A Large Vision-Language Assistant for Temporal Earth Observation Data}},
+  booktitle = {International Conference on Learning Representations (ICLR)}, year = {2025}
+}
+@article{levircc,
+  author  = {Chenyang Liu and Rui Zhao and Hao Chen and Zhengxia Zou and Zhenwei Shi},
+  title   = {{Remote Sensing Image Change Captioning With Dual-Branch Transformers: A New Method and a Large Scale Dataset}},
+  journal = {IEEE Transactions on Geoscience and Remote Sensing},
+  volume  = {60}, pages = {1--20}, year = {2022}, doi = {10.1109/TGRS.2022.3218921}
+}
+@article{levirmci,
+  author  = {Chenyang Liu and Keyan Chen and Haotian Zhang and Zipeng Qi and Zhengxia Zou and Zhenwei Shi},
+  title   = {{Change-Agent: Toward Interactive Comprehensive Remote Sensing Change Interpretation and Analysis}},
+  journal = {IEEE Transactions on Geoscience and Remote Sensing},
+  volume  = {62}, pages = {1--16}, year = {2024}, doi = {10.1109/TGRS.2024.3425815}
+}
+@article{secondcc,
+  author  = {Ali Can Karaca and M. Enes Ozelbas and Saadettin Berber and Orkhan Karimli and Turabi Yildirim and M. Fatih Amasyali},
+  title   = {{Robust Change Captioning in Remote Sensing: SECOND-CC Dataset and MModalCC Framework}},
+  journal = {IEEE Journal of Selected Topics in Applied Earth Observations and Remote Sensing},
+  volume  = {18}, pages = {21494--21513}, year = {2025}, doi = {10.1109/JSTARS.2025.3600613}
+}
+@article{second,
+  author  = {Kunping Yang and Gui-Song Xia and Zicheng Liu and Bo Du and Wen Yang and Marcello Pelillo and Liangpei Zhang},
+  title   = {{Asymmetric Siamese Networks for Semantic Change Detection in Aerial Images}},
+  journal = {IEEE Transactions on Geoscience and Remote Sensing},
+  volume  = {60}, pages = {1--18}, year = {2022}, doi = {10.1109/TGRS.2021.3113912}
+}
+@inproceedings{fmow,
+  author    = {Gordon Christie and Neil Fendley and James Wilson and Ryan Mukherjee},
+  title     = {{Functional Map of the World}},
+  booktitle = {IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR)}, year = {2018}
+}
+@article{sentinel2,
+  author  = {Matthias Drusch and Umberto Del Bello and S\'ebastien Carlier and Olivier Colin and Veronica Fernandez and Ferran Gascon and Bianca Hoersch and Claudia Isola and Paolo Laberinti and Philippe Martimort and Aim\'e Meygret and Fabrizio Spoto and Omar Sy and Franco Marchese and Pierre Bargellini},
+  title   = {{Sentinel-2: ESA's Optical High-Resolution Mission for GMES Operational Services}},
+  journal = {Remote Sensing of Environment}, volume = {120}, pages = {25--36}, year = {2012}, doi = {10.1016/j.rse.2011.11.026}
+}
+@misc{planetfusion,
+  author       = {{Planet Labs PBC}},
+  title        = {{Planet Fusion Monitoring: A Sensor-Agnostic, Daily, 3\,m Surface Reflectance Product}},
+  howpublished = {\url{https://www.planet.com/products/monitoring/}}, year = {2022}, note = {Accessed 2026}
+}
+
+% ---------- Adaptation / objectives / tooling ----------
+@inproceedings{lora,
+  author    = {Edward J. Hu and Yelong Shen and Phillip Wallis and Zeyuan Allen-Zhu and Yuanzhi Li and Shean Wang and Lu Wang and Weizhu Chen},
+  title     = {{LoRA: Low-Rank Adaptation of Large Language Models}},
+  booktitle = {International Conference on Learning Representations (ICLR)}, year = {2022}
+}
+@article{infonce,
+  author  = {Aaron van den Oord and Yazhe Li and Oriol Vinyals},
+  title   = {{Representation Learning with Contrastive Predictive Coding}},
+  journal = {arXiv preprint arXiv:1807.03748}, year = {2018}
+}
+@inproceedings{torchgeo,
+  author    = {Adam J. Stewart and Caleb Robinson and Isaac A. Corley and Anthony Ortiz and Juan M. Lavista Ferres and Arindam Banerjee},
+  title     = {{TorchGeo: Deep Learning With Geospatial Data}},
+  booktitle = {Proceedings of the 30th International Conference on Advances in Geographic Information Systems (SIGSPATIAL)},
+  pages     = {1--12}, year = {2022}, doi = {10.1145/3557915.3560953}
+}
+@article{gradio,
+  author  = {Abubakar Abid and Ali Abdalla and Ali Abid and Dawood Khan and Abdulrahman Alfozan and James Zou},
+  title   = {{Gradio: Hassle-Free Sharing and Testing of ML Models in the Wild}},
+  journal = {arXiv preprint arXiv:1906.02569}, year = {2019}
+}
+
+% ---------- Statistics ----------
+@article{benjaminihochberg,
+  author  = {Yoav Benjamini and Yosef Hochberg},
+  title   = {{Controlling the False Discovery Rate: A Practical and Powerful Approach to Multiple Testing}},
+  journal = {Journal of the Royal Statistical Society: Series B (Methodological)},
+  volume  = {57}, number = {1}, pages = {289--300}, year = {1995}
+}
