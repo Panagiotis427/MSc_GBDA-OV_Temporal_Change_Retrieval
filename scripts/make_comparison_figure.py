@@ -132,7 +132,7 @@ def main() -> None:
     ap.add_argument("--split", default="train")
     ap.add_argument("--color", default="rgb", choices=["rgb", "nrg", "ndvi"])
     ap.add_argument("--cache-dir", default="data/cache")
-    ap.add_argument("--out-dir", default="figures")
+    ap.add_argument("--out-dir", default="latex/figures")
     ap.add_argument("--top-k", type=int, default=3)
     ap.add_argument("--svg", action="store_true")
     args = ap.parse_args()

@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 R = Path("results")
-OUT = Path("figures/cv_progression.png")
+OUT = Path("latex/figures/cv_progression.png")
 
 
 def _load(name):
