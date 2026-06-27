@@ -132,7 +132,13 @@ demolition/vegetation/water ~0.15–0.30; 5-query macro ~0.40, was a 3-query ~0.
   retrieval) stays. Localization pillar already covered by LEVIR-MCI + SECOND-CC.
 - **Rejected with reasons:** **fMoW** — functional-classification dataset with **no change labels**;
   repurposing reintroduces the weak-label noise that sank DEN PEFT (rationale in the plan §2). DEN
-  alternative sources (TUM raw / HEVC / torchgeo) — same labels, no gain.
+  alternative sources (TUM raw / HEVC / torchgeo) — same labels, no gain. **OSCD**
+  ([rcdaudt.github.io/oscd](https://rcdaudt.github.io/oscd/), live) — evaluated 2026-06-27, rejected:
+  **binary** urban change only (no semantic classes → no open-vocab vocabulary), Sentinel-2 10–60 m
+  (coarse → domain shift for the high-res-trained CLIP variants), 24 pairs, 2 dates. Its pixel masks
+  only support *binary* localization, already covered better by high-res class-labelled LEVIR-MCI +
+  SECOND-CC. The "OSCD + Our Dates" multidate extension + Siamese weights are on the dead Granular
+  engine (CF 1016). Off-brief, strictly weaker than the existing corpus — do not integrate.
 - **Still future-work:** S1 SAR Δ-features (off-brief, optical-encoder mismatch) · PEFT
   anti-memorisation via augmentation · human relevance judgements (annotation, no compute).
 
