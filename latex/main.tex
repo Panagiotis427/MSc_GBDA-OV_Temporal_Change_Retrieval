@@ -889,7 +889,9 @@ and colour composite (native RGB vs JPEG NRG) --- but for this corpus colour bar
 moves the score (georsclip: RGB $0.085$ vs NRG $0.100$), so the direction is robust:
 the native source is no worse, corroborating the no-loss conclusion of
 Section~\ref{sec:data} with the repository's native dominant-class metric rather than
-the caption-retrieval one.\footnote{The leakage-free $k$-fold PEFT estimate on the
+the caption-retrieval one. The two remaining confounds are removed in the fully
+controlled ablation below (Table~\ref{tab:jpegablation}, Figure~\ref{fig:jpegablation}).%
+\footnote{The leakage-free $k$-fold PEFT estimate on the
 native rasters is $0.215\pm0.306$; the large variance (one fold at $0.75$, the rest
 $0.03$--$0.19$, driven by few positives per small fold) makes the zero-shot figure
 the reliable point of comparison.}
@@ -907,6 +909,116 @@ the reliable point of comparison.}
         Native 3\,m raster & RGB & 0.130 $\pm$ 0.068 \\
         JPEG subset                    & NRG & 0.076 \\
         JPEG subset (fraction rel.)    & NRG & 0.123 \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\paragraph{Controlled compression and resolution ablation.}
+The cross-checks above leave two confounds (AOI count and colour composite). To
+isolate image fidelity itself we hold \emph{everything} fixed --- the same 23 AOIs,
+253 pairs, RGB composite, encoder, zero-shot scoring and 5 AOI folds --- and vary
+only the degradation applied to each tile before encoding. The native lossless
+raster is the upper bound; every other row is the identical corpus pushed through a
+lossy round-trip in memory. Relevance labels (from the lossless masks) and the
+text-query vectors are computed once and shared across all rows, so the only thing
+that changes between rows is the image. Two degradation families are swept: JPEG
+quality $q\in\{95,75,50,25,10\}$ (radiometric / compression loss at full
+resolution), and bicubic downsampling to $\{512,256,128,64\}$\,px followed by JPEG
+$q{=}75$ (the resolution loss the preprocessed subset's resize step would
+introduce). Table~\ref{tab:jpegablation} and Figure~\ref{fig:jpegablation} report
+CLIP ViT-L/14.
+
+\begin{table}[H]
+    \centering
+    \caption{Controlled degradation ablation on the native 3\,m rasters (CLIP
+    ViT-L/14, RGB, zero-shot, 253 pairs / 23 AOIs, 5-fold AOI cross-validation,
+    seed 42). Identical corpus throughout; only the per-tile degradation varies.
+    Every row overlaps native within one fold standard deviation.}
+    \label{tab:jpegablation}
+    \begin{tabular}{lcc}
+        \toprule
+        \textbf{Degradation} & \textbf{macro mAP (mean $\pm$ std)} & \textbf{$\Delta$ vs native} \\
+        \midrule
+        Native 3\,m (lossless, 1024\,px) & 0.130 $\pm$ 0.068 & --- \\
+        \midrule
+        JPEG $q{=}95$  & 0.115 $\pm$ 0.065 & $-0.015$ \\
+        JPEG $q{=}75$  & 0.094 $\pm$ 0.064 & $-0.036$ \\
+        JPEG $q{=}50$  & 0.128 $\pm$ 0.078 & $-0.001$ \\
+        JPEG $q{=}25$  & 0.095 $\pm$ 0.065 & $-0.034$ \\
+        JPEG $q{=}10$  & 0.138 $\pm$ 0.108 & $+0.009$ \\
+        \midrule
+        Downsample 512\,px ($+$ JPEG $q75$) & 0.088 $\pm$ 0.054 & $-0.042$ \\
+        Downsample 256\,px & 0.154 $\pm$ 0.150 & $+0.025$ \\
+        Downsample 128\,px & 0.146 $\pm$ 0.166 & $+0.016$ \\
+        Downsample \phantom{0}64\,px & 0.216 $\pm$ 0.213 & $+0.086$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\linewidth]{jpeg_ablation__clip_vitl14__rgb.png}
+    \caption{Zero-shot AOI-CV macro mAP versus JPEG quality on the identical native
+    corpus (CLIP ViT-L/14, RGB). The dashed line and shaded band are the native
+    lossless mean $\pm$ fold std. Every JPEG point sits inside the band, and the
+    curve is non-monotonic --- the most-compressed setting ($q{=}10$) scores
+    \emph{above} the lightly-compressed ones --- so the variation is fold sampling,
+    not a compression effect.}
+    \label{fig:jpegablation}
+\end{figure}
+
+The reading is unambiguous: \emph{image fidelity is not the bottleneck}. The
+largest gap from native across the entire JPEG sweep is $0.036$\,mAP --- about half
+of one fold's standard deviation ($\sim$$0.065$) --- and the deltas alternate sign
+with quality, so they are fold-sampling noise rather than a degradation signal. The
+resolution sweep is, if anything, more decisive: collapsing the tile to 64\,px (a
+$16\times$ linear reduction) does not lower retrieval and nominally raises it,
+because the frozen encoder resizes every input to its own $224$\,px window and the
+change signal that survives in the global embedding is coarse --- high-frequency
+spatial detail is simply not what the web-pretrained features exploit for these
+queries.\footnote{The honest caveat is that fold variance grows under aggressive
+downsampling (std up to $0.21$ at 64\,px, driven by few positives per small fold),
+so we claim only that \emph{no degradation is detectable} at this corpus size, not
+exact equivalence.} This is direct evidence for the report's central thesis
+(Sections~\ref{sec:audit},~\ref{sec:nativeraster}): the ceiling is the frozen
+web-pretrained representation and the small labelled-AOI set, not imagery
+compression or resolution. It also retroactively vindicates the
+Section~\ref{sec:data} decision to work from the $\sim$7\,GB preprocessed subset
+rather than the $\sim$525\,GB native mirror.
+
+The result is not an artefact of the generic web-pretrained encoder. Repeating the
+identical ablation with the RS-pretrained GeoRSCLIP (ViT-B/32) gives the same null
+(Table~\ref{tab:jpegablationgeors}): the largest deviation from its native baseline
+($0.085\pm0.059$) is $0.027$\,mAP, again inside one fold standard deviation, and
+every JPEG and downsample row overlaps native. Tellingly, the two encoders disagree
+on the \emph{sign} of the small downsampling deltas --- CLIP nominally rises toward
+64\,px, GeoRSCLIP nominally falls --- which is exactly what fold-sampling noise, and
+not a real fidelity effect, would produce. Both the domain-agnostic and the
+RS-domain backbone are insensitive to compression and resolution on this task.
+
+\begin{table}[H]
+    \centering
+    \caption{Confirmation under GeoRSCLIP (ViT-B/32, RGB, zero-shot, same 253
+    pairs / 23 AOIs, 5-fold AOI cross-validation, seed 42). Same null as
+    Table~\ref{tab:jpegablation}: every row within one fold standard deviation of
+    native.}
+    \label{tab:jpegablationgeors}
+    \begin{tabular}{lcc}
+        \toprule
+        \textbf{Degradation} & \textbf{macro mAP (mean $\pm$ std)} & \textbf{$\Delta$ vs native} \\
+        \midrule
+        Native 3\,m (lossless, 1024\,px) & 0.085 $\pm$ 0.059 & --- \\
+        \midrule
+        JPEG $q{=}95$  & 0.083 $\pm$ 0.054 & $-0.002$ \\
+        JPEG $q{=}75$  & 0.095 $\pm$ 0.075 & $+0.010$ \\
+        JPEG $q{=}50$  & 0.091 $\pm$ 0.058 & $+0.006$ \\
+        JPEG $q{=}25$  & 0.091 $\pm$ 0.073 & $+0.006$ \\
+        JPEG $q{=}10$  & 0.104 $\pm$ 0.079 & $+0.019$ \\
+        \midrule
+        Downsample 512\,px ($+$ JPEG $q75$) & 0.102 $\pm$ 0.082 & $+0.017$ \\
+        Downsample 256\,px & 0.076 $\pm$ 0.059 & $-0.010$ \\
+        Downsample 128\,px & 0.074 $\pm$ 0.075 & $-0.011$ \\
+        Downsample \phantom{0}64\,px & 0.058 $\pm$ 0.035 & $-0.027$ \\
         \bottomrule
     \end{tabular}
 \end{table}
