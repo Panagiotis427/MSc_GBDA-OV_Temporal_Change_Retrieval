@@ -266,13 +266,13 @@ testable in seconds with no network.
   reverses on held-out test (§7.2/§7.3, where GeoRSCLIP leads). On zero-shot, RS pretraining
   already helps in-sample (RemoteCLIP 0.057 > CLIP 0.043 > GeoRSCLIP 0.040).
 
-![mAP by encoder x approach, train split](assets/figures/map_bars__train__rgb.png)
+![mAP by encoder x approach, train split](latex/figures/map_bars__train__rgb.png)
 
 Qualitative zero-shot vs PEFT (top-3 retrievals per query, [T1 | T2], green =
 relevant): the adapter sharpens scores but the gain is concentrated on the
 classes its weak captions cover.
 
-![Zero-shot vs PEFT, CLIP, train](assets/figures/zeroshot_vs_peft__clip_vitl14__train.png)
+![Zero-shot vs PEFT, CLIP, train](latex/figures/zeroshot_vs_peft__clip_vitl14__train.png)
 
 ### 7.2 Cross-split generalisation (adapter trained on train, eval on val/test)
 
@@ -309,7 +309,7 @@ clearest on QFabric, Appendix B.5, where train-fit hits 0.998.)
 
 The train spike then val/test collapse is the signature of the overfit:
 
-![Cross-split mAP, CLIP](assets/figures/cross_split__clip_vitl14__rgb.png)
+![Cross-split mAP, CLIP](latex/figures/cross_split__clip_vitl14__rgb.png)
 
 ### 7.3 NIR false-colour ablation
 
@@ -331,7 +331,7 @@ Three colour modes compared (zero-shot mAP, all three splits):
 sits between NRG and RGB, except for GeoRSCLIP, whose anomalously high test RGB
 (0.299) exceeds its NDVI (0.216).
 
-![Colour-mode ablation, zero-shot, test](assets/figures/color_ablation__zero_shot__test.png)
+![Colour-mode ablation, zero-shot, test](latex/figures/color_ablation__zero_shot__test.png)
 
 NRG hurts on train (−0.010 to −0.034) but substantially helps on test
 (+0.061 CLIP, **+0.127 GeoRSCLIP**, +0.079 RemoteCLIP). NDVI sits
@@ -401,7 +401,7 @@ false-colour) generalises; learned visual priors do not.** No amount of adapter
 sophistication — small projection head, or LoRA at any rank/epoch we tried —
 beats the structural prior embedded in RS-pretrained zero-shot GeoRSCLIP + NIR.
 
-![GeoRSCLIP NRG: frozen zero-shot vs LoRA across splits](assets/figures/cross_split__georsclip__nrg.png)
+![GeoRSCLIP NRG: frozen zero-shot vs LoRA across splits](latex/figures/cross_split__georsclip__nrg.png)
 
 ### 7.5 Re-ranking quantification (GeoRSCLIP + NRG, zero_shot, test split)
 
@@ -494,7 +494,7 @@ subset (N = 2476 before/after pairs) and 6 change-type queries
 | GeoRSCLIP | **0.269** | 0.182 |
 | RemoteCLIP | **0.233** | 0.180 |
 
-![QFabric change-type mAP by encoder x approach](assets/figures/map_bars__eval__rgb.png)
+![QFabric change-type mAP by encoder x approach](latex/figures/map_bars__eval__rgb.png)
 
 **naive beats zero-shot — the opposite of DEN.** QFabric change *types*
 (residential / road / industrial …) are identifiable from the **after** image
@@ -540,7 +540,7 @@ both splits (`scripts/benchmark_qfabric.py --peft`):
 | RemoteCLIP | train | 0.244 | 0.179 | **0.999** |
 | RemoteCLIP | test | 0.245 | 0.183 | **0.288** |
 
-![QFabric PEFT — test split, naive vs zero-shot vs PEFT](assets/figures/qfabric_peft_test.png)
+![QFabric PEFT — test split, naive vs zero-shot vs PEFT](latex/figures/qfabric_peft_test.png)
 
 **PEFT overfits train on *both* datasets (≈0.999 here) — but generalises
 differently.** On held-out QFabric test the adapter is **at-or-above `naive`**:
@@ -772,17 +772,23 @@ dominated by **`stable`** pairs (6–7 of 10), not by seasonal or wrong-transiti
 confusion — i.e. the failure mode is surfacing no-change pairs, consistent with
 the class-imbalance reading above.
 
-![Confusion: GeoRSCLIP NRG zero-shot, test](assets/figures/confusion__georsclip__test__zero_shot.png)
+![Confusion: GeoRSCLIP NRG zero-shot, test](latex/figures/confusion__georsclip__test__zero_shot.png)
 
-Seasonal-drift@K curves (flat at 0 on train, as expected) and the per-encoder
-confusion matrices for CLIP train (zero-shot vs PEFT) are in `assets/figures/`.
+Seasonal-drift@K curves are flat at 0 (train and test, as expected — no spurious
+seasonal retrieval):
+
+![Seasonal-drift@K, train](latex/figures/seasonal_drift__train__rgb.png)
+![Seasonal-drift@K, test](latex/figures/seasonal_drift__test__rgb.png)
+
+The per-encoder confusion matrices for CLIP train (zero-shot vs PEFT) are also in
+`latex/figures/`.
 
 **Reproducing the figures (from cached embeddings — no GPU training):**
 
 ```
 python -m scripts.export_results --color-modes rgb nrg ndvi \
     --approaches naive zero_shot peft --lora --confusion --results-dir results
-python -m scripts.make_figures --results-dir results --out-dir assets/figures
+python -m scripts.make_figures --results-dir results --out-dir latex/figures
 python -m scripts.make_comparison_figure --encoder clip_vitl14 --split train
 ```
 
@@ -933,7 +939,7 @@ pytest -q --ignore=tests/test_text_encoder.py    # fast suite, deterministic, no
 # Regenerate result JSON/CSV + publication figures from cache
 python -m scripts.export_results --color-modes rgb nrg ndvi \
     --approaches naive zero_shot peft --lora --confusion --results-dir results
-python -m scripts.make_figures --results-dir results --out-dir assets/figures
+python -m scripts.make_figures --results-dir results --out-dir latex/figures
 # Statistical-validity audit (Appendix B): random-baseline + FDR over every result cell
 python -m scripts.significance_audit --csv results/results_audit_summary.csv
 ```
@@ -1068,8 +1074,8 @@ on this machine.
 0.102→0.104, NDVI 0.062→0.064); §7.8 mega_projects 80→76 pairs; §7.9 figure paraphrase tied to
 real §7.2 cells; §9 cache-key wording; `embeddings.py` cache-path docstring; `lora_train` default
 dataset crash (`dynamic_earthnet_pp`→`dynamic_earthnet`); §7.2 footnote disclosing the 3-wetland
-headline basis. Test suite now runs **240 passed, 1 skipped** (supersedes the stale "129/192"
-counts).
+headline basis. Test suite now runs **249 passed, 1 skipped** (full suite, 250 collected;
+supersedes the stale "129/192" counts).
 
 **A.3 Behaviour changes deferred (need a re-run to assess):** `change_type` forced to `"stable"`
 on large sub-dominant change (+ degenerate `"X replaced by X"` caption); DEN `.tif` loader
@@ -1296,7 +1302,7 @@ global vector. For query `t` and spatially-aligned patch grids `P1,P2`:
 `patch_top3` = mean of the top-3 such deltas. Same 75-AOI corpus, fraction relevance, 5-fold CV —
 directly comparable to B.9.
 
-![DEN result chain: the 0.426 test-split headline collapses to ~0.10 under cross-validation, then recovers to ~0.20 by fixing evaluation (S1, fraction relevance) and method (S3, patch scoring); per-query, S3 rescues localised change-types](assets/figures/cv_progression.png)
+![DEN result chain: the 0.426 test-split headline collapses to ~0.10 under cross-validation, then recovers to ~0.20 by fixing evaluation (S1, fraction relevance) and method (S3, patch scoring); per-query, S3 rescues localised change-types](latex/figures/cv_progression.png)
 
 | GeoRSCLIP NRG, fraction relevance | k-fold CV mAP | FDR-significant queries (of 9) |
 |---|---|---|

@@ -842,7 +842,10 @@ Table~\ref{tab:nativeraster} reports the result.
     \centering
     \caption{Native 3\,m raster source (CLIP ViT-L/14, adapter, \texttt{difference};
     23 AOIs, 5-seed stratified AOI cross-validation). NIR here is the
-    NIR-Red-Green false colour (matching \texttt{nrg} elsewhere).}
+    NIR-Red-Green false colour (matching \texttt{nrg} elsewhere). These figures come
+    from a one-off run on the full-resolution Planet-Fusion rasters, external to the
+    committed \texttt{results/} artifacts (which cover the $\sim$7\,GB JPEG subset);
+    reported here for the source-fidelity comparison only.}
     \label{tab:nativeraster}
     \begin{tabular}{llc}
         \toprule
@@ -1222,7 +1225,7 @@ is the breadth counterpart: 6{,}041 pairs with
 human captions \emph{and} six-class semantic maps for both phases. Seven free-text
 queries cover the six SECOND classes plus road (heavily captioned, no semantic
 class). Test split, 1{,}227 pairs, frozen encoders, RGB; macro random-ranking
-floor 0.255.
+floor 0.297.
 
 \begin{table}[H]
     \centering
@@ -1249,7 +1252,7 @@ floor 0.255.
 
 Across seven change types every query clears its prevalence floor --- broader
 recovery than DEN, where most queries sat at random --- but only modestly: the
-zero-shot macro ($\approx$0.33) is $\approx$+0.04 over the 0.255 floor, buildings
+zero-shot macro ($\approx$0.33) is $\approx$+0.04 over the 0.297 floor, buildings
 ($\approx$0.70) dominate, and water/playground are weak. As on QFabric, naive
 $>$ zero-shot (macro 0.45 vs 0.33): end-state appearance carries more of these
 land-cover categories than the temporal $\Delta$. Localisation on the SECOND-CC
