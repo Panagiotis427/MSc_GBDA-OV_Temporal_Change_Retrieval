@@ -1,5 +1,18 @@
 # QFabric (pentatemporal + polygon masks) — future-work spec
 
+> **DROPPED 2026-06-27 — do not pursue.** The full 5-date polygon-mask form is unobtainable: the
+> `labaerien/qfabric` HF mirror stayed gated (manual review pending ~2 weeks) and **every contact
+> channel is dead** — `hello@labaerien.com` bounces (GitHub-Pages domain, no mail server),
+> `sagar@granular.ai` returns 550 "account inactive" (Granular folded; lead author left RS for Deltia
+> AI), `engine.granular.ai` returns Cloudflare 1016 origin-DNS. No deliverable impact — the
+> localization pillar is already covered by LEVIR-MCI + SECOND-CC, and Tracks 0–4 meet the full brief.
+> The reduced `qfabric_teo` (2-date retrieval crops) stays in the corpus. The spec below is retained
+> as a historical record only; revive solely if a working mirror with polygon vectors appears.
+> *Also checked + ruled out (2026-06-27):* `github.com/sagarverma/fabric` and `github.com/granularai/fabric`
+> are the change-detection **model** repos, not the QFabric dataset — their only data links point to
+> the dead Granular engine + dead `sagar@granular.ai`, and the single GitHub release carries no data
+> assets. Do not re-investigate.
+
 *Single authoritative description of the one remaining committed dataset, written so a contributor
 can pick it up cold. Status as of 2026-06-13: **blocked on dataset access** (below). The current
 repo already ships a *reduced* QFabric (`qfabric_teo` / `qfabric_status`, 2-date TEOChatlas crops,
@@ -37,12 +50,29 @@ localization**, which is exactly the gap this slice fills.
 
 - **Source:** [`labaerien/qfabric`](https://huggingface.co/datasets/labaerien/qfabric) on the HF Hub
   — **gated**. As of 2026-06-13 the access request is **awaiting manual review by Lab Aérien**
-  (each request is reviewed by hand; released for academic / non-commercial use only). Auth (HF
-  login) is already configured on `laptop-4060`; the block is the pending approval, not the token.
+  (each request is reviewed by hand; released for academic / non-commercial use only, CC-BY-NC-4.0).
+  Auth (HF login) is already configured on `laptop-4060`; the block is the pending approval, not the token.
+- **Access-channel audit 2026-06-27 — only the HF form works; the other two channels are dead:**
+  - **HF "Request access" button** (on the dataset page) is the **sole working path** — paste an
+    academic/non-commercial use justification; Lab Aérien reviews by hand. Request text drafted in
+    the session scratchpad (`qfabric_access_drafts.md`).
+  - `hello@labaerien.com` (listed contact) is for **commercial / bulk transfer only** *and* it
+    **hard-bounces** — `labaerien.com` resolves to GitHub Pages (185.199.108–111.153), which runs
+    no mail server (SMTP connect times out). Do not rely on it for access.
+  - `engine.granular.ai` (the Granular project link below) is **offline** — Cloudflare **error
+    1016, origin DNS unresolvable**. The original self-serve platform is gone.
+  - **`sagar@granular.ai` is also DEAD** (550 "account inactive / User unknown", 2026-06-27) —
+    Granular has folded and lead author Sagar Verma has left RS (now at Deltia AI). So **every email
+    channel is dead**; the HF form is the only live automated path. Remaining live human contacts:
+    Sagar via LinkedIn `in/versag` / X `@ver_sag` (low odds — off RS) or co-author Aakaash Panigrahi
+    (`aakaash-panigrahi.com`). Drafts: `data/_notes/qfabric_access_drafts.md` (untracked).
+  - Review pending ~2 weeks with a dead contact mailbox → **Lab Aérien may be dormant; approval is
+    not guaranteed.** **Realistic outcome: accept QFabric stays cut** — Tracks 0–4 already meet the
+    brief; this slice is a localization bonus, not a gate.
 - **Do NOT use** [`EVER-Z/QFabric_mt_images_1024`](https://huggingface.co/datasets/EVER-Z/QFabric_mt_images_1024)
   — it is **298 GB**, image-only (no polygon vectors), and out of scope by size. The `labaerien`
   mirror is strictly better: it carries both the 5-date rasters **and** the COCO polygon vectors.
-- Other references: Granular AI engine (login) — https://engine.granular.ai/organizations/granular/projects/631e0974b59aa3b615b0d29a/overview ;
+- Other references: Granular AI engine (**offline, CF 1016**) — https://engine.granular.ai/organizations/granular/projects/631e0974b59aa3b615b0d29a/overview ;
   paper — https://openaccess.thecvf.com/content/CVPR2021W/EarthVision/papers/Verma_QFabric_Multi-Task_Change_Detection_Dataset_CVPRW_2021_paper.pdf
 
 **Automated watcher (active):** a session cron job (id `201d9dbc`, every 2 h at :17) probes a gated

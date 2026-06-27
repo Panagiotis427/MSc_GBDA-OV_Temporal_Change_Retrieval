@@ -3,7 +3,7 @@ Publication figures from ``results/*.json`` (written by ``scripts.export_results
 
 Pure consumer of the JSON results — imports only matplotlib + ``src.results_io``
 (no torch / no model). Headless ``Agg`` backend; 150-dpi PNG (optionally SVG)
-into ``assets/figures/``.
+into ``latex/figures/``.
 
 Figures
 -------
@@ -16,7 +16,7 @@ Figures
 
 Run::
 
-    python -m scripts.make_figures --results-dir results --out-dir assets/figures
+    python -m scripts.make_figures --results-dir results --out-dir latex/figures
 """
 from __future__ import annotations
 
@@ -227,7 +227,7 @@ def fig_confusion(report: Dict, out_dir, *, svg=False) -> Optional[Path]:
 def main() -> None:
     ap = argparse.ArgumentParser(description="Generate figures from results/*.json")
     ap.add_argument("--results-dir", default="results")
-    ap.add_argument("--out-dir", default="assets/figures")
+    ap.add_argument("--out-dir", default="latex/figures")
     ap.add_argument("--svg", action="store_true")
     ap.add_argument("--only", nargs="*", default=None,
                     help="Subset of: recall map color drift cross (default: all)")

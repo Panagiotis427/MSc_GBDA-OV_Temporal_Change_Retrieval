@@ -18,14 +18,13 @@
 \usepackage{cite}        % numeric IEEE-style citation grouping
 \usepackage[bottom=3cm, right=3cm, left=3cm, top=3cm]{geometry}
 
-% Figures live under assets/figures/ and assets/; the NTUA logo (when added) under images/.
-\graphicspath{{assets/figures/}{assets/}{images/}}
+% Figures live under figures/; the NTUA logo (when added) under images/.
+\graphicspath{{figures/}{images/}}
 
 
 \author{}
 \title{
-    % TODO: place the NTUA logo at images/NTUA_logo.png, then uncomment the next line.
-    % {\includegraphics[width=3cm]{NTUA_logo.png}}\par
+    {\includegraphics[width=3cm]{figures/NTUA-logo.png}}\par
     {\Large NATIONAL TECHNICAL UNIVERSITY OF ATHENS} \par \vspace{0.2cm}
     {\large SCHOOL OF ELECTRICAL AND COMPUTER ENGINEERING \par \vspace{0.5cm}
     IPPS DATA SCIENCE AND MACHINE LEARNING \par \vspace{0.5cm}
@@ -1487,40 +1486,44 @@ regenerated automatically by the test suite. The commands below are the
 reproducibility recipe used to produce the numbers in this report (a
 step-by-step guide is in \texttt{README.md}).
 
+{\footnotesize
 \begin{verbatim}
 pip install -e .
-python -m scripts.download_den --dest data/DynamicEarthNet      # ~7 GB, one-time
+python -m scripts.download_den --dest data/DynamicEarthNet   # ~7 GB, one-time
 
-# In-distribution run: train on train split, evaluate on train/val/test
-python -m scripts.run_pipeline --root data/DynamicEarthNet \
-    --encoder clip_vitl14 --train-split train --eval-splits train val test --epochs 40
-python -m scripts.run_pipeline --root data/DynamicEarthNet \
-    --encoder georsclip   --train-split train --eval-splits train val test --epochs 40
-python -m scripts.run_pipeline --root data/DynamicEarthNet \
-    --encoder remoteclip  --train-split train --eval-splits train val test --epochs 40
+# In-distribution: train on train split, evaluate on train/val/test
+python -m scripts.run_pipeline --root data/DynamicEarthNet --encoder clip_vitl14 \
+    --train-split train --eval-splits train val test --epochs 40
+python -m scripts.run_pipeline --root data/DynamicEarthNet --encoder georsclip \
+    --train-split train --eval-splits train val test --epochs 40
+python -m scripts.run_pipeline --root data/DynamicEarthNet --encoder remoteclip \
+    --train-split train --eval-splits train val test --epochs 40
 
-# Best generalising config: GeoRSCLIP + NRG zero-shot (no PEFT training needed)
-python -m scripts.run_pipeline --root data/DynamicEarthNet \
-    --encoder georsclip --color-mode nrg --eval-splits train val test --skip-train
+# Best generalising config: GeoRSCLIP + NRG zero-shot (no PEFT training)
+python -m scripts.run_pipeline --root data/DynamicEarthNet --encoder georsclip \
+    --color-mode nrg --eval-splits train val test --skip-train
 
 # NDVI / NRG colour-mode ablation (zero-shot only)
-python -m scripts.run_pipeline --root data/DynamicEarthNet \
-    --encoder clip_vitl14 --color-mode ndvi --eval-splits train val test --skip-train
-python -m scripts.run_pipeline --root data/DynamicEarthNet \
-    --encoder georsclip   --color-mode ndvi --eval-splits train val test --skip-train
-python -m scripts.run_pipeline --root data/DynamicEarthNet \
-    --encoder remoteclip  --color-mode nrg  --eval-splits train val test --skip-train
+python -m scripts.run_pipeline --root data/DynamicEarthNet --encoder clip_vitl14 \
+    --color-mode ndvi --eval-splits train val test --skip-train
+python -m scripts.run_pipeline --root data/DynamicEarthNet --encoder georsclip \
+    --color-mode ndvi --eval-splits train val test --skip-train
+python -m scripts.run_pipeline --root data/DynamicEarthNet --encoder remoteclip \
+    --color-mode nrg  --eval-splits train val test --skip-train
 
 # LoRA adapter on visual encoder (GeoRSCLIP + NRG)
-python -m scripts.run_pipeline --root data/DynamicEarthNet \
-    --encoder georsclip --color-mode nrg --skip-train \
+python -m scripts.run_pipeline --root data/DynamicEarthNet --encoder georsclip \
+    --color-mode nrg --skip-train \
     --lora --lora-epochs 20 --lora-rank 4 --lora-alpha 8 \
     --eval-splits train val test
 
-python -m src.app --root data/DynamicEarthNet --encoder clip_vitl14 --split train  # Gradio UI
+# Gradio UI
+python -m src.app --root data/DynamicEarthNet --encoder clip_vitl14 --split train
 
-pytest -q --ignore=tests/test_text_encoder.py    # fast suite, deterministic, no network
+# Fast suite (deterministic, no network)
+pytest -q --ignore=tests/test_text_encoder.py
 \end{verbatim}
+}
 
 The figures in this report are regenerated from cached embeddings (no GPU
 training) via \texttt{scripts/export\_results.py} (writes one JSON per run +
