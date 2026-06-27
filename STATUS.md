@@ -5,7 +5,7 @@ Machine-independent: read after `git pull` on any machine. What physically exist
 [`INVENTORY.md`](INVENTORY.md). Supersedes `NEXT_GBDA_STEPS.md` (folded here 2026-06-10;
 completed work lives in git history + [`REPORT.md`](REPORT.md)).*
 
-*Last meaningful update: **2026-06-27** (native-3m controlled JPEG/resolution ablation — see §2; QFabric access-channel audit — see §3).*
+*Last meaningful update: **2026-06-27** (native-3m controlled JPEG/resolution ablation + temporal-pinpointing study — see §2; QFabric access-channel audit — see §3).*
 
 ---
 
@@ -33,6 +33,7 @@ Honest, audited numbers (random baseline + permutation p + BH-FDR + leakage-free
 - **Cross-dataset breadth (§7.11/7.13):** LEVIR-CC 5-query — salient construction strong (buildings AP ~0.8, roads ~0.6), subtle/sparse weak (~0.15–0.30), macro ~0.40. SECOND-CC 7-query — every type clears its prevalence floor but modestly (zero-shot macro ~0.33 vs floor 0.30; naive ~0.45 > zero-shot). Same salience law as DEN, wider vocabulary.
 - **Localization (§7.12/7.13, LEVIR-MCI + SECOND-CC masks):** the query-conditioned change heatmap is a *weak* localizer — pointing-game lift within ±0.04–0.10 of the random-patch floor; only road on RS-pretrained encoders is clearly positive. Localizing change is harder than retrieving it.
 - **Native-3m controlled ablation (§nativeraster, `feature/planet-3m`):** holding AOIs/pairs/colour/encoder/approach/folds fixed and varying *only* image degradation, neither JPEG compression (to q10) nor downsampling (to 64 px) moves retrieval mAP — all rows within one fold std of native (CLIP native 0.130 ± 0.068, max |Δ| 0.036; GeoRSCLIP native 0.085 ± 0.059, max |Δ| 0.027), curves non-monotonic. **Image fidelity is not the bottleneck** — direct evidence for the frozen-VLM method ceiling and vindicates the JPEG-subset data choice. Script `feature_3m_native/jpeg_ablation.py`, fig `jpeg_ablation__*`.
+- **Temporal pinpointing (§temporalpinpoint, `feature/planet-3m`):** the brief's "*when* does the change occur" check — rank a AOI's 24 monthly steps by zero-shot Δ-similarity, test whether the score peaks at the true transition month. CLIP ViT-L/14 above chance (macro temporal mAP 0.309 vs 0.207 random; peak within ±1 month 63%), strongest for sharp events (snow melt 0.586, p=0.025); GeoRSCLIP ViT-B/32 at/below chance (0.146 vs 0.208) — **encoder-dependent**. Small per-query AOI counts (1–7) → 0/5 clears BH-FDR. **Pinpointing *when* (like *where*) is harder than retrieving *whether*.** Script `feature_3m_native/temporal_pinpoint.py`, fig `temporal_pinpoint__*`.
 - Ruled-out approaches documented in REPORT Appendix B (B.9, B.11, B.12) — do not re-propose.
 - Engine **deployed on HF Space**; full test suite **passes** (1 skipped: the real-CLIP `test_text_encoder`, needs weights; ~90 s, shared venv) — re-run `pytest -q` after pulling to confirm the current count.
 
