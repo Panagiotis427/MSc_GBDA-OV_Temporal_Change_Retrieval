@@ -5,7 +5,7 @@ Machine-independent: read after `git pull` on any machine. What physically exist
 [`INVENTORY.md`](INVENTORY.md). Supersedes `NEXT_GBDA_STEPS.md` (folded here 2026-06-10;
 completed work lives in git history + [`REPORT.md`](REPORT.md)).*
 
-*Last meaningful update: **2026-06-27** (QFabric access-channel audit — see §3).*
+*Last meaningful update: **2026-06-27** (native-3m controlled JPEG/resolution ablation — see §2; QFabric access-channel audit — see §3).*
 
 ---
 
@@ -32,6 +32,7 @@ Honest, audited numbers (random baseline + permutation p + BH-FDR + leakage-free
 - PEFT: high in-distribution train-fit is memorisation; leakage-free CV PEFT (NRG 0.196 ± 0.049) overlaps frozen zero-shot (0.139 ± 0.024) within fold variance — no clear OOD gain, not a collapse (B.5/B.9/B.14; RGB lower at 0.049). Feature-noise augmentation doesn't help (B.14). Seasonal gate FPR→0 at thr ≥ 0.05.
 - **Cross-dataset breadth (§7.11/7.13):** LEVIR-CC 5-query — salient construction strong (buildings AP ~0.8, roads ~0.6), subtle/sparse weak (~0.15–0.30), macro ~0.40. SECOND-CC 7-query — every type clears its prevalence floor but modestly (zero-shot macro ~0.33 vs floor 0.30; naive ~0.45 > zero-shot). Same salience law as DEN, wider vocabulary.
 - **Localization (§7.12/7.13, LEVIR-MCI + SECOND-CC masks):** the query-conditioned change heatmap is a *weak* localizer — pointing-game lift within ±0.04–0.10 of the random-patch floor; only road on RS-pretrained encoders is clearly positive. Localizing change is harder than retrieving it.
+- **Native-3m controlled ablation (§nativeraster, `feature/planet-3m`):** holding AOIs/pairs/colour/encoder/approach/folds fixed and varying *only* image degradation, neither JPEG compression (to q10) nor downsampling (to 64 px) moves retrieval mAP — all rows within one fold std of native (CLIP native 0.130 ± 0.068, max |Δ| 0.036; GeoRSCLIP native 0.085 ± 0.059, max |Δ| 0.027), curves non-monotonic. **Image fidelity is not the bottleneck** — direct evidence for the frozen-VLM method ceiling and vindicates the JPEG-subset data choice. Script `feature_3m_native/jpeg_ablation.py`, fig `jpeg_ablation__*`.
 - Ruled-out approaches documented in REPORT Appendix B (B.9, B.11, B.12) — do not re-propose.
 - Engine **deployed on HF Space**; full test suite **passes** (1 skipped: the real-CLIP `test_text_encoder`, needs weights; ~90 s, shared venv) — re-run `pytest -q` after pulling to confirm the current count.
 
