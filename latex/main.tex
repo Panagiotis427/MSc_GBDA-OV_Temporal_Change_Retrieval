@@ -1023,6 +1023,76 @@ RS-domain backbone are insensitive to compression and resolution on this task.
     \end{tabular}
 \end{table}
 
+\subsection{Temporal pinpointing --- \texorpdfstring{\emph{when}}{when} does the change occur?}
+\label{sec:temporalpinpoint}
+
+The Case-11 brief singles out Dynamic EarthNet for its ability to ``pinpoint exact
+time-steps of change'' and asks evaluation to verify that the model identifies ``the
+specific temporal window where the change was most prominent compared to stable
+time-steps''. The retrieval metrics so far answer \emph{which pair} shows a change
+(ranking across AOIs); this is the orthogonal question of \emph{when} a change
+happens (ranking time-steps within one AOI's timeline), and it is uniquely
+accessible through the native loader's monthly raster stack. We build the loader
+with monthly pairing so each AOI's consecutive pairs are its 24-month timeline; the
+per-step change score is the same zero-shot $\Delta$-similarity used throughout
+($\cos(q,f_t)-\cos(q,f_{t-1})$); a step is \emph{relevant} when the query predicate
+fires on its monthly transition label. Within each AOI we rank the steps and score
+the ranking by average precision (a per-AOI \emph{temporal} AP), and we report the
+peak-hit rate --- whether the single highest-scoring step is a true transition, at
+exact and $\pm1$-month tolerance. Significance uses a permutation test that shuffles
+relevance \emph{within} each AOI (preserving its step count) plus BH-FDR.
+
+\begin{table}[H]
+    \centering
+    \caption{Temporal pinpointing on native 3\,m DEN (CLIP ViT-L/14, RGB,
+    zero-shot): ranking the monthly steps within each AOI timeline. ``peak $\pm$1''
+    is the fraction of AOIs whose top-scored step is within one month of a true
+    transition. Macro temporal mAP 0.309 vs a 0.207 permutation floor.}
+    \label{tab:temporalpinpoint}
+    \begin{tabular}{lccccc}
+        \toprule
+        \textbf{Query} & \textbf{temporal mAP} & \textbf{rand} & \textbf{peak $\pm$1mo} & \textbf{perm $p$} & \textbf{AOIs} \\
+        \midrule
+        seasonal snow melting away      & 0.586 & 0.200 & 1.00 & 0.025 & 2 \\
+        bare soil or land cleared       & 0.324 & 0.214 & 0.57 & 0.067 & 7 \\
+        forest loss                     & 0.273 & 0.193 & 0.40 & 0.160 & 5 \\
+        new water body or flooding      & 0.221 & 0.246 & 1.00 & 0.409 & 1 \\
+        deforestation, forest $\to$ soil & 0.142 & 0.183 & 0.20 & 0.617 & 5 \\
+        \midrule
+        \textbf{macro}                  & \textbf{0.309} & 0.207 & 0.63 & --- & --- \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{temporal_pinpoint__clip_vitl14__rgb.png}
+    \caption{\textbf{Left:} per-query temporal mAP (within-AOI step ranking) against
+    the permutation random floor (red ticks). \textbf{Right:} an example AOI
+    timeline --- the zero-shot change score for \emph{``forest loss''} spikes at the
+    labelled transition month (2019-07, dashed green), where the model's peak
+    (orange star) also lands.}
+    \label{fig:temporalpinpoint}
+\end{figure}
+
+The system does locate change in time above chance: macro temporal mAP
+$0.309$ against a $0.207$ random floor, and within a $\pm1$-month tolerance the
+model's peak step lands on a true transition $63\%$ of the time
+(Table~\ref{tab:temporalpinpoint}, Figure~\ref{fig:temporalpinpoint}). The signal
+is strongest for temporally sharp events --- snow melt ($0.586$, $p=0.025$) and
+abrupt soil clearing ($0.324$) --- and weak for gradual or ambiguous ones
+(deforestation $0.142$, below its floor). As with spatial localization
+(Section~\ref{sec:nativeraster}) the effect is encoder-dependent: repeating the
+study with GeoRSCLIP (ViT-B/32) gives macro $0.146$ vs the same $0.208$ floor ---
+\emph{at or below chance} --- so the larger general-purpose ViT-L/14 pinpoints
+change in time where the smaller RS-pretrained backbone does not. The honest limit
+is statistical power: only 1--7 AOIs carry positives per query, so although the
+aggregate clears the floor and snow melt is individually significant at $p=0.025$,
+no query survives BH-FDR --- the same small-labelled-AOI ceiling documented
+throughout. Pinpointing \emph{when} a change occurs is feasible for salient,
+abrupt transitions on a capable frozen encoder, but, like pinpointing \emph{where},
+it is harder than retrieving \emph{whether} the change is present.
+
 \subsection{Re-ranking quantification}
 \label{sec:rerank}
 
