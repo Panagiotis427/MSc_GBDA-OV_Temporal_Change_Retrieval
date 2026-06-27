@@ -5,7 +5,7 @@ Machine-independent: read after `git pull` on any machine. What physically exist
 [`INVENTORY.md`](INVENTORY.md). Supersedes `NEXT_GBDA_STEPS.md` (folded here 2026-06-10;
 completed work lives in git history + [`REPORT.md`](REPORT.md)).*
 
-*Last meaningful update: **2026-06-17**.*
+*Last meaningful update: **2026-06-27** (QFabric access-channel audit — see §3).*
 
 ---
 
@@ -71,17 +71,16 @@ LEVIR-MCI). REPORT §7.13. **Track 4 DONE** — anti-memorization check
 (`scripts/peft_augment_eval.py`): embedding-space feature-noise does not help PEFT (σ=0.25 → 0.206
 within noise of no-aug 0.196; degrades higher). It also surfaced + fixed a mis-cited claim — matched
 leakage-free CV PEFT (NRG 0.196 ± 0.049) *overlaps* frozen zero-shot (0.139 ± 0.024), not the RGB
-0.049 some summaries paired against NRG (REPORT B.14; all docs aligned). **Only remaining item —
-BLOCKED on external access:** QFabric pentatemporal + polygon masks via `labaerien/qfabric` (HF,
-**gated — access request awaiting Lab Aérien review**); plan = capped ~50-location slice (~3–5 GB,
-never the 298 GB EVER-Z). A session watcher polls access every 2h and auto-starts the build on grant.
-**Full pickup-cold spec (description, role, access, on-disk layout, build steps, watcher):
-[`docs/QFABRIC_FUTURE_WORK.md`](docs/QFABRIC_FUTURE_WORK.md).**
-
-> **⚠ On `laptop-4060`, before the QFabric download:** disk-gated but clear — **~55 GB free**
-> after the full expansion + ~14 GB reclaimed (redundant archives, dead `_torchgeo_labels`, and the
-> `_levir_cc` duplicate deduped onto the LEVIR-MCI dir). Ample for a capped QFabric slice; still
-> **never** pull the 298 GB EVER-Z parquet. Current `data/` breakdown → [`INVENTORY.md`](INVENTORY.md).
+0.049 some summaries paired against NRG (REPORT B.14; all docs aligned). **QFabric (the last
+remaining expansion item) is now DROPPED from scope (2026-06-27)** — the full 5-date polygon-mask
+form is unobtainable: the `labaerien/qfabric` HF mirror stayed gated with manual review pending
+~2 weeks, and **every contact channel is dead** (`hello@labaerien.com` bounces — GitHub-Pages
+domain, no mail server; `sagar@granular.ai` 550 "account inactive" — Granular folded, lead author
+left RS; `engine.granular.ai` Cloudflare 1016 origin-DNS). No deliverable impact: Tracks 0–4
+already satisfy every assignment requirement, so the QFabric localization slice was a *bonus*, not a
+gate. The existing reduced `qfabric_teo` (2-date retrieval crops) stays in the corpus. Channel-audit
+detail + (now-stale) request drafts archived at `data/_notes/qfabric_access_drafts.md` (untracked);
+full historical spec at [`docs/QFABRIC_FUTURE_WORK.md`](docs/QFABRIC_FUTURE_WORK.md) (marked DROPPED).
 
 ## 4. Next steps — course-deliverable gap pass (deliverable = written report + repo with presentation-grade README)
 
@@ -125,10 +124,12 @@ in a reduced TEOChatlas form (no masks, 2/5 dates); LEVIR-CC was under-utilized 
 5 queries: salient construction strong — buildings AP ~0.8, roads ~0.6 — subtle/sparse weak —
 demolition/vegetation/water ~0.15–0.30; 5-query macro ~0.40, was a 3-query ~0.55 carried by buildings).
 
-- **Committed (in the plan):** LEVIR-MCI (same images + building/road masks → localization eval),
-  SECOND-CC (30 change categories → open-vocab breadth), QFabric pentatemporal + polygon masks
-  (disk-gated localization upgrade — never the 298 GB EVER-Z parquet), DEN finer (monthly) temporal
-  pairing. Localization/heatmap eval is now a first-class pillar.
+- **Committed (in the plan), all DONE:** LEVIR-MCI (same images + building/road masks → localization
+  eval), SECOND-CC (30 change categories → open-vocab breadth), DEN finer (monthly) temporal pairing.
+  Localization/heatmap eval is now a first-class pillar.
+- **Dropped 2026-06-27:** QFabric pentatemporal + polygon masks — full mask form unobtainable (HF
+  `labaerien/qfabric` gated + every contact channel dead; see §3). Reduced `qfabric_teo` (2-date
+  retrieval) stays. Localization pillar already covered by LEVIR-MCI + SECOND-CC.
 - **Rejected with reasons:** **fMoW** — functional-classification dataset with **no change labels**;
   repurposing reintroduces the weak-label noise that sank DEN PEFT (rationale in the plan §2). DEN
   alternative sources (TUM raw / HEVC / torchgeo) — same labels, no gain.
