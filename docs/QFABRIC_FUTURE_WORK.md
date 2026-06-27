@@ -8,6 +8,10 @@
 > localization pillar is already covered by LEVIR-MCI + SECOND-CC, and Tracks 0–4 meet the full brief.
 > The reduced `qfabric_teo` (2-date retrieval crops) stays in the corpus. The spec below is retained
 > as a historical record only; revive solely if a working mirror with polygon vectors appears.
+> *Also checked + ruled out (2026-06-27):* `github.com/sagarverma/fabric` and `github.com/granularai/fabric`
+> are the change-detection **model** repos, not the QFabric dataset — their only data links point to
+> the dead Granular engine + dead `sagar@granular.ai`, and the single GitHub release carries no data
+> assets. Do not re-investigate.
 
 *Single authoritative description of the one remaining committed dataset, written so a contributor
 can pick it up cold. Status as of 2026-06-13: **blocked on dataset access** (below). The current
