@@ -1,12 +1,13 @@
 """
-Figure for the honest DEN result chain (REPORT Appendix B.8-B.10).
+Figure for the DEN result decomposition (GeoRSCLIP NRG).
 
-Panel A — the headline progression for GeoRSCLIP NRG: the committed 110-pair
-test-split mAP (0.426) collapses under 5-fold AOI cross-validation (lucky fold),
-then partially recovers via fraction-based relevance (S1, fixes eval starvation)
-and patch-level localised scoring (S3, fixes the global-embedding ceiling).
-Panel B — per-query CV AP, global vs patch, showing S3 rescues the localised
-change-types (buildings / urban / water) that global pooling left at chance.
+Panel A — the high-variance single 110-pair test-split mAP (0.426) against the
+5-fold AOI cross-validated estimate, and the effect of two design choices:
+pixel-fraction relevance (S1) and localised patch-level scoring (S3), which
+together reach the cross-validated ~0.20 macro mAP.
+Panel B — per-query CV AP, global vs patch, showing patch scoring (S3) recovers
+the localised change-types (buildings / urban / water) that global pooling leaves
+at chance.
 
 Reads the committed JSONs; reproduce: ``python -m scripts.make_cv_figure``.
 """
@@ -48,8 +49,8 @@ def main() -> None:
     axA.set_xticks(x)
     axA.set_xticklabels(labels, fontsize=8.5)
     axA.set_ylabel("DEN macro mAP")
-    axA.set_title("GeoRSCLIP + NRG: headline 0.426 is a lucky single fold;\n"
-                  "CV truth ≈ 0.10, recovered to ≈ 0.20 by fixing eval (S1) + method (S3)",
+    axA.set_title("GeoRSCLIP + NRG: single-split mAP (0.426) is high-variance;\n"
+                  "cross-validated ≈ 0.10, reaching ≈ 0.20 with fraction relevance (S1) + patch scoring (S3)",
                   fontsize=9.5)
     for xi, v, e in zip(x, vals, errs):
         axA.text(xi, v + (e if e else 0) + 0.012, f"{v:.3f}" + (f"\n±{e:.3f}" if e else ""),
