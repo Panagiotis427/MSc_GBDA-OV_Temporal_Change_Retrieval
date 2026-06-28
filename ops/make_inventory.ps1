@@ -1,5 +1,5 @@
 ﻿# make_inventory.ps1 - READ-ONLY machine manifest generator (Windows).
-# Writes inventory/<MachineId>.md describing THIS machine's view of the repo:
+# Writes local/<MachineId>.md describing THIS machine's view of the repo:
 # git state + gitignored payloads (the part other machines can't see) + env.
 # Sanitized: home paths -> "~". Run from anywhere inside the repo:
 #     powershell -ExecutionPolicy Bypass -File .\ops\make_inventory.ps1 [-MachineId laptop-4060]
@@ -101,7 +101,7 @@ foreach ($c in @(".env")) {
     $L.Add("- ${c}: $present")
 }
 
-$outDir = Join-Path $root "inventory"
+$outDir = Join-Path $root "local"
 if (-not (Test-Path $outDir)) { New-Item -ItemType Directory $outDir | Out-Null }
 $out = Join-Path $outDir "$MachineId.md"
 $L | Set-Content -Path $out -Encoding utf8

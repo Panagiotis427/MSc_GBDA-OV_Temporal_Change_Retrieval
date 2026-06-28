@@ -1,6 +1,6 @@
 #!/bin/bash
 # make_inventory.sh — READ-ONLY machine manifest generator (macOS / Linux).
-# Writes inventory/<machine-id>.md: git state + gitignored payloads + env.
+# Writes local/<machine-id>.md: git state + gitignored payloads + env.
 # Sanitized: $HOME -> "~".
 # Usage (from anywhere inside the repo):
 #     bash ops/make_inventory.sh <machine-id>     # e.g. macbook
@@ -8,7 +8,7 @@ set -uo pipefail
 MID="${1:?usage: bash ops/make_inventory.sh <machine-id>}"
 ROOT="$(git rev-parse --show-toplevel)" || { echo "not a git repo" >&2; exit 1; }
 REPO="$(basename "$ROOT")"
-OUT_DIR="$ROOT/inventory"; mkdir -p "$OUT_DIR"
+OUT_DIR="$ROOT/local"; mkdir -p "$OUT_DIR"
 OUT="$OUT_DIR/$MID.md"
 
 san() { sed -e "s|$HOME|~|g"; }

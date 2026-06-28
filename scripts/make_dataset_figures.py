@@ -6,7 +6,7 @@ Pure consumer of the per-dataset benchmark JSON (written by
 Imports only ``json`` + ``matplotlib`` + ``numpy`` --- no torch, no models, no
 network --- so it is safe to run anywhere the result JSON exists.
 
-Figures (into ``latex/figures/``)
+Figures (into ``report/figures/``)
 ----------------------------------
 - ``per_query_ap__levir_cc__test.png``   per-query zero-shot AP, 3 encoders + floor
 - ``per_query_ap__second_cc__test.png``  per-query zero-shot AP, 3 encoders + floor
@@ -15,7 +15,7 @@ Figures (into ``latex/figures/``)
 
 Run::
 
-    python -m scripts.make_dataset_figures --results-dir results --out-dir latex/figures
+    python -m scripts.make_dataset_figures --results-dir results --out-dir report/figures
 """
 from __future__ import annotations
 
@@ -199,7 +199,7 @@ def fig_salience_law(results_dir: Path, out_dir: Path, *, svg: bool = False) -> 
 def main() -> None:
     ap = argparse.ArgumentParser(description="Cross-dataset retrieval figures from results/*.json")
     ap.add_argument("--results-dir", default="results")
-    ap.add_argument("--out-dir", default="latex/figures")
+    ap.add_argument("--out-dir", default="report/figures")
     ap.add_argument("--svg", action="store_true")
     args = ap.parse_args()
 

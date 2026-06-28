@@ -32,17 +32,17 @@ quantitative change localisation.
 
 ## Demo
 
-![Gradio UI — semantic change search engine](latex/figures/app_screenshot.png)
+![Gradio UI — semantic change search engine](report/figures/app_screenshot.png)
 
 *Enter a free-text change query, pick a dataset / encoder / scoring approach, and get
 ranked before→after pairs with a change heatmap on T2.* To (re)generate the screenshot
-locally (it lands in `latex/figures/app_screenshot.png`):
+locally (it lands in `report/figures/app_screenshot.png`):
 
 ```bash
 pip install -e .
 python -m scripts.make_den_fixture
 python -m src.app --root tests/fixtures/den_tiny --split all --encoder clip_vitl14   # http://127.0.0.1:7860
-# then save a screenshot of the browser tab to latex/figures/app_screenshot.png
+# then save a screenshot of the browser tab to report/figures/app_screenshot.png
 ```
 
 ## Pipeline
@@ -125,7 +125,7 @@ derived `PairLabel`s → Recall@K, mAP, plus a seasonal-vs-permanent
 
 Everything below is audited (random-ranking baselines, permutation tests, BH-FDR,
 leakage-free 5-fold leave-AOI-out cross-validation); full tables and the audit trail are in the
-[Technical report](#technical-report) below; the formal written report is [`latex/main.tex`](latex/main.tex) (compiled to PDF).
+[Technical report](#technical-report) below; the formal written report is [`report/main.tex`](report/main.tex) (compiled to PDF).
 
 | Finding | Number |
 |---|---|
@@ -139,12 +139,12 @@ leakage-free 5-fold leave-AOI-out cross-validation); full tables and the audit t
 | Change localization (LEVIR-MCI + SECOND-CC masks) | heatmap is a weak localizer — pointing-game lift within ±0.04–0.10 of the random-patch floor; only road on RS-pretrained encoders is clearly positive |
 | Frozen-VLM ceiling on DEN | ≈ 0.20 CV mAP — robust across hybrids, prompt ensembles, attention variants, query-gated routing |
 
-![From the lucky single split to the audited recovery](latex/figures/cv_progression.png)
+![From the lucky single split to the audited recovery](report/figures/cv_progression.png)
 
 *The honest arc: single-split 0.426 collapses under cross-validation to ≈0.10; fixing the
 relevance rule and scoring locally (patch top-3) recovers 0.193 ± 0.051.*
 
-![Zero-shot vs PEFT, top-K retrievals side by side](latex/figures/zeroshot_vs_peft__clip_vitl14__train.png)
+![Zero-shot vs PEFT, top-K retrievals side by side](report/figures/zeroshot_vs_peft__clip_vitl14__train.png)
 
 *Zero-shot vs PEFT visual comparison (CLIP ViT-L/14, train split): the adapter's
 in-distribution wins are memorisation; held-out, frozen zero-shot is the stronger ranking.*
@@ -402,7 +402,7 @@ Download links and citations for the datasets and encoders used.
 
 ## Technical report
 
-*Full report in markdown, kept in sync with `latex/main.tex` (the compiled PDF is the formal deliverable — update both together).*
+*Full report in markdown, kept in sync with `report/main.tex` (the compiled PDF is the formal deliverable — update both together).*
 
 **GBDA Case 11 — National Technical University of Athens, School of Electrical and Computer Engineering, IPPS Data Science and Machine Learning, Geospatial Big Data Analytics.** Supervisor: Vasilis Tsironis.
 
@@ -444,7 +444,7 @@ This report makes three contributions. First, it delivers a working, dataset-agn
 
 For each bi-temporal pair (T1, T2) the pipeline proceeds as follows. A frozen VLM encodes both timesteps into L2-normalised global embeddings f_T1, f_T2, cached to disk per (dataset, encoder, split, colour mode). A change feature is then formed, either as a difference Δf = f_T2 − f_T1 or as a concatenation [f_T1 ; f_T2]. The query text is encoded by the same model's text tower into t, and the pair is scored by one of the approaches of Section 5.
 
-![Open-vocabulary temporal change-retrieval engine](latex/figures/engine_pipeline.png)
+![Open-vocabulary temporal change-retrieval engine](report/figures/engine_pipeline.png)
 
 **Dataset-agnostic core.** A structural `TemporalDataset` protocol (`src/datasets/base.py`) defines the only contract downstream code depends on (list locations and pairs, load images, load metadata, derive a `PairLabel` ground truth). A registry maps a dataset name to a factory; the DEN factory auto-detects the on-disk layout. Concrete loaders span the datasets and their formats and temporal axes: `DENNpyDataset` (DynNet preprocessed `.npy`, 24-month) and `DENDataset` (raster `.tif`, monthly) for Dynamic EarthNet; for QFabric, `TEOChatlasQFabricDataset` (polygon-centred `.tif` crops carrying the real RQA2 change-type labels) and a RQA5 status-transition sibling; and `LevirCCDataset`/`LevirMCIDataset`/`SecondCCDataset` for the captioned, masked datasets. Adding a dataset or encoder means adding files, never editing the shared pipeline — the abstraction is enforced by the protocol.
 
@@ -518,7 +518,7 @@ Under the cross-validated protocol of Section 7, the defensible DEN result is na
 
 *Relevance and locality.* The pixel-fraction relevance rule roughly triples full-corpus mAP and tightens the cross-validation interval to 0.139 ± 0.024 by making nine change-types evaluable rather than three. Beyond relevance, the remaining ceiling is the global embedding: differencing two whole-tile 1024² embeddings dilutes a small change region, leaving localised change-types near chance. Scoring from per-patch embeddings with `patch_top3` lifts cross-validated mAP to 0.193 ± 0.051 — the best DEN configuration — and makes new buildings (q=0.003) and urban expansion (q=0.006) beat random under FDR correction for the first time, with new water borderline (q=0.053). Diffuse large-area wetland change still prefers the global score, so the two are complementary. GeoRSCLIP's coarse 49-patch grid beats CLIP-L/14's finer 256-patch grid (0.193 vs 0.149), so domain pre-training outweighs patch resolution.
 
-![DEN result decomposition (GeoRSCLIP+NRG)](latex/figures/cv_progression.png)
+![DEN result decomposition (GeoRSCLIP+NRG)](report/figures/cv_progression.png)
 
 *The frozen adapter does not help out of distribution.* Leakage-free cross-validated PEFT on GeoRSCLIP+NRG (0.196 ± 0.049, fraction relevance) overlaps frozen zero-shot (0.139 ± 0.024) within fold variance — neither a collapse nor a gain — so low-compute fine-tuning is not shown to improve retrieval out of distribution. The high in-distribution PEFT figures (0.42–0.998) are the adapter scored on its own training pairs, as Section 8.2 establishes directly.
 
@@ -534,8 +534,8 @@ The in-distribution and cross-split measurements isolate why the adapters do not
 
 Three observations follow. First, zero-shot is near chance in-distribution: Δ-similarity beats the naive image baseline only marginally, because CLIP and GeoRSCLIP embed scene appearance rather than directional land-cover transition, so differencing two normalised global embeddings discards the localised change signal. Second, the ~8–10× PEFT lift confirms the adapter has the capacity to memorise the 55 training AOIs but says nothing about retrieval skill until evaluated out of distribution; on QFabric the same train fit reaches mAP 0.998 (Section 8.5), unmistakably memorisation. Third, the train-fit ranking (CLIP 0.420 > RemoteCLIP 0.352 > GeoRSCLIP 0.335, the larger backbone fitting hardest) reverses on held-out data, where GeoRSCLIP leads.
 
-![mAP by encoder x approach, train split](latex/figures/map_bars__train__rgb.png)
-![Zero-shot vs PEFT, CLIP, train](latex/figures/zeroshot_vs_peft__clip_vitl14__train.png)
+![mAP by encoder x approach, train split](report/figures/map_bars__train__rgb.png)
+![Zero-shot vs PEFT, CLIP, train](report/figures/zeroshot_vs_peft__clip_vitl14__train.png)
 
 Training the adapter on the train split and evaluating across train/val/test makes the collapse explicit. On unseen val and test AOIs the adapter is equal to or worse than zero-shot, while GeoRSCLIP zero-shot reaches 0.299 mAP on the test split with no training at all.
 
@@ -551,7 +551,7 @@ Training the adapter on the train split and evaluating across train/val/test mak
 | RemoteCLIP ViT-L/14 | zero-shot | 0.057 | 0.025 | 0.050 |
 | RemoteCLIP ViT-L/14 | **PEFT** | **0.352** | **0.028** | **0.103** |
 
-![Cross-split mAP, CLIP](latex/figures/cross_split__clip_vitl14__rgb.png)
+![Cross-split mAP, CLIP](report/figures/cross_split__clip_vitl14__rgb.png)
 
 #### 8.3 Ablations: what carries the signal
 
@@ -571,7 +571,7 @@ Training the adapter on the train split and evaluating across train/val/test mak
 
 NRG hurts on train (−0.010 to −0.034) but substantially helps on test (+0.061 CLIP, +0.127 GeoRSCLIP, +0.079 RemoteCLIP). NDVI usually lands between NRG and RGB: it provides some NIR signal but collapses all spectral texture into a single channel replicated across R/G/B, so the RS-pretrained encoders cannot exploit the inter-channel colour contrasts that NRG preserves. GeoRSCLIP's RS5M pre-training gives a stronger prior for the NIR-Green spectral contrast characteristic of vegetation transitions. The single-split NRG lift for GeoRSCLIP (0.426) is a high-variance fold (cross-validated 0.100 ± 0.139, Section 8.1); NRG remaining the best colour mode for every encoder, and the encoder ordering (GeoRSCLIP ≫ CLIP ≈ RemoteCLIP), both hold under cross-validation.
 
-![Colour-mode ablation, zero-shot, test](latex/figures/color_ablation__zero_shot__test.png)
+![Colour-mode ablation, zero-shot, test](report/figures/color_ablation__zero_shot__test.png)
 
 **Change-feature mode: difference vs concatenate.** Keeping both endpoints overfits less.
 
@@ -605,7 +605,7 @@ LoRA fits the train split (0.025 → 0.153) but collapses out of distribution (0
 
 Every rank/epoch setting fits the train split (0.13–0.17) yet overfits to test 0.06–0.07; more rank or more epochs only memorise harder. This reinforces the project's core finding that spectral physics (NRG false-colour) generalises while learned visual priors only memorise.
 
-![GeoRSCLIP NRG: frozen zero-shot vs LoRA across splits](latex/figures/cross_split__georsclip__nrg.png)
+![GeoRSCLIP NRG: frozen zero-shot vs LoRA across splits](report/figures/cross_split__georsclip__nrg.png)
 
 **Aggregation refinements (honest negatives).** Several cheaper in-scope refinements were tested and none improved on `patch_top3`. Averaging the query embedding over a prompt ensemble is a wash (0.142 cross-validated mAP); fusing the global Δ-cosine with the patch score by z-scoring and summing hurts (0.165), the mostly-noise global signal diluting the stronger patch signal; query-conditioned soft-attention over the per-patch Δ (0.137) and 3×3 spatial smoothing of the Δ-map (0.168) refine the aggregation without breaking the ≈0.20 ceiling. Routing each query by its a-priori spatial geometry — diffuse phrasings to the global score, localised ones to patch top-3 — scores 0.186 ± 0.051, statistically indistinguishable from ungated patch top-3, so query geometry is not a usable routing signal at this encoder scale. A learned query-to-patch attention head is deliberately not pursued, since every trained head on this data memorises the training AOIs with no held-out gain.
 
@@ -615,7 +615,7 @@ The benchmark reports seasonal drift@K (non-relevant top-K retrievals that invol
 
 The dominant real error is not seasonal confusion but low recall from class imbalance and weak label-derived captions. The per-query confusion analysis makes this concrete: on the best test configuration (GeoRSCLIP + NRG), the wetland queries' top-10 are dominated by `stable` pairs (6–7 of 10), so the failure mode is surfacing no-change pairs.
 
-![Per-query confusion (GeoRSCLIP NRG zero-shot, test)](latex/figures/confusion__georsclip__test__zero_shot.png)
+![Per-query confusion (GeoRSCLIP NRG zero-shot, test)](report/figures/confusion__georsclip__test__zero_shot.png)
 
 Seasonal robustness is also probed directly. The zero-shot score is turned into a whole-image binary gate: for a change query t and a pair's L2-normalised global embeddings, the gate fires when Δ = cos(t, f_T2) − cos(t, f_T1) > τ. On a stable pair f_T1 ≈ f_T2, so Δ ≈ 0 for any query and every firing is a false positive; sweeping τ over the stable subset yields a false-positive-rate curve.
 
@@ -639,7 +639,7 @@ The three further datasets test the dataset-agnostic design and the salience hyp
 
 Naive beats zero-shot here, the opposite of DEN. QFabric change types (residential / road / industrial …) are identifiable from the after-image content alone, so cos(t, f_T2) wins; the directional Δ-similarity that helped on DEN here adds noise. The random-ranking baseline is the macro class prevalence, 0.167; naive (0.274) sits +0.11 above chance while zero_shot (0.187) is only +0.02. Per-query (CLIP naive), the signal concentrates in road (AP 0.50), residential (0.36) and industrial (0.30); demolition (0.25) and commercial (0.22) are weak; mega_projects (0.03) is at chance. The pipeline runs end-to-end on a different taxonomy, sensor, and crop scale with no code changes beyond a loader and a query set.
 
-![QFabric change-type mAP by encoder x approach](latex/figures/map_bars__eval__rgb.png)
+![QFabric change-type mAP by encoder x approach](report/figures/map_bars__eval__rgb.png)
 
 **QFabric PEFT.** A stratified, crop-disjoint train/test split (train N=2422, held-out test N=2048), with a ProjectionHead adapter trained on the train split:
 
@@ -654,7 +654,7 @@ Naive beats zero-shot here, the opposite of DEN. QFabric change types (residenti
 
 PEFT overfits train on both datasets (≈0.999 here) but generalises differently. On held-out QFabric test the adapter is at-or-above naive: GeoRSCLIP +0.062 (0.334, the best QFabric result), RemoteCLIP +0.043 (0.288), CLIP neutral. This contrasts with DEN (Section 8.2), where PEFT test collapsed below zero-shot. The difference is what the adapter must learn: QFabric change types are consistent visual categories (a road looks like a road across crops), so the head learns transferable features; DEN's directional spectral transitions are subtle and AOI-specific, so the head memorises training-AOI statistics. PEFT's value is therefore dataset-dependent: harmful on DEN, mildly helpful on QFabric. Both effects are small in absolute terms, since a random ranker already scores mAP ≈ 0.17 on QFabric.
 
-![QFabric PEFT — test split, naive vs zero-shot vs PEFT](latex/figures/qfabric_peft_test.png)
+![QFabric PEFT — test split, naive vs zero-shot vs PEFT](report/figures/qfabric_peft_test.png)
 
 **QFabric status-transition retrieval: the regime inverts.** QFabric also carries a temporal task through the TEOChatlas RQA5/RTQA5 answers: the per-timepoint development status of each region, on a nine-stage scale from greenland through land-cleared and construction-started to operational. Six transition queries are relevant only to pairs whose status actually changes; stable pairs become hard negatives with the same end-state. On a stratified subset of ≤120 crops per final status (N = 4200 pairs, frozen encoders, RGB):
 
@@ -666,7 +666,7 @@ PEFT overfits train on both datasets (≈0.999 here) but generalises differently
 
 The regime inverts: zero-shot is at least as good as naive on all three encoders, the opposite of the change-type result, where naive led by about 0.09. The directional Δ is the appropriate tool for transitions, while after-image content is the appropriate tool for types — one dataset, two tasks, two regimes. Both scores sit just above the 0.043 macro-prevalence baseline: status-transition retrieval is genuinely hard zero-shot. The signal concentrates in the visually distinct, well-populated transitions — land cleared (AP 0.17) and construction started (0.18) — and collapses on the rare or long-range ones (demolition 0.01, n=32; vacant-to-finished building 0.02, n=64). Relabelling the same crops along a temporal axis rather than a categorical one inverts which scoring approach wins, direct evidence that the naive-versus-Δ trade-off is set by task geometry rather than by the dataset.
 
-![QFabric status-transition retrieval (RQA5)](latex/figures/qfabric_status_map__eval.png)
+![QFabric status-transition retrieval (RQA5)](report/figures/qfabric_status_map__eval.png)
 
 **LEVIR-CC: salience-scaled retrieval.** LEVIR-CC pairs are parsed into five open-vocabulary change tags from their captions. On the held-out test split (1929 pairs, frozen encoders, RGB), per-query average precision and the five-query macro; the macro random-ranking baseline is the mean query prevalence, 0.255.
 
@@ -681,7 +681,7 @@ The regime inverts: zero-shot is at least as good as naive on all three encoders
 
 The five-query macro (0.38–0.40 zero-shot; naive 0.41–0.43) is held up by two strong queries and dragged by three weak ones, so the per-query reading is the honest one. Building and road change — large, high-contrast, and described in the vocabulary the CLIP text tower was trained on — are retrieved strongly (buildings ≈0.8, roads ≈0.6), whereas demolition, vegetation, and the 19-positive water class sit at or only just above their prevalence floors. This is the salience-proportional law the project finds everywhere: DEN's subtle spectral transitions recover to ≈0.20, QFabric construction types to ≈0.27, and within LEVIR-CC itself salient construction recovers to ≈0.8 while subtle land-cover and sparse classes stay near random.
 
-![LEVIR-CC per-query zero-shot AP by encoder](latex/figures/per_query_ap__levir_cc__test.png)
+![LEVIR-CC per-query zero-shot AP by encoder](report/figures/per_query_ap__levir_cc__test.png)
 
 **SECOND-CC: open-vocabulary breadth.** Seven free-text queries cover the six SECOND classes plus road. Test split, 1,227 pairs, frozen encoders, RGB; macro random-ranking floor 0.297.
 
@@ -699,7 +699,7 @@ The five-query macro (0.38–0.40 zero-shot; naive 0.41–0.43) is held up by tw
 
 Across seven change types every query clears its prevalence floor — broader recovery than DEN — but only modestly: the zero-shot macro (≈0.33) is ≈+0.04 over the 0.297 floor, buildings (≈0.70) dominate, and water/playground are weak. As on QFabric, naive > zero-shot (macro 0.45 vs 0.33): end-state appearance carries more of these land-cover categories than the temporal Δ. SECOND-CC thus extends the project's central law to a wide open vocabulary: recovery scales with the visual salience and prevalence of the change type, and is weak in absolute terms with frozen CLIP-variant encoders.
 
-![SECOND-CC per-query zero-shot AP by encoder](latex/figures/per_query_ap__second_cc__test.png)
+![SECOND-CC per-query zero-shot AP by encoder](report/figures/per_query_ap__second_cc__test.png)
 
 **Quantitative change localisation.** The change heatmap is scored on the LEVIR-MCI and SECOND-CC pixel masks. For each masked query the query-conditioned heatmap (per-patch Δ-similarity cos(t, P2_p) − cos(t, P1_p)) is scored by pointing-game (is the highest-Δ patch a true change patch?) and patch-AP. Each encoder is compared only to its own random-patch floor, since the patch grid differs by encoder (GeoRSCLIP 7×7, the ViT-L encoders 16×16).
 
@@ -716,7 +716,7 @@ The heatmap is a weak localiser. Only road change is localised above chance, and
 
 **The salience law.** Pooled across the open-vocabulary datasets, the recovered signal tracks change salience: weak on DEN's subtle spectral transitions, dataset-dependent on QFabric, strong on LEVIR-CC's salient building/road change (per-query AP ≈0.6–0.8) yet near-random on its subtle vegetation and sparse water, and above every SECOND-CC prevalence floor but only modestly. This is consistent with the visual-saliency principle that salient regions are recovered preferentially; here it is the single empirical law the project finds in every dataset.
 
-![The salience law, pooled across the open-vocabulary datasets](latex/figures/salience_law__summary.png)
+![The salience law, pooled across the open-vocabulary datasets](report/figures/salience_law__summary.png)
 
 ### 9. Resources and operational metrics
 

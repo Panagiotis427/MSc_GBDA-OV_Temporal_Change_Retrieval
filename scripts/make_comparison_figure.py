@@ -10,7 +10,7 @@ relevant/irrelevant (from the query's label predicate). One PNG per encoder ->
 
 Embeddings are read from cache (no image forward passes); only the cheap *text*
 tower runs. Defaults to ``--split train`` where PEFT visibly wins (it overfits
-on held-out splits — see REPORT 7.2).
+on held-out splits — see report §8.2).
 
 Run::
 
@@ -132,7 +132,7 @@ def main() -> None:
     ap.add_argument("--split", default="train")
     ap.add_argument("--color", default="rgb", choices=["rgb", "nrg", "ndvi"])
     ap.add_argument("--cache-dir", default="data/cache")
-    ap.add_argument("--out-dir", default="latex/figures")
+    ap.add_argument("--out-dir", default="report/figures")
     ap.add_argument("--top-k", type=int, default=3)
     ap.add_argument("--svg", action="store_true")
     args = ap.parse_args()
