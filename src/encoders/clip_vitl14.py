@@ -6,7 +6,6 @@ Composes the existing `FrozenTextEncoder` for text and loads a `CLIPModel` /
 """
 from __future__ import annotations
 
-import os
 from src import _cache  # noqa: F401  sets HF_HOME before transformers
 from typing import List, Optional, Union
 

@@ -28,7 +28,6 @@ from typing import List, Optional
 import numpy as np
 from PIL import Image
 
-from src.datasets.registry import get_dataset
 from src.embeddings import load_or_compute
 from src.encoders import get_encoder
 from src.retrieval import APPROACHES, ChangeRetriever
@@ -561,8 +560,9 @@ class SemanticChangeSearch:
                     "completeness). Switching reloads embeddings, so press **Apply Settings**.\n\n"
                     "**Note on QFabric here:** this is the reduced *2-date* TEOChatlas crop subset "
                     "(change-type / status retrieval only). The full *5-date* QFabric with polygon "
-                    "change-masks (for temporal pinpointing + pixel localization) is committed future "
-                    "work, pending dataset access — it is **not** the same as the 2-date subset shown here."
+                    "change-masks (for temporal pinpointing + pixel localization) is a future-work "
+                    "direction that was dropped from scope (the dataset source is access-gated) — it "
+                    "is **not** the same as the 2-date subset shown here."
                 )
 
             # ---- Query first — most important ----

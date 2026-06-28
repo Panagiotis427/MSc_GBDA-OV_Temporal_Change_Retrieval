@@ -22,7 +22,6 @@ from typing import Callable, Dict, List, Optional
 import numpy as np
 
 from src.datasets.base import PairLabel, TemporalDataset
-from src.datasets.registry import get_dataset
 from src.embeddings import cache_tag_for, load_or_compute
 from src.encoders import get_encoder
 from src.retrieval import APPROACHES, ChangeRetriever

@@ -5,10 +5,9 @@ This module loads a pretrained HuggingFace CLIP text model and converts natural 
 change queries (e.g., "new industrial buildings") into embeddings compatible with the image
 element space. The text encoder is frozen - only parameters are learned during training.
 """
-import os
 from src import _cache  # sets HF_HOME before transformers import
 import torch
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 from transformers import AutoTokenizer, AutoModel
 
 # CLIP ViT-L/14 multilingual model for good performance on remote sensing terminology

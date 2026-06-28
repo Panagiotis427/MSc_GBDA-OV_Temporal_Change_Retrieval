@@ -202,14 +202,6 @@ def apply_overlay(
     return Image.fromarray(blended)
 
 
-def apply_heatmap_only(heatmap: np.ndarray, colormap: str = "jet") -> Image.Image:
-    heat_colormap = cv2.applyColorMap(
-        (np.clip(heatmap, 0, 1) * 255).astype(np.uint8),
-        getattr(cv2, f"COLORMAP_{colormap.upper()}", cv2.COLORMAP_JET),
-    )
-    return Image.fromarray(cv2.cvtColor(heat_colormap, cv2.COLOR_BGR2RGB))
-
-
 def generate_grid_heatmap_from_patches(
     patch_scores: np.ndarray,
     grid_shape: Tuple[int, int] = (12, 12),

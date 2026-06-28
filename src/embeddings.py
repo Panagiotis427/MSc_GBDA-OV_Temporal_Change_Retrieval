@@ -27,7 +27,6 @@ import numpy as np
 import torch
 
 from src.datasets.base import PairKey, TemporalDataset
-from src.datasets.registry import get_dataset
 from src.encoders import get_encoder
 from src.features import compute_change_feature
 
@@ -210,7 +209,7 @@ def load_or_compute(
 # Encoding them at first ``approach="patch"`` query stalls the UI for the length
 # of a full GPU pass over every pair. This store decouples that encode (slow,
 # GPU) from the scoring pass (fast, CPU) exactly as the pair store does — a warm
-# cache makes the first patch query instant (docs/UX_DESIGN.md instant-search).
+# cache makes the first patch query instant (the instant-search precompute).
 # Rows are aligned positionally to an ordered pair list; the pair list is the
 # pair store's (so engine code can index ``patch_t1[i]`` with the same ``i`` it
 # uses on ``store.pairs[i]``).

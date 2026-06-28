@@ -1,7 +1,7 @@
 """
 Lock the dataset / encoder / queries registry contract so dataset-extension
-branches cannot quietly break the merge invariants documented in
-``docs/ARCHITECTURE.md``.
+branches cannot quietly break the merge invariants documented in the README
+"Extending" section.
 """
 from pathlib import Path
 

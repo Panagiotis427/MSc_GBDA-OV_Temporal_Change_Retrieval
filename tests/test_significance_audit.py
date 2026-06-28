@@ -1,7 +1,7 @@
 """Guards the BH-FDR step-up in ``scripts.significance_audit.collect``.
 
 The ``bh_fdr`` column it computes feeds the committed ``results_audit_summary.csv``
-and the q-values cited in ``REPORT.md``, so a regression in the step-up would
+and the q-values cited in the report, so a regression in the step-up would
 silently corrupt a statistical claim. These tests pin the textbook properties:
 monotone q-values, capped at 1.0, ``m==1`` boundary, and train cells excluded
 from the FDR family.

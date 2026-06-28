@@ -1,11 +1,11 @@
 """
 Offline warm of the per-patch embedding cache -> instant first patch query.
 
-Localised patch-level Δ-similarity (REPORT Appendix B.10, the best DEN config)
-needs per-patch embeddings for the *whole* corpus. Computing them at the first
+Localised patch-level Δ-similarity (report §8.1, the best DEN config) needs
+per-patch embeddings for the *whole* corpus. Computing them at the first
 ``approach="patch"`` query stalls the Gradio app for a full GPU pass over every
 pair. This script precomputes + caches them so the app loads them instantly on
-startup (docs/UX_DESIGN.md instant-search, "Precompute-embeddings backend").
+startup (the instant-search precompute backend).
 
 The patch cache is keyed by ``(dataset, encoder, split, color_mode, lora)`` via
 the single source of truth in ``src.embeddings.cache_tag_for`` and its rows are
