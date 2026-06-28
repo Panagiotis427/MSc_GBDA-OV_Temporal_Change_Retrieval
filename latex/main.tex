@@ -1,5 +1,8 @@
 \documentclass{article}
 
+\usepackage{silence}              % load first: suppress the benign \showhyphens redefinition notice
+\WarningFilter{latex}{Command}      % kernel \CheckCommand emits "Command \showhyphens has changed."
+\WarningFilter{microtype}{Command}
 \usepackage[T1]{fontenc}
 \usepackage[utf8]{inputenc}   % if you're using UTF-8
 
@@ -12,11 +15,21 @@
 \usepackage{caption}
 \usepackage{float}
 \usepackage{hyperref}
+\usepackage{xurl}        % allow URLs (e.g. the \url in the bibliography) to break anywhere -> no overfull line
 \usepackage{subcaption}  % for subfigures
 \usepackage{tikz}        % scoring-modes schematic
 \usetikzlibrary{arrows.meta, positioning, fit, backgrounds}
 \usepackage{cite}        % numeric IEEE-style citation grouping
 \usepackage[bottom=3cm, right=3cm, left=3cm, top=3cm]{geometry}
+\usepackage{microtype}            % char protrusion + font expansion: clears sub-line overfulls
+\setlength{\emergencystretch}{3em} % last-resort interword stretch: removes residual overfull \hbox
+\setlength{\hfuzz}{1pt}             % ignore sub-pixel (<1pt) overfulls
+\usepackage{etoolbox}
+\AtBeginEnvironment{thebibliography}{\sloppy} % standard: loosen line-breaking in the bibliography
+\hypersetup{                       % explicit PDF metadata so hyperref never derives strings from the rich \title
+    pdftitle={Open-Vocabulary Temporal Change Retrieval},
+    pdfauthor={Panagiotis Giannikos}
+}
 
 % Figures live under figures/; the NTUA logo (when added) under images/.
 \graphicspath{{figures/}{images/}}
@@ -717,7 +730,7 @@ GeoRSCLIP leads.
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=0.9\linewidth]{zeroshot_vs_peft__clip_vitl14__train.png}
+    \includegraphics[width=0.83\linewidth]{zeroshot_vs_peft__clip_vitl14__train.png}
     \caption{Qualitative zero-shot vs PEFT (CLIP, train): top-3 retrievals per
     query, $[T_1 \mid T_2]$, green = relevant. The adapter sharpens scores, but
     the gain is concentrated on the classes its weak captions cover.}
@@ -880,8 +893,8 @@ LoRA~\cite{lora} applied to GeoRSCLIP's ViT-B/32 visual encoder targets the FFN
 projections \texttt{c\_fc} and \texttt{c\_proj} in each ResBlock: 368{,}640
 trainable params out of 88M (0.42\%). The attention output projection
 \texttt{out\_proj} is deliberately not adapted --- open\_clip's attention is an
-\texttt{nn.MultiheadAttention} whose forward reads \texttt{out\_proj.weight}
-directly (via \texttt{F.multi\_head\_attention\_forward}) and never calls
+\texttt{nn.\allowbreak{}MultiheadAttention} whose forward reads \texttt{out\_proj.weight}
+directly (via \texttt{F.\allowbreak{}multi\_\allowbreak{}head\_\allowbreak{}attention\_\allowbreak{}forward}) and never calls
 \texttt{out\_proj.forward}, so a LoRA wrapper there receives no gradient.
 Training is online (images loaded on the fly) using the same masked symmetric
 InfoNCE loss as the ProjectionHead. Table~\ref{tab:lora} compares frozen
@@ -1390,6 +1403,7 @@ summarise hardware, model sizes, disk footprint and timings.
     \centering
     \caption{Model sizes. The adapter is $<$0.2\% of the backbone --- the PEFT premise.}
     \label{tab:models}
+    \setlength{\tabcolsep}{4pt}
     \begin{tabular}{lrrr}
         \toprule
         \textbf{Model} & \textbf{Weights on disk} & \textbf{Params (approx)} & \textbf{Dim} \\
@@ -1489,9 +1503,9 @@ pytest -q --ignore=tests/test_text_encoder.py
 }
 
 The figures in this report are regenerated from cached embeddings (no GPU
-training) via \texttt{scripts/export\_results.py} (writes one JSON per run +
-\texttt{macro\_summary.csv}) followed by \texttt{scripts/make\_figures.py} and
-\texttt{scripts/make\_comparison\_figure.py}. The main sources of run-to-run
+training) via \texttt{scripts/\allowbreak{}export\_\allowbreak{}results.py} (writes one JSON per run +
+\texttt{macro\_\allowbreak{}summary.csv}) followed by \texttt{scripts/\allowbreak{}make\_\allowbreak{}figures.py} and
+\texttt{scripts/\allowbreak{}make\_\allowbreak{}comparison\_\allowbreak{}figure.py}. The main sources of run-to-run
 variance are GPU non-determinism in the encoders and the random partitions of the
 cross-validation; the cross-validation means and standard deviations reported
 throughout quantify the latter, and seeds are fixed for the former.
@@ -1559,7 +1573,7 @@ the heatmap clears its random-patch floor by at most $\approx$0.04--0.10.
 
 \appendix
 
-\section{Native 3\,m raster source: data-source fidelity}
+\section[Native 3 m raster source: data-source fidelity]{Native 3\,m raster source: data-source fidelity}
 \label{sec:nativeraster}
 
 The primary evaluation uses the $\sim$7\,GB preprocessed RGB/NIR-JPEG DEN subset
