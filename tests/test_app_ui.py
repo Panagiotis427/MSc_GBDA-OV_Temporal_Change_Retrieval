@@ -53,6 +53,8 @@ def test_swipe_and_download_present(engine):
     # Two swipe sliders: Before↔After and After↔heatmap.
     assert kinds.count("ImageSlider") >= 2, "expected before/after + after/heatmap sliders"
     assert "File" in kinds, "CSV download (gr.File) missing"
+    # Three per-image download buttons: Before / After / heatmap.
+    assert kinds.count("DownloadButton") >= 3, "expected before/after/heatmap download buttons"
     assert "Gallery" in kinds, "top-K gallery missing"
 
 

@@ -233,6 +233,10 @@ class SemanticChangeSearch:
         .stats-card code {background:rgba(21,101,192,0.08); padding:1px 6px;
                           border-radius:4px; font-weight:600;}
         .stats-err {border-left-color:#c62828; background:#fff4f4;}
+        /* Keep each comparison slider sized to its (square) tile so the swipe
+           divider stays bounded to the image instead of travelling into empty
+           letterbox margins. */
+        .bounded-slider {max-width: 360px !important; margin-left:auto; margin-right:auto;}
         """
 
     def __init__(self, cfg: RunConfig):
@@ -757,18 +761,21 @@ class SemanticChangeSearch:
                     # change-detection interaction) instead of static tiles — one
                     # wide component reads better and stacks cleanly on mobile.
                     # interactive=False = compare only, no upload.
+                    # Square component (== tile aspect) + bounded-slider CSS so the
+                    # swipe divider stays inside the image. buttons=[] -> no toolbar
+                    # (download is handled by the explicit per-image buttons below).
                     cmp = gr.ImageSlider(
                         label="Before ↔ After — drag the divider to compare",
-                        height=340, interactive=False, format="png",
-                        buttons=["download"],  # drop broken share + sticky fullscreen
+                        height=340, width=340, interactive=False, format="png",
+                        buttons=[], elem_classes="bounded-slider",
                     )
                     # Heatmap as an After↔overlay swipe: drag to dial the change
                     # heatmap in and out over the After image (replaces a fixed-alpha
                     # static overlay — lets the user reveal exactly what changed).
                     hm_cmp = gr.ImageSlider(
                         label="After ↔ change heatmap — drag to reveal Δ",
-                        height=340, interactive=False, format="png",
-                        buttons=["download"],  # drop broken share + sticky fullscreen
+                        height=340, width=340, interactive=False, format="png",
+                        buttons=[], elem_classes="bounded-slider",
                     )
                 gr.Markdown(
                     "_Left: swipe **Before ↔ After**. Right: swipe the **After** image against the "
@@ -776,17 +783,25 @@ class SemanticChangeSearch:
                     "little/none) to dial the overlay in and out. See About._"
                 )
                 summary = gr.Markdown("*Press Search to retrieve.*")
+                # Explicit, separately-named downloads for each image of the top
+                # match. Hidden until a search/selection populates them.
+                with gr.Row():
+                    dl_before = gr.DownloadButton("Download Before", visible=False, size="sm")
+                    dl_after = gr.DownloadButton("Download After", visible=False, size="sm")
+                    dl_heat = gr.DownloadButton("Download heatmap", visible=False, size="sm")
 
             # ---- All matches at a glance (top-K) ----
             gr.Markdown("## All matches")
             gallery = gr.Gallery(
-                label="Top-K results — click any tile to inspect it above",
+                label="Top-K results — click any tile to load it into Top match above",
                 columns=5, height=260, object_fit="contain",
                 show_label=True, interactive=False, format="png",
-                # Click selects (-> loads into Top match) without opening the
-                # enlarge-on-click lightbox that was hard to exit. Keep only the
-                # download button (drop the broken share + fullscreen).
-                allow_preview=False, buttons=["download"],
+                # allow_preview must stay True: in Gradio the click/select event is
+                # dispatched by the preview mechanism, so allow_preview=False makes
+                # tiles unclickable. Clicking fires `select` -> loads the result into
+                # the persistent Top-match panel above (close the zoom with its X /
+                # Esc). buttons=["download"] drops the broken share + fullscreen.
+                allow_preview=True, buttons=["download"],
             )
 
             with gr.Accordion("Results table", open=True):
@@ -826,18 +841,21 @@ class SemanticChangeSearch:
                     f"_Reasoning:_ {e.seasonal_note}."
                 )
 
-            def _slider_vals(e):
-                """The two swipe-slider tuples for an event, as named PNG paths so
-                each side downloads with a meaningful filename: (Before, After) and
-                (After, heatmap). A side is None if its image is missing (a tuple
-                containing None breaks ImageSlider)."""
+            def _dl(path):
+                return gr.update(value=path, visible=path is not None)
+
+            def _event_view(e):
+                """Materialise an event's images to named PNGs and return the two
+                swipe-slider tuples plus the three image paths (Before / After /
+                heatmap). Named paths give meaningful download filenames; a slider
+                tuple is None if a side is missing (None in a tuple breaks ImageSlider)."""
                 b = materialize_image(e.t1_img, f"before_{e.location}_{e.t1_key}")
                 a = materialize_image(e.t2_img, f"after_{e.location}_{e.t2_key}")
                 h = materialize_image(
                     e.heatmap, f"heatmap_{e.location}_{e.t1_key}_to_{e.t2_key}")
                 before_after = (b, a) if b and a else None
                 after_heat = (a, h) if a and h else None
-                return before_after, after_heat
+                return before_after, after_heat, b, a, h
 
             def handle(text, approach, top_k,
                        geo_enabled, geo_region, rerank_enabled, rerank_strategy,
@@ -853,14 +871,18 @@ class SemanticChangeSearch:
                         rerank_strategy=active_rerank,
                     )
                 except Exception as exc:
-                    return None, None, (
+                    return (None, None, (
                         f"**Error:** {exc}\n\n*If you just changed Dataset / Encoder / Color mode, "
                         "press **Apply Settings** first. For PEFT, an adapter must exist for the "
-                        "selected encoder + colour mode.*"), [], [], gr.update(visible=False), []
+                        "selected encoder + colour mode.*"), [], [],
+                        gr.update(visible=False), gr.update(visible=False),
+                        gr.update(visible=False), gr.update(visible=False), [])
                 if not evs:
-                    return None, None, (
+                    return (None, None, (
                         "*No results for this query. Try a curated example above, or a different "
-                        "**Approach** (patch / zero-shot).*"), [], [], gr.update(visible=False), []
+                        "**Approach** (patch / zero-shot).*"), [], [],
+                        gr.update(visible=False), gr.update(visible=False),
+                        gr.update(visible=False), gr.update(visible=False), [])
                 progress(0.9, desc="Rendering results…")
                 top = evs[0]
                 rows = [[e.rank, e.location, e.t1_key, e.t2_key,
@@ -879,25 +901,26 @@ class SemanticChangeSearch:
                     gallery_items.append(
                         (tile, f"#{e.rank} · {e.location} · {e.t1_key}→{e.t2_key} · "
                                f"match {e.confidence:.2f}"))
-                before_after, after_heat = _slider_vals(top)
+                before_after, after_heat, b, a, h = _event_view(top)
                 csv_path = results_to_csv(rows, engine.cfg.dataset)
-                dl_update = gr.update(value=csv_path, visible=csv_path is not None)
                 return (before_after, after_heat, _event_md(top), rows,
-                        gallery_items, dl_update, shown)
+                        gallery_items, _dl(csv_path), _dl(b), _dl(a), _dl(h), shown)
 
             def inspect(shown, evt: gr.SelectData = None):
                 """Click a gallery tile → load that event into the Top-match view."""
                 if not shown or evt is None or evt.index >= len(shown):
-                    return gr.update(), gr.update(), gr.update()
+                    return tuple(gr.update() for _ in range(6))
                 e = shown[evt.index]
-                before_after, after_heat = _slider_vals(e)
-                return before_after, after_heat, _event_md(e)
+                before_after, after_heat, b, a, h = _event_view(e)
+                return before_after, after_heat, _event_md(e), _dl(b), _dl(a), _dl(h)
 
-            outputs = [cmp, hm_cmp, summary, table, gallery, dl, events_state]
+            outputs = [cmp, hm_cmp, summary, table, gallery, dl,
+                       dl_before, dl_after, dl_heat, events_state]
             inputs = [q, a_dd, k, geo_chk, geo_dd, rerank_chk, rerank_dd]
             go.click(handle, inputs, outputs)
             q.submit(handle, inputs, outputs)
-            gallery.select(inspect, [events_state], [cmp, hm_cmp, summary])
+            gallery.select(inspect, [events_state],
+                           [cmp, hm_cmp, summary, dl_before, dl_after, dl_heat])
 
             # Shareable deep links: ?q=<query>&approach=<naive|zero_shot|patch|peft>&k=<1-10>
             # prefill the controls on page load, so a search can be linked/bookmarked.
