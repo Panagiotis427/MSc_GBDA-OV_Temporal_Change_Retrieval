@@ -256,10 +256,6 @@ def main() -> None:
             p = fig_color_ablation_heatmap(records, out_dir, approach="zero_shot",
                                            split=sp, svg=args.svg)
             if p: made.append(p)
-    if want("drift"):
-        for sp in ("train", "test"):
-            p = fig_seasonal_drift(records, out_dir, split=sp, color="rgb", svg=args.svg)
-            if p: made.append(p)
     if want("cross"):
         for enc in ("clip_vitl14", "georsclip", "remoteclip"):
             p = fig_cross_split_map(records, out_dir, encoder=enc, color="rgb", svg=args.svg)

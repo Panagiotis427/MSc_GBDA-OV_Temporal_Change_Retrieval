@@ -191,8 +191,6 @@ in-distribution wins are memorisation; held-out, frozen zero-shot is the stronge
 | `scripts/significance_audit.py` | random-ranking baseline + permutation p + BH-FDR over every result cell → `results/results_audit_summary.csv` (report §7 protocol, applied across §8) |
 | `scripts/cv_eval.py` | full-corpus + k-fold AOI cross-validation with bootstrap CIs; `--relevance fraction` swaps dominant-class-flip relevance for pixel-fraction (report §8.1); merges cached split embeddings, no re-encode |
 | `scripts/patch_eval.py` | patch-level (localised) Δ-similarity change retrieval vs the global baseline (report §8.1, "S3"); caches per-patch embeddings via `encoder.encode_image_patches`. `--approach hybrid` fuses global+patch, `patch_softattn`/`patch_spatial` are training-free change-attention variants, `--prompt-ensemble` averages query templates (all report §8.3) |
-| `ops/` | bookkeeping helper scripts (`make_inventory.ps1` / `make_inventory.sh`) — generate local-only per-machine manifests; not needed to run the project |
-| `legacy/` | gitignored local archive of superseded first-attempt material + the Case-11 assignment brief (not used by the pipeline) |
 | `.github/workflows/` | CI: `gitleaks.yml` secret-scanning on push/PR |
 
 ## Run / install / use

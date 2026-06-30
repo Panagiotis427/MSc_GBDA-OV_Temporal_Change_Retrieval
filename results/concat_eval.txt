@@ -1,4 +1,4 @@
-Change-feature mode: difference vs concatenate — PEFT mAP (RGB, 40 epochs) (REPORT §7.7)
+Change-feature mode: difference vs concatenate — PEFT mAP (RGB, 40 epochs) (report §8.3)
 Reproduce: python -m scripts.run_pipeline --encoder <e> --mode concatenate --eval-splits train val test
 Adapters saved mode-tagged: models/dynamic_earthnet__<e>_concatenate__adapter.pt (no clobber of difference).
 
