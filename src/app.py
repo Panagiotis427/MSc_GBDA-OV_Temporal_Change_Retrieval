@@ -43,6 +43,31 @@ _CSV_HEADER = ["rank", "location", "before", "after", "score",
                "match_0_1", "caption", "land_cover_change"]
 
 
+_DL_DIR = None  # lazily-created temp dir for named, downloadable result images
+
+
+def _safe_name(raw: str) -> str:
+    return "".join(c if (c.isalnum() or c in "._-") else "_" for c in str(raw)) or "image"
+
+
+def materialize_image(img, raw_name: str) -> Optional[str]:
+    """Save a PIL image to a PNG with a meaningful basename and return its path.
+
+    Gradio names a downloaded image after the served file's basename, so passing a
+    named path (rather than a bare PIL object, which downloads as ``image.png``)
+    gives the user a sensible filename like ``after_2065_2018-07-01.png``.
+    Returns None when *img* is None.
+    """
+    if img is None:
+        return None
+    global _DL_DIR
+    if _DL_DIR is None:
+        _DL_DIR = tempfile.mkdtemp(prefix="change_dl_")
+    path = os.path.join(_DL_DIR, _safe_name(raw_name) + ".png")
+    img.save(path)
+    return path
+
+
 def results_to_csv(rows, dataset: str) -> Optional[str]:
     """Write ranked result *rows* to a CSV with a clean, dataset-named basename
     (e.g. ``change_results_levir_mci.csv``) so the in-app download has a usable
@@ -735,6 +760,7 @@ class SemanticChangeSearch:
                     cmp = gr.ImageSlider(
                         label="Before ↔ After — drag the divider to compare",
                         height=340, interactive=False, format="png",
+                        buttons=["download"],  # drop broken share + sticky fullscreen
                     )
                     # Heatmap as an After↔overlay swipe: drag to dial the change
                     # heatmap in and out over the After image (replaces a fixed-alpha
@@ -742,6 +768,7 @@ class SemanticChangeSearch:
                     hm_cmp = gr.ImageSlider(
                         label="After ↔ change heatmap — drag to reveal Δ",
                         height=340, interactive=False, format="png",
+                        buttons=["download"],  # drop broken share + sticky fullscreen
                     )
                 gr.Markdown(
                     "_Left: swipe **Before ↔ After**. Right: swipe the **After** image against the "
@@ -756,6 +783,10 @@ class SemanticChangeSearch:
                 label="Top-K results — click any tile to inspect it above",
                 columns=5, height=260, object_fit="contain",
                 show_label=True, interactive=False, format="png",
+                # Click selects (-> loads into Top match) without opening the
+                # enlarge-on-click lightbox that was hard to exit. Keep only the
+                # download button (drop the broken share + fullscreen).
+                allow_preview=False, buttons=["download"],
             )
 
             with gr.Accordion("Results table", open=True):
@@ -796,15 +827,16 @@ class SemanticChangeSearch:
                 )
 
             def _slider_vals(e):
-                """The two swipe-slider tuples for an event: (Before,After) and
-                (After,heatmap). Each is None if an image is missing (a tuple with
-                None breaks ImageSlider)."""
-                before_after = ((e.t1_img, e.t2_img)
-                                if e.t1_img is not None and e.t2_img is not None
-                                else None)
-                after_heat = ((e.t2_img, e.heatmap)
-                              if e.t2_img is not None and e.heatmap is not None
-                              else None)
+                """The two swipe-slider tuples for an event, as named PNG paths so
+                each side downloads with a meaningful filename: (Before, After) and
+                (After, heatmap). A side is None if its image is missing (a tuple
+                containing None breaks ImageSlider)."""
+                b = materialize_image(e.t1_img, f"before_{e.location}_{e.t1_key}")
+                a = materialize_image(e.t2_img, f"after_{e.location}_{e.t2_key}")
+                h = materialize_image(
+                    e.heatmap, f"heatmap_{e.location}_{e.t1_key}_to_{e.t2_key}")
+                before_after = (b, a) if b and a else None
+                after_heat = (a, h) if a and h else None
                 return before_after, after_heat
 
             def handle(text, approach, top_k,
@@ -838,12 +870,15 @@ class SemanticChangeSearch:
                 # order. `shown` mirrors that exact filter so a gallery click index
                 # maps 1:1 back to the right event for the inspect handler.
                 shown = [e for e in evs if (e.heatmap or e.t2_img) is not None]
-                gallery_items = [
-                    (e.heatmap or e.t2_img,
-                     f"#{e.rank} · {e.location} · {e.t1_key}→{e.t2_key} · "
-                     f"match {e.confidence:.2f}")
-                    for e in shown
-                ]
+                gallery_items = []
+                for e in shown:
+                    kind = "heatmap" if e.heatmap is not None else "after"
+                    tile = materialize_image(
+                        e.heatmap or e.t2_img,
+                        f"rank{e.rank}_{kind}_{e.location}_{e.t1_key}_to_{e.t2_key}")
+                    gallery_items.append(
+                        (tile, f"#{e.rank} · {e.location} · {e.t1_key}→{e.t2_key} · "
+                               f"match {e.confidence:.2f}"))
                 before_after, after_heat = _slider_vals(top)
                 csv_path = results_to_csv(rows, engine.cfg.dataset)
                 dl_update = gr.update(value=csv_path, visible=csv_path is not None)

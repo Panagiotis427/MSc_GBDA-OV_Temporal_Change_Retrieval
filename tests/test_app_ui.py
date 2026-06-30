@@ -77,6 +77,18 @@ def test_results_csv_clean_name_and_content(tmp_path):
     assert read[1][1] == "loc_A"
 
 
+def test_materialize_image_named_png():
+    """Result images are saved with meaningful basenames so downloads aren't all
+    called 'image.png'."""
+    from PIL import Image as _Im
+    from src.app import materialize_image
+    assert materialize_image(None, "x") is None
+    p = materialize_image(_Im.new("RGB", (8, 8), "red"), "after_2065_2018-07-01")
+    assert Path(p).name == "after_2065_2018-07-01.png", Path(p).name
+    p2 = materialize_image(_Im.new("RGB", (8, 8), "red"), "weird/name?")
+    assert Path(p2).name == "weird_name_.png", Path(p2).name
+
+
 def test_results_csv_sanitizes_dataset_name():
     """A dataset key with path-unsafe characters still yields a safe basename."""
     from src.app import results_to_csv
