@@ -237,6 +237,15 @@ class SemanticChangeSearch:
            divider stays bounded to the image instead of travelling into empty
            letterbox margins. */
         .bounded-slider {max-width: 360px !important; margin-left:auto; margin-right:auto;}
+        /* Per-image download buttons: bigger, bold, each its own colour-coded box
+           so they read as distinct, obvious download actions (not plain links). */
+        .dl-row {gap: 12px;}
+        .dl-btn button {font-size: 1.02rem !important; font-weight: 700 !important;
+                        border-radius: 10px !important; padding: 12px 10px !important;
+                        border-width: 2px !important; border-style: solid !important;}
+        .dl-before button {background:#e3f0fc !important; border-color:#1565c0 !important; color:#0d3b66 !important;}
+        .dl-after  button {background:#e2f5ef !important; border-color:#1f9d76 !important; color:#0c4a39 !important;}
+        .dl-heat   button {background:#fdebd8 !important; border-color:#e08a2e !important; color:#7a3d06 !important;}
         """
 
     def __init__(self, cfg: RunConfig):
@@ -784,11 +793,19 @@ class SemanticChangeSearch:
                 )
                 summary = gr.Markdown("*Press Search to retrieve.*")
                 # Explicit, separately-named downloads for each image of the top
-                # match. Hidden until a search/selection populates them.
-                with gr.Row():
-                    dl_before = gr.DownloadButton("Download Before", visible=False, size="sm")
-                    dl_after = gr.DownloadButton("Download After", visible=False, size="sm")
-                    dl_heat = gr.DownloadButton("Download heatmap", visible=False, size="sm")
+                # match — bigger, colour-coded, distinct boxes. Hidden until a
+                # search/selection populates them.
+                gr.Markdown("**Download images**")
+                with gr.Row(elem_classes="dl-row"):
+                    dl_before = gr.DownloadButton(
+                        "Download Before", visible=False, size="lg",
+                        elem_classes=["dl-btn", "dl-before"])
+                    dl_after = gr.DownloadButton(
+                        "Download After", visible=False, size="lg",
+                        elem_classes=["dl-btn", "dl-after"])
+                    dl_heat = gr.DownloadButton(
+                        "Download heatmap", visible=False, size="lg",
+                        elem_classes=["dl-btn", "dl-heat"])
 
             # ---- All matches at a glance (top-K) ----
             gr.Markdown("## All matches")
@@ -907,12 +924,15 @@ class SemanticChangeSearch:
                         gallery_items, _dl(csv_path), _dl(b), _dl(a), _dl(h), shown)
 
             def inspect(shown, evt: gr.SelectData = None):
-                """Click a gallery tile → load that event into the Top-match view."""
+                """Click a gallery tile → load that event into the Top-match view,
+                then collapse the gallery back to its grid (selected_index=None) so
+                the user isn't stranded in the one-big-image preview with no way back."""
                 if not shown or evt is None or evt.index >= len(shown):
-                    return tuple(gr.update() for _ in range(6))
+                    return tuple(gr.update() for _ in range(7))
                 e = shown[evt.index]
                 before_after, after_heat, b, a, h = _event_view(e)
-                return before_after, after_heat, _event_md(e), _dl(b), _dl(a), _dl(h)
+                return (before_after, after_heat, _event_md(e),
+                        _dl(b), _dl(a), _dl(h), gr.update(selected_index=None))
 
             outputs = [cmp, hm_cmp, summary, table, gallery, dl,
                        dl_before, dl_after, dl_heat, events_state]
@@ -920,7 +940,7 @@ class SemanticChangeSearch:
             go.click(handle, inputs, outputs)
             q.submit(handle, inputs, outputs)
             gallery.select(inspect, [events_state],
-                           [cmp, hm_cmp, summary, dl_before, dl_after, dl_heat])
+                           [cmp, hm_cmp, summary, dl_before, dl_after, dl_heat, gallery])
 
             # Shareable deep links: ?q=<query>&approach=<naive|zero_shot|patch|peft>&k=<1-10>
             # prefill the controls on page load, so a search can be linked/bookmarked.
