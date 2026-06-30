@@ -70,7 +70,7 @@ def main() -> None:
     box(ax, 0.48, 0.10, 0.22, 0.10, "Seasonal-drift gate\n(stable-pair FP filter)", SCORE, 8.0)
     arrow(ax, (0.59, 0.20), (0.59, 0.31))
 
-    ax.set_title("Open-vocabulary temporal change-retrieval engine (Case 11)", fontsize=11, pad=6)
+    ax.set_title("Open-vocabulary temporal change-retrieval engine", fontsize=11, pad=6)
     fig.tight_layout()
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.out, dpi=160, bbox_inches="tight"); plt.close(fig)

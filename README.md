@@ -402,7 +402,7 @@ Download links and citations for the datasets and encoders used.
 
 *Full report in markdown, kept in sync with `report/main.tex` (the compiled PDF is the formal deliverable — update both together).*
 
-**GBDA Case 11 — National Technical University of Athens, School of Electrical and Computer Engineering, IPPS Data Science and Machine Learning, Geospatial Big Data Analytics.** Supervisor: Vasilis Tsironis.
+**GBDA Lab Project — National Technical University of Athens, School of Electrical and Computer Engineering, IPPS Data Science and Machine Learning, Geospatial Big Data Analytics.** Professors: K. Karantzalos, V. Douskos, V. Tsironis, A. Psalta. Students: Panagiotis Giannikos, Markos Syroukis.
 
 ### Abstract
 
