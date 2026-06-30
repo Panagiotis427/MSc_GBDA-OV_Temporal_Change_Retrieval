@@ -39,6 +39,25 @@ from src.rerank import RERANK_STRATEGIES
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 _SNOW = "snow_and_ice"
 
+_CSV_HEADER = ["rank", "location", "before", "after", "score",
+               "match_0_1", "caption", "land_cover_change"]
+
+
+def results_to_csv(rows, dataset: str) -> Optional[str]:
+    """Write ranked result *rows* to a CSV with a clean, dataset-named basename
+    (e.g. ``change_results_levir_mci.csv``) so the in-app download has a usable
+    name + extension, not a random temp name. Returns the path, or None if no rows.
+    """
+    if not rows:
+        return None
+    safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in dataset) or "results"
+    path = os.path.join(tempfile.mkdtemp(), f"change_results_{safe}.csv")
+    with open(path, "w", newline="", encoding="utf-8") as fh:
+        writer = csv.writer(fh)
+        writer.writerow(_CSV_HEADER)
+        writer.writerows(rows)
+    return path
+
 
 def _app_datasets() -> list:
     """Datasets offered in the app UI: those with a registered query set, so
@@ -715,14 +734,14 @@ class SemanticChangeSearch:
                     # interactive=False = compare only, no upload.
                     cmp = gr.ImageSlider(
                         label="Before ↔ After — drag the divider to compare",
-                        height=340, interactive=False,
+                        height=340, interactive=False, format="png",
                     )
                     # Heatmap as an After↔overlay swipe: drag to dial the change
                     # heatmap in and out over the After image (replaces a fixed-alpha
                     # static overlay — lets the user reveal exactly what changed).
                     hm_cmp = gr.ImageSlider(
                         label="After ↔ change heatmap — drag to reveal Δ",
-                        height=340, interactive=False,
+                        height=340, interactive=False, format="png",
                     )
                 gr.Markdown(
                     "_Left: swipe **Before ↔ After**. Right: swipe the **After** image against the "
@@ -736,7 +755,7 @@ class SemanticChangeSearch:
             gallery = gr.Gallery(
                 label="Top-K results — click any tile to inspect it above",
                 columns=5, height=260, object_fit="contain",
-                show_label=True, interactive=False,
+                show_label=True, interactive=False, format="png",
             )
 
             with gr.Accordion("Results table", open=True):
@@ -754,21 +773,10 @@ class SemanticChangeSearch:
                 )
 
             # Export the ranked results so they can be saved / shared / analysed
-            # offline. Hidden until a search produces rows.
-            dl = gr.DownloadButton("Download ranked results (CSV)", visible=False)
-
-            def _results_csv(rows) -> Optional[str]:
-                """Write the ranked rows to a temp CSV; return its path (or None)."""
-                if not rows:
-                    return None
-                fd = tempfile.NamedTemporaryFile(
-                    "w", suffix=".csv", delete=False, newline="", encoding="utf-8")
-                writer = csv.writer(fd)
-                writer.writerow(["rank", "location", "before", "after", "score",
-                                 "match_0_1", "caption", "land_cover_change"])
-                writer.writerows(rows)
-                fd.close()
-                return fd.name
+            # offline. gr.File (not DownloadButton) serves the file reliably with
+            # its real basename; hidden until a search produces rows.
+            dl = gr.File(label="Download ranked results (CSV)", visible=False,
+                         interactive=False)
 
             def _pill(c: float) -> str:
                 cls = "low" if c < 0.4 else ("mid" if c < 0.7 else "")
@@ -837,7 +845,7 @@ class SemanticChangeSearch:
                     for e in shown
                 ]
                 before_after, after_heat = _slider_vals(top)
-                csv_path = _results_csv(rows)
+                csv_path = results_to_csv(rows, engine.cfg.dataset)
                 dl_update = gr.update(value=csv_path, visible=csv_path is not None)
                 return (before_after, after_heat, _event_md(top), rows,
                         gallery_items, dl_update, shown)

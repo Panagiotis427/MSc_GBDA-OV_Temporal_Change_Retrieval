@@ -52,5 +52,33 @@ def test_swipe_and_download_present(engine):
     kinds = [type(b).__name__ for b in demo.blocks.values()]
     # Two swipe sliders: Before↔After and After↔heatmap.
     assert kinds.count("ImageSlider") >= 2, "expected before/after + after/heatmap sliders"
-    assert "DownloadButton" in kinds, "CSV download control missing"
+    assert "File" in kinds, "CSV download (gr.File) missing"
     assert "Gallery" in kinds, "top-K gallery missing"
+
+
+def test_results_csv_clean_name_and_content(tmp_path):
+    """The CSV export has a usable, dataset-named basename ending in .csv and
+    contains the header + every row (the download bug was a random extension-less
+    temp name)."""
+    import csv as _csv
+    from src.app import results_to_csv, _CSV_HEADER
+
+    assert results_to_csv([], "levir_mci") is None  # no rows -> no file
+    rows = [[1, "loc_A", "2018-05", "2018-07", 0.42, 0.91, "new buildings", "permanent"],
+            [2, "loc_B", "2018-05", "2018-07", 0.31, 0.55, "new road", "permanent"]]
+    path = results_to_csv(rows, "levir_mci")
+    assert path is not None
+    base = Path(path).name
+    assert base == "change_results_levir_mci.csv", base
+    with open(path, newline="", encoding="utf-8") as fh:
+        read = list(_csv.reader(fh))
+    assert read[0] == _CSV_HEADER
+    assert len(read) == 1 + len(rows)
+    assert read[1][1] == "loc_A"
+
+
+def test_results_csv_sanitizes_dataset_name():
+    """A dataset key with path-unsafe characters still yields a safe basename."""
+    from src.app import results_to_csv
+    path = results_to_csv([[1, "x", "a", "b", 0.1, 0.2, "c", "d"]], "weird/name :*?")
+    assert Path(path).name == "change_results_weird_name____.csv", Path(path).name
