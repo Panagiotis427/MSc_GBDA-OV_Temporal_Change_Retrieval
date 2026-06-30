@@ -42,11 +42,9 @@
     {\large SCHOOL OF ELECTRICAL AND COMPUTER ENGINEERING \par \vspace{0.5cm}
     IPPS DATA SCIENCE AND MACHINE LEARNING \par \vspace{0.5cm}
     GEOSPATIAL BIG DATA ANALYTICS  \par \vspace{0.5cm}
-    % Supervisor filled from the Case 11 brief; verify before submission.
-    Supervisor: \textit{Vasilis Tsironis} \par \vspace{0.5cm}
-    Students: Panagiotis Giannikos, 03400245, panagiotisgiannikos@mail.ntua.gr \par \vspace{0.5cm}}
-    % Co-authored submission? Insert a co-author line before the closing brace above:
-    %   \textit{Co-author name, registration number, e-mail} \par \vspace{0.5cm}
+    Professors: K. Karantzalos, V. Douskos, V. Tsironis, A. Psalta \par \vspace{0.5cm}
+    Students: Panagiotis Giannikos, 03400245, panagiotisgiannikos@mail.ntua.gr \par
+    Markos Syroukis, ------, ------@ntua.gr \par \vspace{0.5cm}}
     {\Large Open-Vocabulary Temporal Change Retrieval}
     \par \vspace{-1cm}
     }
@@ -112,7 +110,7 @@ tiles and time-steps where the described change occurred. Text and image-change
 embeddings are aligned, and a pair is scored by the cosine similarity between
 its change embedding and the query embedding.
 
-Per the GBDA Case 11 brief, the work is constrained to a low-compute budget and
+Per the GBDA Lab Project's general guidelines, the work is constrained to a low-compute budget and
 must deliver a subset of an appropriate dataset, CLIP-variant frozen encoders,
 both zero-shot inference and light PEFT, retrieval metrics (Recall@$K$, mAP), an
 error analysis of seasonal-vs-permanent confusion (``semantic drift''), and a
@@ -221,8 +219,9 @@ single small splits are high-variance, we estimate generalisation with $k$-fold
 \emph{leave-one-AOI-out} cross-validation, which partitions by geographic area
 of interest so that no area appears in both train and evaluation, controlling
 the leakage that otherwise inflates learned adapters. Significance is assessed
-against a Monte-Carlo random-ranking baseline (a permutation test on the ranking
-with the relevant set fixed), with bootstrap confidence intervals and
+against a Monte-Carlo random-ranking baseline (a permutation test~\cite{permtest}
+on the ranking with the relevant set fixed), with bootstrap~\cite{bootstrap}
+confidence intervals and
 Benjamini--Hochberg~\cite{benjaminihochberg} false-discovery-rate correction
 across the query set. Localisation of the change heatmap is scored with the
 pointing-game metric~\cite{pointinggame} - whether the most-activated patch
@@ -321,8 +320,8 @@ Only the \texttt{ProjectionHead} adapter trains; the backbones stay frozen.
 Supervision is DEN's weak caption derived from its LULC labels
 (e.g. ``agriculture replaced by wetlands'', ``stable forest land cover''). The
 loss is a masked symmetric InfoNCE~\cite{infonce}: pairs sharing an identical
-caption are treated as mutual positives, which avoids the false-negative problem
-of plain diagonal InfoNCE, since DEN captions repeat heavily.
+caption are treated as mutual positives~\cite{supcon}, which avoids the
+false-negative problem of plain diagonal InfoNCE, since DEN captions repeat heavily.
 
 \paragraph{Search engine.}
 Evaluation is label-grounded against a fixed query set, and the same scoring path
@@ -416,7 +415,9 @@ scoring modes, all of which share the single frozen encoder.
 \paragraph{Localised patch scoring.}
 A global $\Delta$ over two whole-tile embeddings dilutes a change confined to a
 small region. The localised scorer therefore embeds each timestep into a grid of
-per-patch embeddings and computes a per-patch $\Delta$-similarity
+per-patch embeddings (dense features from the frozen encoder's patch tokens,
+following the dense-CLIP recipe~\cite{maskclip}) and computes a per-patch
+$\Delta$-similarity
 $\cos(t, P2_p) - \cos(t, P1_p)$; the pair score \texttt{patch\_top3} is the mean
 of the top-3 per-patch deltas (\texttt{scripts/patch\_eval.py}). The same
 per-patch $\Delta$-field, conditioned on the query, is the change heatmap shown
@@ -556,8 +557,9 @@ Because a single 110-pair split is high-variance, the generalisation estimate is
 evaluation. For learned adapters this leakage control is essential: an adapter
 evaluated on areas it trained on measures memorisation, not retrieval.
 Significance is assessed against a Monte-Carlo random-ranking baseline (the
-relevant set fixed, the ranking shuffled), with bootstrap confidence intervals
-and Benjamini--Hochberg~\cite{benjaminihochberg} FDR correction across the query
+relevant set fixed, the ranking shuffled)~\cite{permtest}, with
+bootstrap~\cite{bootstrap} confidence intervals and
+Benjamini--Hochberg~\cite{benjaminihochberg} FDR correction across the query
 set; a query is reported as significant only after FDR correction.
 
 
@@ -1357,9 +1359,11 @@ recovered signal tracks change salience: weak on DEN's subtle spectral
 transitions, dataset-dependent on QFabric, strong on LEVIR-CC's salient
 building/road change (per-query AP $\approx$0.6--0.8) yet near-random on its
 subtle vegetation and sparse water, and above every SECOND-CC prevalence floor
-but only modestly. This is consistent with the visual-saliency
-principle~\cite{saliency} that salient regions are recovered preferentially; here
-it is the single empirical law the project finds in every dataset.
+but only modestly. This echoes --- by analogy rather than shared mechanism ---
+the classical visual-saliency observation~\cite{saliency} that salient stimuli
+dominate perception: here the driver is text--image embedding alignment, not
+bottom-up attention, yet salience is the single empirical regularity the project
+finds in every dataset.
 
 \begin{figure}[H]
     \centering
@@ -1522,7 +1526,7 @@ weak (captions are derived from dominant-class label flips), so LLM-generated or
 human-written change captions are a natural improvement; both the ProjectionHead
 and LoRA adapters overfit train-AOI statistics, so multi-AOI held-out training or
 domain-randomised augmentation might close the out-of-distribution gap; and
-Sentinel-1/2~\cite{sentinel2} fusion is unimplemented, though
+Sentinel-1~\cite{sentinel1}/2~\cite{sentinel2} fusion is unimplemented, though
 \texttt{aoi\_metadata.json} confirms 51/75 AOIs carry full SAR (S1) coverage and
 feeding SAR $\Delta$-features would be a direct extension of the NRG pattern. The
 third tier concerns scope: crop-precise polygon grounding for finer localisation
@@ -1536,7 +1540,7 @@ head on this data memorises rather than generalises.
 \section{Conclusion}
 \label{sec:conclusion}
 
-The system fulfils the Case 11 brief: an open-vocabulary, frozen-backbone change
+The system fulfils the GBDA Lab Project's brief: an open-vocabulary, frozen-backbone change
 search engine with a Gradio interface, a label-grounded Recall@$K$/mAP benchmark,
 seasonal-vs-permanent error analysis, and a clear zero-shot vs PEFT comparison
 across three CLIP-variant encoders on Dynamic EarthNet, reported under a strict
