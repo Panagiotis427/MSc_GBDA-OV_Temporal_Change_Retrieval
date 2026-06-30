@@ -240,12 +240,14 @@ class SemanticChangeSearch:
         /* Per-image download buttons: bigger, bold, each its own colour-coded box
            so they read as distinct, obvious download actions (not plain links). */
         .dl-row {gap: 12px;}
-        .dl-btn button {font-size: 1.02rem !important; font-weight: 700 !important;
+        /* elem_classes land on the button element itself, so target both the class
+           and a nested button to be robust across Gradio versions. */
+        .dl-btn, .dl-btn button {font-size: 1.02rem !important; font-weight: 700 !important;
                         border-radius: 10px !important; padding: 12px 10px !important;
                         border-width: 2px !important; border-style: solid !important;}
-        .dl-before button {background:#e3f0fc !important; border-color:#1565c0 !important; color:#0d3b66 !important;}
-        .dl-after  button {background:#e2f5ef !important; border-color:#1f9d76 !important; color:#0c4a39 !important;}
-        .dl-heat   button {background:#fdebd8 !important; border-color:#e08a2e !important; color:#7a3d06 !important;}
+        .dl-before, .dl-before button {background:#e3f0fc !important; border-color:#1565c0 !important; color:#0d3b66 !important;}
+        .dl-after,  .dl-after button  {background:#e2f5ef !important; border-color:#1f9d76 !important; color:#0c4a39 !important;}
+        .dl-heat,   .dl-heat button   {background:#fdebd8 !important; border-color:#e08a2e !important; color:#7a3d06 !important;}
         """
 
     def __init__(self, cfg: RunConfig):
@@ -809,17 +811,20 @@ class SemanticChangeSearch:
 
             # ---- All matches at a glance (top-K) ----
             gr.Markdown("## All matches")
+            # Static visual overview. Gradio couples gallery click-select to its
+            # enlarge-on-click preview (which replaced the grid with a single big
+            # image + thumbnail strip and was hard to exit); allow_preview=False
+            # keeps it a clean grid. Inspection is driven by the explicit, reliable
+            # "View result #" selector below instead of a fragile gallery click.
             gallery = gr.Gallery(
-                label="Top-K results — click any tile to load it into Top match above",
+                label="Top-K overview — pick a result below to inspect it in Top match",
                 columns=5, height=260, object_fit="contain",
                 show_label=True, interactive=False, format="png",
-                # allow_preview must stay True: in Gradio the click/select event is
-                # dispatched by the preview mechanism, so allow_preview=False makes
-                # tiles unclickable. Clicking fires `select` -> loads the result into
-                # the persistent Top-match panel above (close the zoom with its X /
-                # Esc). buttons=["download"] drops the broken share + fullscreen.
-                allow_preview=True, buttons=["download"],
+                allow_preview=False, buttons=[],
             )
+            result_pick = gr.Radio(
+                choices=[], label="View result # (loads it into Top match above)",
+                visible=False)
 
             with gr.Accordion("Results table", open=True):
                 table = gr.Dataframe(
@@ -893,13 +898,15 @@ class SemanticChangeSearch:
                         "press **Apply Settings** first. For PEFT, an adapter must exist for the "
                         "selected encoder + colour mode.*"), [], [],
                         gr.update(visible=False), gr.update(visible=False),
-                        gr.update(visible=False), gr.update(visible=False), [])
+                        gr.update(visible=False), gr.update(visible=False),
+                        gr.update(visible=False), [])
                 if not evs:
                     return (None, None, (
                         "*No results for this query. Try a curated example above, or a different "
                         "**Approach** (patch / zero-shot).*"), [], [],
                         gr.update(visible=False), gr.update(visible=False),
-                        gr.update(visible=False), gr.update(visible=False), [])
+                        gr.update(visible=False), gr.update(visible=False),
+                        gr.update(visible=False), [])
                 progress(0.9, desc="Rendering results…")
                 top = evs[0]
                 rows = [[e.rank, e.location, e.t1_key, e.t2_key,
@@ -920,27 +927,37 @@ class SemanticChangeSearch:
                                f"match {e.confidence:.2f}"))
                 before_after, after_heat, b, a, h = _event_view(top)
                 csv_path = results_to_csv(rows, engine.cfg.dataset)
+                # Populate the "View result #" selector (1..N) so any result can be
+                # loaded into Top match; only worth showing when there is more than one.
+                pick = gr.update(choices=[str(i + 1) for i in range(len(shown))],
+                                 value="1", visible=len(shown) > 1)
                 return (before_after, after_heat, _event_md(top), rows,
-                        gallery_items, _dl(csv_path), _dl(b), _dl(a), _dl(h), shown)
+                        gallery_items, _dl(csv_path), _dl(b), _dl(a), _dl(h), pick, shown)
 
-            def inspect(shown, evt: gr.SelectData = None):
-                """Click a gallery tile → load that event into the Top-match view,
-                then collapse the gallery back to its grid (selected_index=None) so
-                the user isn't stranded in the one-big-image preview with no way back."""
-                if not shown or evt is None or evt.index >= len(shown):
-                    return tuple(gr.update() for _ in range(7))
-                e = shown[evt.index]
+            def inspect_idx(shown, choice):
+                """'View result #N' selected → load that event into the Top-match
+                view and refresh the per-image download buttons. Reliable and
+                preview-free (the gallery stays a static grid)."""
+                noop = tuple(gr.update() for _ in range(6))
+                if not shown or not choice:
+                    return noop
+                try:
+                    idx = int(choice) - 1
+                except (TypeError, ValueError):
+                    return noop
+                if idx < 0 or idx >= len(shown):
+                    return noop
+                e = shown[idx]
                 before_after, after_heat, b, a, h = _event_view(e)
-                return (before_after, after_heat, _event_md(e),
-                        _dl(b), _dl(a), _dl(h), gr.update(selected_index=None))
+                return before_after, after_heat, _event_md(e), _dl(b), _dl(a), _dl(h)
 
             outputs = [cmp, hm_cmp, summary, table, gallery, dl,
-                       dl_before, dl_after, dl_heat, events_state]
+                       dl_before, dl_after, dl_heat, result_pick, events_state]
             inputs = [q, a_dd, k, geo_chk, geo_dd, rerank_chk, rerank_dd]
             go.click(handle, inputs, outputs)
             q.submit(handle, inputs, outputs)
-            gallery.select(inspect, [events_state],
-                           [cmp, hm_cmp, summary, dl_before, dl_after, dl_heat, gallery])
+            result_pick.change(inspect_idx, [events_state, result_pick],
+                               [cmp, hm_cmp, summary, dl_before, dl_after, dl_heat])
 
             # Shareable deep links: ?q=<query>&approach=<naive|zero_shot|patch|peft>&k=<1-10>
             # prefill the controls on page load, so a search can be linked/bookmarked.

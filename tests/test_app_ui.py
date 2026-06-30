@@ -56,6 +56,7 @@ def test_swipe_and_download_present(engine):
     # Three per-image download buttons: Before / After / heatmap.
     assert kinds.count("DownloadButton") >= 3, "expected before/after/heatmap download buttons"
     assert "Gallery" in kinds, "top-K gallery missing"
+    assert "Radio" in kinds, "'View result #' selector missing"
 
 
 def test_results_csv_clean_name_and_content(tmp_path):
