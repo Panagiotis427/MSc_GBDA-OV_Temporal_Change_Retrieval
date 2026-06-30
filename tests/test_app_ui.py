@@ -55,8 +55,9 @@ def test_swipe_and_download_present(engine):
     assert "File" in kinds, "CSV download (gr.File) missing"
     # Three per-image download buttons: Before / After / heatmap.
     assert kinds.count("DownloadButton") >= 3, "expected before/after/heatmap download buttons"
-    assert "Gallery" in kinds, "top-K gallery missing"
-    assert "Radio" in kinds, "'View result #' selector missing"
+    # All-matches grid: MAX_RESULTS (10) image tiles, each with its own View button.
+    assert kinds.count("Image") >= 10, "expected 10 all-matches tile images"
+    assert kinds.count("Button") >= 10, "expected per-tile View buttons"
 
 
 def test_results_csv_clean_name_and_content(tmp_path):

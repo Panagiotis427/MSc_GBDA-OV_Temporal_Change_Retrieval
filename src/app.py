@@ -245,9 +245,11 @@ class SemanticChangeSearch:
         .dl-btn, .dl-btn button {font-size: 1.02rem !important; font-weight: 700 !important;
                         border-radius: 10px !important; padding: 12px 10px !important;
                         border-width: 2px !important; border-style: solid !important;}
-        .dl-before, .dl-before button {background:#e3f0fc !important; border-color:#1565c0 !important; color:#0d3b66 !important;}
-        .dl-after,  .dl-after button  {background:#e2f5ef !important; border-color:#1f9d76 !important; color:#0c4a39 !important;}
-        .dl-heat,   .dl-heat button   {background:#fdebd8 !important; border-color:#e08a2e !important; color:#7a3d06 !important;}
+        .dl-before, .dl-before button {background:#1565c0 !important; border-color:#0d47a1 !important; color:#fff !important;}
+        .dl-after,  .dl-after button  {background:#1f9d76 !important; border-color:#14785a !important; color:#fff !important;}
+        .dl-heat,   .dl-heat button   {background:#e0822e !important; border-color:#b5641a !important; color:#fff !important;}
+        /* All-matches grid: each "View" button spans its tile's width. */
+        .view-btn, .view-btn button {width:100% !important; font-weight:600 !important;}
         """
 
     def __init__(self, cfg: RunConfig):
@@ -809,22 +811,26 @@ class SemanticChangeSearch:
                         "Download heatmap", visible=False, size="lg",
                         elem_classes=["dl-btn", "dl-heat"])
 
-            # ---- All matches at a glance (top-K) ----
-            gr.Markdown("## All matches")
-            # Static visual overview. Gradio couples gallery click-select to its
-            # enlarge-on-click preview (which replaced the grid with a single big
-            # image + thumbnail strip and was hard to exit); allow_preview=False
-            # keeps it a clean grid. Inspection is driven by the explicit, reliable
-            # "View result #" selector below instead of a fragile gallery click.
-            gallery = gr.Gallery(
-                label="Top-K overview — pick a result below to inspect it in Top match",
-                columns=5, height=260, object_fit="contain",
-                show_label=True, interactive=False, format="png",
-                allow_preview=False, buttons=[],
-            )
-            result_pick = gr.Radio(
-                choices=[], label="View result # (loads it into Top match above)",
-                visible=False)
+            # ---- All matches (top-K) ----
+            # A custom grid of full-size tiles, each with its own "View" button
+            # directly beneath it (outside the image). Replaces gr.Gallery, which
+            # clipped tiles behind an internal scrollbar and whose click was bound
+            # to a hard-to-exit enlarge preview. MAX_RESULTS components are built up
+            # front (== Top-K slider max) and shown/hidden per query.
+            gr.Markdown("## All matches — click a tile's **View** button to inspect it above")
+            MAX_RESULTS = 10  # == Top-K slider maximum
+            tiles, view_btns = [], []
+            with gr.Column(elem_classes="matches-grid"):
+                for _r in range(2):
+                    with gr.Row():
+                        for _c in range(5):
+                            with gr.Column(min_width=140):
+                                tiles.append(gr.Image(
+                                    visible=False, interactive=False, height=220,
+                                    show_label=False, format="png", buttons=[]))
+                                view_btns.append(gr.Button(
+                                    "View", visible=False, size="sm",
+                                    elem_classes="view-btn"))
 
             with gr.Accordion("Results table", open=True):
                 table = gr.Dataframe(
@@ -896,68 +902,66 @@ class SemanticChangeSearch:
                     return (None, None, (
                         f"**Error:** {exc}\n\n*If you just changed Dataset / Encoder / Color mode, "
                         "press **Apply Settings** first. For PEFT, an adapter must exist for the "
-                        "selected encoder + colour mode.*"), [], [],
+                        "selected encoder + colour mode.*"), [],
                         gr.update(visible=False), gr.update(visible=False),
-                        gr.update(visible=False), gr.update(visible=False),
-                        gr.update(visible=False), [])
+                        gr.update(visible=False), gr.update(visible=False), [],
+                        *[gr.update(value=None, visible=False) for _ in range(MAX_RESULTS)],
+                        *[gr.update(visible=False) for _ in range(MAX_RESULTS)])
                 if not evs:
                     return (None, None, (
                         "*No results for this query. Try a curated example above, or a different "
-                        "**Approach** (patch / zero-shot).*"), [], [],
+                        "**Approach** (patch / zero-shot).*"), [],
                         gr.update(visible=False), gr.update(visible=False),
-                        gr.update(visible=False), gr.update(visible=False),
-                        gr.update(visible=False), [])
+                        gr.update(visible=False), gr.update(visible=False), [],
+                        *[gr.update(value=None, visible=False) for _ in range(MAX_RESULTS)],
+                        *[gr.update(visible=False) for _ in range(MAX_RESULTS)])
                 progress(0.9, desc="Rendering results…")
                 top = evs[0]
                 rows = [[e.rank, e.location, e.t1_key, e.t2_key,
                          round(e.score, 4), e.confidence, e.caption,
                          e.seasonal_note] for e in evs]
-                # Gallery shows the events that have a displayable image, in rank
-                # order. `shown` mirrors that exact filter so a gallery click index
-                # maps 1:1 back to the right event for the inspect handler.
+                # Events with a displayable image, in rank order; `shown` indexes the
+                # tiles/buttons 1:1 so a tile's View button maps back to its event.
                 shown = [e for e in evs if (e.heatmap or e.t2_img) is not None]
-                gallery_items = []
-                for e in shown:
-                    kind = "heatmap" if e.heatmap is not None else "after"
-                    tile = materialize_image(
-                        e.heatmap or e.t2_img,
-                        f"rank{e.rank}_{kind}_{e.location}_{e.t1_key}_to_{e.t2_key}")
-                    gallery_items.append(
-                        (tile, f"#{e.rank} · {e.location} · {e.t1_key}→{e.t2_key} · "
-                               f"match {e.confidence:.2f}"))
+                tile_ups, btn_ups = [], []
+                for i in range(MAX_RESULTS):
+                    if i < len(shown):
+                        e = shown[i]
+                        kind = "heatmap" if e.heatmap is not None else "after"
+                        tp = materialize_image(
+                            e.heatmap or e.t2_img,
+                            f"rank{e.rank}_{kind}_{e.location}_{e.t1_key}_to_{e.t2_key}")
+                        tile_ups.append(gr.update(value=tp, visible=True))
+                        btn_ups.append(gr.update(
+                            value=f"View #{e.rank} · {e.location}", visible=True))
+                    else:
+                        tile_ups.append(gr.update(value=None, visible=False))
+                        btn_ups.append(gr.update(visible=False))
                 before_after, after_heat, b, a, h = _event_view(top)
                 csv_path = results_to_csv(rows, engine.cfg.dataset)
-                # Populate the "View result #" selector (1..N) so any result can be
-                # loaded into Top match; only worth showing when there is more than one.
-                pick = gr.update(choices=[str(i + 1) for i in range(len(shown))],
-                                 value="1", visible=len(shown) > 1)
                 return (before_after, after_heat, _event_md(top), rows,
-                        gallery_items, _dl(csv_path), _dl(b), _dl(a), _dl(h), pick, shown)
+                        _dl(csv_path), _dl(b), _dl(a), _dl(h), shown,
+                        *tile_ups, *btn_ups)
 
-            def inspect_idx(shown, choice):
-                """'View result #N' selected → load that event into the Top-match
-                view and refresh the per-image download buttons. Reliable and
-                preview-free (the gallery stays a static grid)."""
-                noop = tuple(gr.update() for _ in range(6))
-                if not shown or not choice:
-                    return noop
-                try:
-                    idx = int(choice) - 1
-                except (TypeError, ValueError):
-                    return noop
-                if idx < 0 or idx >= len(shown):
-                    return noop
-                e = shown[idx]
-                before_after, after_heat, b, a, h = _event_view(e)
-                return before_after, after_heat, _event_md(e), _dl(b), _dl(a), _dl(h)
+            def make_loader(i):
+                """A tile's View button → load result *i* into the Top-match view and
+                refresh the per-image download buttons (preview-free, always reliable)."""
+                def _load(shown):
+                    if not shown or i >= len(shown):
+                        return tuple(gr.update() for _ in range(6))
+                    e = shown[i]
+                    before_after, after_heat, b, a, h = _event_view(e)
+                    return before_after, after_heat, _event_md(e), _dl(b), _dl(a), _dl(h)
+                return _load
 
-            outputs = [cmp, hm_cmp, summary, table, gallery, dl,
-                       dl_before, dl_after, dl_heat, result_pick, events_state]
+            outputs = [cmp, hm_cmp, summary, table, dl,
+                       dl_before, dl_after, dl_heat, events_state, *tiles, *view_btns]
             inputs = [q, a_dd, k, geo_chk, geo_dd, rerank_chk, rerank_dd]
             go.click(handle, inputs, outputs)
             q.submit(handle, inputs, outputs)
-            result_pick.change(inspect_idx, [events_state, result_pick],
-                               [cmp, hm_cmp, summary, dl_before, dl_after, dl_heat])
+            for _i, _btn in enumerate(view_btns):
+                _btn.click(make_loader(_i), [events_state],
+                           [cmp, hm_cmp, summary, dl_before, dl_after, dl_heat])
 
             # Shareable deep links: ?q=<query>&approach=<naive|zero_shot|patch|peft>&k=<1-10>
             # prefill the controls on page load, so a search can be linked/bookmarked.
