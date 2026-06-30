@@ -704,31 +704,37 @@ class SemanticChangeSearch:
 
             # ---- Results ----
             gr.Markdown("## Top match")
+            # Holds the displayed top-K events server-side so clicking a gallery
+            # tile can swap that result into this detailed Top-match view.
+            events_state = gr.State([])
             with gr.Group(elem_classes="top-card"):
                 with gr.Row():
-                    with gr.Column(scale=3):
-                        # Before/After as a draggable swipe comparison (the classic
-                        # RS change-detection interaction) instead of two static tiles:
-                        # one wide component reads better and also stacks cleanly on
-                        # narrow / mobile screens. interactive=False = compare only,
-                        # no upload.
-                        cmp = gr.ImageSlider(
-                            label="Before ↔ After — drag the divider to compare",
-                            height=340, interactive=False,
-                        )
-                    with gr.Column(scale=2):
-                        hmi = gr.Image(label="Change heatmap (Δ T1→T2)", height=340,
-                                       interactive=False)
+                    # Before/After as a draggable swipe comparison (the classic RS
+                    # change-detection interaction) instead of static tiles — one
+                    # wide component reads better and stacks cleanly on mobile.
+                    # interactive=False = compare only, no upload.
+                    cmp = gr.ImageSlider(
+                        label="Before ↔ After — drag the divider to compare",
+                        height=340, interactive=False,
+                    )
+                    # Heatmap as an After↔overlay swipe: drag to dial the change
+                    # heatmap in and out over the After image (replaces a fixed-alpha
+                    # static overlay — lets the user reveal exactly what changed).
+                    hm_cmp = gr.ImageSlider(
+                        label="After ↔ change heatmap — drag to reveal Δ",
+                        height=340, interactive=False,
+                    )
                 gr.Markdown(
-                    "_Drag the divider to swipe **Before ↔ After**. Jet heatmap over the "
-                    "**After** image: warm = query-change grew, cool = little/none. See About._"
+                    "_Left: swipe **Before ↔ After**. Right: swipe the **After** image against the "
+                    "query-conditioned **change heatmap** (jet — warm = query-change grew, cool = "
+                    "little/none) to dial the overlay in and out. See About._"
                 )
                 summary = gr.Markdown("*Press Search to retrieve.*")
 
             # ---- All matches at a glance (top-K) ----
             gr.Markdown("## All matches")
             gallery = gr.Gallery(
-                label="Top-K change heatmaps — click any tile to enlarge",
+                label="Top-K results — click any tile to inspect it above",
                 columns=5, height=260, object_fit="contain",
                 show_label=True, interactive=False,
             )
@@ -770,6 +776,29 @@ class SemanticChangeSearch:
                         f"(min–max normalized over the candidate set), not a calibrated "
                         f"probability'>match {c:.2f}</span>")
 
+            def _event_md(e) -> str:
+                """The Top-match detail markdown for one change event."""
+                return (
+                    f"### {e.caption}\n"
+                    f"{_pill(e.confidence)} &nbsp; "
+                    f"**Location** `{e.location}` &nbsp; "
+                    f"**Before → After** `{e.t1_key}` → `{e.t2_key}` &nbsp; "
+                    f"**Score** `{e.score:.4f}`\n\n"
+                    f"_Reasoning:_ {e.seasonal_note}."
+                )
+
+            def _slider_vals(e):
+                """The two swipe-slider tuples for an event: (Before,After) and
+                (After,heatmap). Each is None if an image is missing (a tuple with
+                None breaks ImageSlider)."""
+                before_after = ((e.t1_img, e.t2_img)
+                                if e.t1_img is not None and e.t2_img is not None
+                                else None)
+                after_heat = ((e.t2_img, e.heatmap)
+                              if e.t2_img is not None and e.heatmap is not None
+                              else None)
+                return before_after, after_heat
+
             def handle(text, approach, top_k,
                        geo_enabled, geo_region, rerank_enabled, rerank_strategy,
                        progress=gr.Progress()):
@@ -787,46 +816,45 @@ class SemanticChangeSearch:
                     return None, None, (
                         f"**Error:** {exc}\n\n*If you just changed Dataset / Encoder / Color mode, "
                         "press **Apply Settings** first. For PEFT, an adapter must exist for the "
-                        "selected encoder + colour mode.*"), [], [], gr.update(visible=False)
+                        "selected encoder + colour mode.*"), [], [], gr.update(visible=False), []
                 if not evs:
                     return None, None, (
                         "*No results for this query. Try a curated example above, or a different "
-                        "**Approach** (patch / zero-shot).*"), [], [], gr.update(visible=False)
+                        "**Approach** (patch / zero-shot).*"), [], [], gr.update(visible=False), []
                 progress(0.9, desc="Rendering results…")
                 top = evs[0]
                 rows = [[e.rank, e.location, e.t1_key, e.t2_key,
                          round(e.score, 4), e.confidence, e.caption,
                          e.seasonal_note] for e in evs]
-                # Gallery: prefer the localization heatmap, fall back to the After
-                # tile when a heatmap could not be generated for that pair.
+                # Gallery shows the events that have a displayable image, in rank
+                # order. `shown` mirrors that exact filter so a gallery click index
+                # maps 1:1 back to the right event for the inspect handler.
+                shown = [e for e in evs if (e.heatmap or e.t2_img) is not None]
                 gallery_items = [
-                    (img, f"#{e.rank} · {e.location} · "
-                          f"{e.t1_key}→{e.t2_key} · match {e.confidence:.2f}")
-                    for e in evs
-                    for img in (e.heatmap or e.t2_img,)
-                    if img is not None
+                    (e.heatmap or e.t2_img,
+                     f"#{e.rank} · {e.location} · {e.t1_key}→{e.t2_key} · "
+                     f"match {e.confidence:.2f}")
+                    for e in shown
                 ]
-                md = (
-                    f"### {top.caption}\n"
-                    f"{_pill(top.confidence)} &nbsp; "
-                    f"**Location** `{top.location}` &nbsp; "
-                    f"**Before → After** `{top.t1_key}` → `{top.t2_key}` &nbsp; "
-                    f"**Score** `{top.score:.4f}`\n\n"
-                    f"_Reasoning:_ {top.seasonal_note}."
-                )
-                # Swipe slider takes a (Before, After) tuple; fall back to no image
-                # if either tile failed to load (a tuple with None breaks the slider).
-                compare = ((top.t1_img, top.t2_img)
-                           if top.t1_img is not None and top.t2_img is not None
-                           else None)
+                before_after, after_heat = _slider_vals(top)
                 csv_path = _results_csv(rows)
                 dl_update = gr.update(value=csv_path, visible=csv_path is not None)
-                return compare, top.heatmap, md, rows, gallery_items, dl_update
+                return (before_after, after_heat, _event_md(top), rows,
+                        gallery_items, dl_update, shown)
 
-            outputs = [cmp, hmi, summary, table, gallery, dl]
+            def inspect(shown, evt: gr.SelectData = None):
+                """Click a gallery tile → load that event into the Top-match view."""
+                if not shown or evt is None or evt.index >= len(shown):
+                    return gr.update(), gr.update(), gr.update()
+                e = shown[evt.index]
+                before_after, after_heat = _slider_vals(e)
+                return before_after, after_heat, _event_md(e)
+
+            outputs = [cmp, hm_cmp, summary, table, gallery, dl, events_state]
             inputs = [q, a_dd, k, geo_chk, geo_dd, rerank_chk, rerank_dd]
             go.click(handle, inputs, outputs)
             q.submit(handle, inputs, outputs)
+            gallery.select(inspect, [events_state], [cmp, hm_cmp, summary])
 
             # Shareable deep links: ?q=<query>&approach=<naive|zero_shot|patch|peft>&k=<1-10>
             # prefill the controls on page load, so a search can be linked/bookmarked.

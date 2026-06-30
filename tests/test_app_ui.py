@@ -49,6 +49,8 @@ def test_interface_constructs(engine):
 
 def test_swipe_and_download_present(engine):
     demo = engine.build_interface()
-    kinds = {type(b).__name__ for b in demo.blocks.values()}
-    assert "ImageSlider" in kinds, "before/after swipe slider missing"
+    kinds = [type(b).__name__ for b in demo.blocks.values()]
+    # Two swipe sliders: Before↔After and After↔heatmap.
+    assert kinds.count("ImageSlider") >= 2, "expected before/after + after/heatmap sliders"
     assert "DownloadButton" in kinds, "CSV download control missing"
+    assert "Gallery" in kinds, "top-K gallery missing"
