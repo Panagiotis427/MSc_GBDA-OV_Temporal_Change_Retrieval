@@ -19,7 +19,9 @@ CLI:
 from __future__ import annotations
 
 import argparse
+import csv
 import os
+import tempfile
 import traceback
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -704,13 +706,22 @@ class SemanticChangeSearch:
             gr.Markdown("## Top match")
             with gr.Group(elem_classes="top-card"):
                 with gr.Row():
-                    t1i = gr.Image(label="Before", height=300, interactive=False)
-                    t2i = gr.Image(label="After", height=300, interactive=False)
-                    hmi = gr.Image(label="Change heatmap (Δ T1→T2)", height=300,
-                                   interactive=False)
+                    with gr.Column(scale=3):
+                        # Before/After as a draggable swipe comparison (the classic
+                        # RS change-detection interaction) instead of two static tiles:
+                        # one wide component reads better and also stacks cleanly on
+                        # narrow / mobile screens. interactive=False = compare only,
+                        # no upload.
+                        cmp = gr.ImageSlider(
+                            label="Before ↔ After — drag the divider to compare",
+                            height=340, interactive=False,
+                        )
+                    with gr.Column(scale=2):
+                        hmi = gr.Image(label="Change heatmap (Δ T1→T2)", height=340,
+                                       interactive=False)
                 gr.Markdown(
-                    "_Jet heatmap over the **After** image: warm = query-change grew, "
-                    "cool = little/none. See About for details._"
+                    "_Drag the divider to swipe **Before ↔ After**. Jet heatmap over the "
+                    "**After** image: warm = query-change grew, cool = little/none. See About._"
                 )
                 summary = gr.Markdown("*Press Search to retrieve.*")
 
@@ -736,6 +747,23 @@ class SemanticChangeSearch:
                     "(see About). Before/After are the two timesteps._"
                 )
 
+            # Export the ranked results so they can be saved / shared / analysed
+            # offline. Hidden until a search produces rows.
+            dl = gr.DownloadButton("Download ranked results (CSV)", visible=False)
+
+            def _results_csv(rows) -> Optional[str]:
+                """Write the ranked rows to a temp CSV; return its path (or None)."""
+                if not rows:
+                    return None
+                fd = tempfile.NamedTemporaryFile(
+                    "w", suffix=".csv", delete=False, newline="", encoding="utf-8")
+                writer = csv.writer(fd)
+                writer.writerow(["rank", "location", "before", "after", "score",
+                                 "match_0_1", "caption", "land_cover_change"])
+                writer.writerows(rows)
+                fd.close()
+                return fd.name
+
             def _pill(c: float) -> str:
                 cls = "low" if c < 0.4 else ("mid" if c < 0.7 else "")
                 return (f"<span class='conf-pill {cls}' title='relative match score "
@@ -756,14 +784,14 @@ class SemanticChangeSearch:
                         rerank_strategy=active_rerank,
                     )
                 except Exception as exc:
-                    return None, None, None, (
+                    return None, None, (
                         f"**Error:** {exc}\n\n*If you just changed Dataset / Encoder / Color mode, "
                         "press **Apply Settings** first. For PEFT, an adapter must exist for the "
-                        "selected encoder + colour mode.*"), [], []
+                        "selected encoder + colour mode.*"), [], [], gr.update(visible=False)
                 if not evs:
-                    return None, None, None, (
+                    return None, None, (
                         "*No results for this query. Try a curated example above, or a different "
-                        "**Approach** (patch / zero-shot).*"), [], []
+                        "**Approach** (patch / zero-shot).*"), [], [], gr.update(visible=False)
                 progress(0.9, desc="Rendering results…")
                 top = evs[0]
                 rows = [[e.rank, e.location, e.t1_key, e.t2_key,
@@ -786,18 +814,40 @@ class SemanticChangeSearch:
                     f"**Score** `{top.score:.4f}`\n\n"
                     f"_Reasoning:_ {top.seasonal_note}."
                 )
-                return top.t1_img, top.t2_img, top.heatmap, md, rows, gallery_items
+                # Swipe slider takes a (Before, After) tuple; fall back to no image
+                # if either tile failed to load (a tuple with None breaks the slider).
+                compare = ((top.t1_img, top.t2_img)
+                           if top.t1_img is not None and top.t2_img is not None
+                           else None)
+                csv_path = _results_csv(rows)
+                dl_update = gr.update(value=csv_path, visible=csv_path is not None)
+                return compare, top.heatmap, md, rows, gallery_items, dl_update
 
-            go.click(
-                handle,
-                [q, a_dd, k, geo_chk, geo_dd, rerank_chk, rerank_dd],
-                [t1i, t2i, hmi, summary, table, gallery],
-            )
-            q.submit(
-                handle,
-                [q, a_dd, k, geo_chk, geo_dd, rerank_chk, rerank_dd],
-                [t1i, t2i, hmi, summary, table, gallery],
-            )
+            outputs = [cmp, hmi, summary, table, gallery, dl]
+            inputs = [q, a_dd, k, geo_chk, geo_dd, rerank_chk, rerank_dd]
+            go.click(handle, inputs, outputs)
+            q.submit(handle, inputs, outputs)
+
+            # Shareable deep links: ?q=<query>&approach=<naive|zero_shot|patch|peft>&k=<1-10>
+            # prefill the controls on page load, so a search can be linked/bookmarked.
+            # Values are validated; anything missing/invalid leaves that control as-is.
+            _APPROACHES = {"naive", "zero_shot", "patch", "peft"}
+
+            def _prefill_from_url(request: gr.Request = None):
+                params = dict(request.query_params or {}) if request is not None else {}
+                q_up = gr.update(value=params["q"]) if params.get("q") else gr.update()
+                a_val = params.get("approach")
+                a_up = gr.update(value=a_val) if a_val in _APPROACHES else gr.update()
+                k_up = gr.update()
+                try:
+                    k_val = int(params.get("k", ""))
+                    if 1 <= k_val <= 10:
+                        k_up = gr.update(value=k_val)
+                except (TypeError, ValueError):
+                    pass
+                return q_up, a_up, k_up
+
+            demo.load(_prefill_from_url, None, [q, a_dd, k])
         return demo
 
 
