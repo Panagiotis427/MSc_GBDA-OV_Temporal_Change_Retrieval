@@ -1615,7 +1615,7 @@ Section~\ref{sec:denmain}: a 5-seed stratified AOI-level hold-out (split on real
 cube id, stratified by dominant change class), reporting mean $\pm$ std across
 seeds. These particular figures were produced by an earlier iteration of this
 project's codebase (the \texttt{cross\_validate.py} pipeline over
-\texttt{train\_v2.py} and \texttt{evaluate\_v2.py}), which is \emph{not} part of the
+\texttt{train\_v2.py} and \texttt{evaluate\_v2.py}), which is not part of the
 committed source; the run is therefore a one-off that cannot be regenerated from the
 current tree. The per-seed fold values are archived verbatim in
 \texttt{results/cv\_eval\_\_clip\_vitl14\_\_rgb\_\_planet3m.json}, and the
@@ -1667,7 +1667,7 @@ indistinguishable top group and remains the reference.
 
 \paragraph{Cross-check under the repository's own benchmark.}
 The table above reports the fitted adapter under a 5-seed stratified AOI hold-out.
-As a second, independent check --- this time \emph{zero-shot} and under the
+As a second, independent check --- this time zero-shot and under the
 disjoint 5-fold AOI \texttt{cv\_eval} harness that produced the JPEG-subset
 headline (dominant-class relevance over the ten DEN queries;
 Section~\ref{sec:denmain}), via the registry-resolved
@@ -1676,7 +1676,7 @@ directly against the preprocessed subset. Both use the same dominant-class
 relevance metric, so the two rows are read as adapter-vs-zero-shot, not
 metric-vs-metric. Table~\ref{tab:native3mcv} reports the head-to-head. Under the
 identical encoder, metric and zero-shot setting the native 3\,m source (macro mAP
-$0.130\pm0.068$) sits \emph{at or above} the JPEG subset ($0.076$; $0.123$ under
+$0.130\pm0.068$) sits at or above the JPEG subset ($0.076$; $0.123$ under
 fraction relevance), despite covering fewer AOIs. The comparison is not fully
 controlled --- the corpora differ in AOI count (23 vs 75) and colour composite
 (native RGB vs JPEG NRG) --- but for this corpus colour barely moves the score
