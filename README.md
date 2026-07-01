@@ -1,14 +1,3 @@
----
-title: Open Vocabulary Temporal Change Retrieval
-emoji: 🛰️
-colorFrom: blue
-colorTo: green
-sdk: gradio
-sdk_version: "6.18.0"
-app_file: app.py
-pinned: false
----
-
 # Open Vocabulary Temporal Change Retrieval (GBDA Lab Project)
 
 > **Results → [Results at a glance](#results-at-a-glance) below; full report → [`report/main.pdf`](report/main.pdf)** (best: GeoRSCLIP+NRG `patch_top3`, CV mAP 0.193 ± 0.051, 4/9 FDR-significant).
