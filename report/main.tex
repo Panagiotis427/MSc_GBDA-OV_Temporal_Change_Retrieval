@@ -1613,7 +1613,16 @@ land-cover classes. The adapter (frozen CLIP ViT-L/14, \texttt{difference} chang
 feature) was scored under the same held-out protocol as
 Section~\ref{sec:denmain}: a 5-seed stratified AOI-level hold-out (split on real
 cube id, stratified by dominant change class), reporting mean $\pm$ std across
-seeds.
+seeds. These particular figures were produced by an earlier iteration of this
+project's codebase (the \texttt{cross\_validate.py} pipeline over
+\texttt{train\_v2.py} and \texttt{evaluate\_v2.py}), which is \emph{not} part of the
+committed source; the run is therefore a one-off that cannot be regenerated from the
+current tree. The per-seed fold values are archived verbatim in
+\texttt{results/cv\_eval\_\_clip\_vitl14\_\_rgb\_\_planet3m.json}, and the
+reproducible native-3m counterpart --- run through this repository's own committed
+\texttt{cv\_eval} harness --- is reported in Table~\ref{tab:native3mcv}. The adapter
+table below is retained for the source-fidelity comparison it supports, read with
+that provenance caveat in mind.
 
 \begin{table}[H]
     \centering
@@ -1622,7 +1631,10 @@ seeds.
     NIR-Red-Green false colour (matching \texttt{nrg} elsewhere). These figures come
     from a one-off run on the full-resolution Planet-Fusion rasters, external to the
     committed \texttt{results/} artifacts (which cover the $\sim$7\,GB JPEG subset);
-    reported here for the source-fidelity comparison only.}
+    its generating pipeline is not committed, so these figures are not reproducible
+    from the tree (per-seed values archived in the run's JSON). Reported for the
+    source-fidelity comparison only; reproducible counterpart in
+    Table~\ref{tab:native3mcv}.}
     \label{tab:nativeraster}
     \begin{tabular}{llc}
         \toprule
