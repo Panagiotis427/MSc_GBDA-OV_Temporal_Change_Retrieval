@@ -4,7 +4,7 @@ emoji: 🛰️
 colorFrom: blue
 colorTo: green
 sdk: gradio
-sdk_version: "6.14.0"
+sdk_version: "6.18.0"
 app_file: app.py
 pinned: false
 ---
@@ -720,7 +720,7 @@ Across seven change types every query clears its prevalence floor — broader re
 
 The heatmap is a weak localiser. Only road change is localised above chance, and only by the RS-pre-trained encoders (RemoteCLIP +0.10, GeoRSCLIP +0.08 pointing-game lift); building change is not localised above its floor by any encoder, and generic CLIP ViT-L *anti-localises* (−0.14 on building). On the SECOND-CC semantic masks the verdict matches — every reliably-sampled class sits within ±0.04 of its random-patch floor (the lone large value, playground +0.30 on GeoRSCLIP, rests on 22 pairs and does not replicate). This is the spatial counterpart of the retrieval result: frozen CLIP-variant embeddings recover change weakly, and localising it — a harder task than retrieving it — is weaker still, with only RS pre-training buying a modest road signal.
 
-**The salience law.** Pooled across the open-vocabulary datasets, the recovered signal tracks change salience: weak on DEN's subtle spectral transitions, dataset-dependent on QFabric, strong on LEVIR-CC's salient building/road change (per-query AP ≈0.6–0.8) yet near-random on its subtle vegetation and sparse water, and above every SECOND-CC prevalence floor but only modestly. This is consistent with the visual-saliency principle that salient regions are recovered preferentially; here it is the single empirical law the project finds in every dataset.
+**The salience law.** Pooled across the open-vocabulary datasets, the recovered signal tracks change salience: weak on DEN's subtle spectral transitions, dataset-dependent on QFabric, strong on LEVIR-CC's salient building/road change (per-query AP ≈0.6–0.8) yet near-random on its subtle vegetation and sparse water, and above every SECOND-CC prevalence floor but only modestly. This echoes — by analogy rather than shared mechanism — the classical visual-saliency observation that salient stimuli dominate perception: here the driver is text–image embedding alignment, not bottom-up attention, yet salience is the single empirical regularity the project finds in every dataset.
 
 ![The salience law, pooled across the open-vocabulary datasets](report/figures/salience_law__summary.png)
 

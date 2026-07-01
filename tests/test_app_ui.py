@@ -98,3 +98,33 @@ def test_results_csv_sanitizes_dataset_name():
     from src.app import results_to_csv
     path = results_to_csv([[1, "x", "a", "b", 0.1, 0.2, "c", "d"]], "weird/name :*?")
     assert Path(path).name == "change_results_weird_name____.csv", Path(path).name
+
+
+def test_displayable_events_top_aligns_with_first_shown():
+    """Top-match must be the first event with a displayable image — never a blank
+    rank-1 whose images failed to load while the grid/View buttons show later
+    ranks (the divergence bug)."""
+    from types import SimpleNamespace
+    from src.app import displayable_events
+    IMG = object()  # truthy stand-in for a PIL image
+
+    def ev(heatmap=None, t2=None):
+        return SimpleNamespace(heatmap=heatmap, t2_img=t2, t1_img=t2)
+
+    a, b = ev(IMG, IMG), ev(IMG, IMG)
+    shown, top = displayable_events([a, b])
+    assert shown == [a, b] and top is a                 # all displayable
+
+    a, b = ev(None, None), ev(IMG, IMG)                 # rank-1 images failed
+    shown, top = displayable_events([a, b])
+    assert shown == [b] and top is b                    # top skips the blank rank-1
+
+    e = ev(None, IMG)                                    # heatmap missing, After present
+    shown, top = displayable_events([e])
+    assert shown == [e] and top is e
+
+    a, b = ev(None, None), ev(None, None)               # nothing displayable
+    shown, top = displayable_events([a, b])
+    assert shown == [] and top is a                      # fall back to evs[0]
+
+    assert displayable_events([]) == ([], None)          # no results

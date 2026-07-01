@@ -43,11 +43,21 @@ _CSV_HEADER = ["rank", "location", "before", "after", "score",
                "match_0_1", "caption", "land_cover_change"]
 
 
-_DL_DIR = None  # lazily-created temp dir for named, downloadable result images
+_EXPORT_DIR = None  # one lazily-created temp dir, reused for all app exports
 
 
 def _safe_name(raw: str) -> str:
     return "".join(c if (c.isalnum() or c in "._-") else "_" for c in str(raw)) or "image"
+
+
+def _export_dir() -> str:
+    """One reused temp dir for every app export (named images + result CSV). With
+    deterministic basenames the files overwrite in place, so the footprint stays
+    bounded across a long-running session instead of leaking a dir per query."""
+    global _EXPORT_DIR
+    if _EXPORT_DIR is None:
+        _EXPORT_DIR = tempfile.mkdtemp(prefix="change_app_")
+    return _EXPORT_DIR
 
 
 def materialize_image(img, raw_name: str) -> Optional[str]:
@@ -60,10 +70,7 @@ def materialize_image(img, raw_name: str) -> Optional[str]:
     """
     if img is None:
         return None
-    global _DL_DIR
-    if _DL_DIR is None:
-        _DL_DIR = tempfile.mkdtemp(prefix="change_dl_")
-    path = os.path.join(_DL_DIR, _safe_name(raw_name) + ".png")
+    path = os.path.join(_export_dir(), _safe_name(raw_name) + ".png")
     img.save(path)
     return path
 
@@ -76,12 +83,27 @@ def results_to_csv(rows, dataset: str) -> Optional[str]:
     if not rows:
         return None
     safe = "".join(c if (c.isalnum() or c in "-_") else "_" for c in dataset) or "results"
-    path = os.path.join(tempfile.mkdtemp(), f"change_results_{safe}.csv")
+    path = os.path.join(_export_dir(), f"change_results_{safe}.csv")
     with open(path, "w", newline="", encoding="utf-8") as fh:
         writer = csv.writer(fh)
         writer.writerow(_CSV_HEADER)
         writer.writerows(rows)
     return path
+
+
+def displayable_events(evs):
+    """Split ranked events for the results view.
+
+    Returns ``(shown, top)`` where ``shown`` is the events that have a displayable
+    image (``heatmap`` or ``t2_img`` — the all-matches tiles + View buttons index
+    these 1:1) and ``top`` is the Top-match event: the first displayable one,
+    falling back to ``evs[0]`` only if none are displayable (``None`` if empty).
+    This keeps the Top-match panel and the first View button pointing at the same
+    event even when a higher-ranked pair's images fail to load.
+    """
+    shown = [e for e in evs if (e.heatmap or e.t2_img) is not None]
+    top = shown[0] if shown else (evs[0] if evs else None)
+    return shown, top
 
 
 def _app_datasets() -> list:
@@ -768,8 +790,8 @@ class SemanticChangeSearch:
 
             # ---- Results ----
             gr.Markdown("## Top match")
-            # Holds the displayed top-K events server-side so clicking a gallery
-            # tile can swap that result into this detailed Top-match view.
+            # Holds the displayed top-K events server-side so a tile's "View"
+            # button can swap that result into this detailed Top-match view.
             events_state = gr.State([])
             with gr.Group(elem_classes="top-card"):
                 with gr.Row():
@@ -920,13 +942,13 @@ class SemanticChangeSearch:
                         *[gr.update(value=None, visible=False) for _ in range(MAX_RESULTS)],
                         *[gr.update(visible=False) for _ in range(MAX_RESULTS)])
                 progress(0.9, desc="Rendering results…")
-                top = evs[0]
                 rows = [[e.rank, e.location, e.t1_key, e.t2_key,
                          round(e.score, 4), e.confidence, e.caption,
                          e.seasonal_note] for e in evs]
-                # Events with a displayable image, in rank order; `shown` indexes the
-                # tiles/buttons 1:1 so a tile's View button maps back to its event.
-                shown = [e for e in evs if (e.heatmap or e.t2_img) is not None]
+                # `shown` = events with a displayable image (the tile grid + View
+                # buttons index these 1:1); `top` = the first displayable one, so the
+                # Top-match panel and View #1 never point at different events.
+                shown, top = displayable_events(evs)
                 tile_ups, btn_ups = [], []
                 for i in range(MAX_RESULTS):
                     if i < len(shown):
