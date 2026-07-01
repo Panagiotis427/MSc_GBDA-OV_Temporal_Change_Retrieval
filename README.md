@@ -194,6 +194,7 @@ in-distribution wins are memorisation; held-out, frozen zero-shot is the stronge
 | `scripts/export_results.py` | regenerate benchmarks from cache → `results/*.json` + `macro_summary.csv` (`--confusion` for error analysis) |
 | `scripts/make_figures.py` | publication PNGs (recall curves, mAP bars, colour heatmap, seasonal drift, cross-split, confusion) from `results/` |
 | `scripts/make_comparison_figure.py` | static zero-shot-vs-PEFT top-K visual comparison per encoder |
+| `scripts/make_qualitative_figure.py` | qualitative salient-vs-subtle retrieval figure — actual top-1 pair per query as [Before \| After \| change heatmap], relevance from the query predicate (honest, non-cherry-picked; heatmap shown as a weak localiser, report §8.5) |
 | `scripts/lora_sweep.py` | LoRA rank/epoch sweep (georsclip+nrg), in-memory, no cache/model clobber |
 | `scripts/significance_audit.py` | random-ranking baseline + permutation p + BH-FDR over every result cell → `results/results_audit_summary.csv` (report §7 protocol, applied across §8) |
 | `scripts/cv_eval.py` | full-corpus + k-fold AOI cross-validation with bootstrap CIs; `--relevance fraction` swaps dominant-class-flip relevance for pixel-fraction (report §8.1); merges cached split embeddings, no re-encode |
@@ -722,6 +723,10 @@ The heatmap is a weak localiser. Only road change is localised above chance, and
 **The salience law.** Pooled across the open-vocabulary datasets, the recovered signal tracks change salience: weak on DEN's subtle spectral transitions, dataset-dependent on QFabric, strong on LEVIR-CC's salient building/road change (per-query AP ≈0.6–0.8) yet near-random on its subtle vegetation and sparse water, and above every SECOND-CC prevalence floor but only modestly. This is consistent with the visual-saliency principle that salient regions are recovered preferentially; here it is the single empirical law the project finds in every dataset.
 
 ![The salience law, pooled across the open-vocabulary datasets](report/figures/salience_law__summary.png)
+
+**The salience law in a single view.** For a salient query (new buildings) and a subtle one (vegetation), the engine's *actual* top-1 retrieved pair — Before, After, and the query-conditioned change heatmap (green border = top-1 satisfies the query's label predicate, red = not). The salient query retrieves a genuine construction event at rank 1; the subtle query's top-1 is a false positive. Consistent with the localisation analysis, the change heatmap is only a weak localiser (shown for transparency), and the absolute Δ-similarity scores (0.11 and 0.05) stay low. Nothing is cherry-picked — regenerates deterministically via `scripts/make_qualitative_figure.py`.
+
+![Qualitative retrieval: salient vs subtle change](report/figures/qualitative_examples__georsclip.png)
 
 ### 9. Resources and operational metrics
 

@@ -1378,6 +1378,26 @@ finds in every dataset.
     \label{fig:saliencelaw}
 \end{figure}
 
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{qualitative_examples__georsclip.png}
+    \caption{The salience law in a single view (LEVIR-CC, GeoRSCLIP, zero-shot).
+    For a salient query (new buildings) and a subtle one (vegetation), the panels
+    show the engine's \emph{actual} top-1 retrieved pair --- Before, After, and the
+    query-conditioned change heatmap --- with a green border when that top-1
+    satisfies the query's label predicate and red otherwise. The salient query
+    retrieves a genuine construction event at rank~1, whereas the subtle query's
+    top-1 is a false positive, mirroring the aggregate per-query AP of
+    Figure~\ref{fig:saliencelaw}. Consistent with the localisation analysis
+    (Table~\ref{tab:localization}), the change heatmap is only a weak localiser and
+    is shown for transparency, not as a localisation result; the absolute
+    $\Delta$-similarity scores (0.11 and 0.05) stay low, as expected under the
+    frozen-VLM ceiling. Nothing is cherry-picked --- the figure regenerates
+    deterministically from cached embeddings via
+    \texttt{scripts/make\_qualitative\_figure.py}.}
+    \label{fig:qualitative}
+\end{figure}
+
 
 \section{Resources and operational metrics}
 \label{sec:resources}
