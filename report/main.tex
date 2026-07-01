@@ -1675,6 +1675,13 @@ benchmark rather than the fitted hold-out above.\footnote{The
 leakage-free $k$-fold PEFT estimate on the native rasters is $0.215\pm0.306$; the
 large variance (one fold at $0.75$, the rest $0.03$--$0.19$, driven by few positives
 per small fold) makes the zero-shot figure the reliable point of comparison.}
+The two native-source adapter estimates also diverge sharply in stability --- the
+external hold-out's tight $0.236\pm0.030$ (Table~\ref{tab:nativeraster}) against the
+leakage-free \texttt{cv\_eval} adapter's $0.215\pm0.306$ --- so the fitted-adapter
+level is not read as a gain over zero-shot: the instability under leakage-free folds
+is exactly the behaviour Section~\ref{sec:memorisation} attributes to adapter
+memorisation on this small labelled corpus, and the source-fidelity reading
+accordingly rests on the stable, reproducible zero-shot rows.
 
 \begin{table}[H]
     \centering
