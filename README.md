@@ -34,6 +34,13 @@ quantitative change localisation.
 
 ![Gradio UI — semantic change search engine](report/figures/app_screenshot.png)
 
+**Screen recordings** (`demos/`, click to play on GitHub) —
+[1](demos/demo_1.mp4) · [2](demos/demo_2.mp4) · [3](demos/demo_3.mp4) the app in default settings
+(LEVIR-CC, GeoRSCLIP, zero-shot) running the built-in example searches;
+[4](demos/demo_4.mp4) a custom free-text query (open-vocabulary);
+[5](demos/demo_5.mp4) switching dataset (LEVIR-CC → Dynamic EarthNet) and scoring approach
+(zero-shot → patch / localised).
+
 *Enter a free-text change query, pick a dataset / encoder / scoring approach, and get
 ranked before→after pairs with a change heatmap on T2.* To (re)generate the screenshot
 locally (it lands in `report/figures/app_screenshot.png`):
