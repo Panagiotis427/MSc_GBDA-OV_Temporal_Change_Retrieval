@@ -28,7 +28,7 @@
 \AtBeginEnvironment{thebibliography}{\sloppy} % standard: loosen line-breaking in the bibliography
 \hypersetup{                       % explicit PDF metadata so hyperref never derives strings from the rich \title
     pdftitle={Open-Vocabulary Temporal Change Retrieval},
-    pdfauthor={Panagiotis Giannikos}
+    pdfauthor={Panagiotis Giannikos and Markos Syroukis}
 }
 
 % Figures live under figures/; the NTUA logo (when added) under images/.
@@ -335,9 +335,11 @@ snapshot is shown in Figure~\ref{fig:app}.
 \begin{figure}[H]
     \centering
     \includegraphics[width=\linewidth]{app_screenshot.png}
-    \caption{The Gradio Semantic Change Search Engine: a text query returns a
-    ranked list of change events, each with the $T_1$/$T_2$ pair, a localisation
-    heatmap, a confidence score, and a seasonal-vs-permanent note.}
+    \caption{The deployed Gradio Semantic Change Search Engine. A free-text query
+    returns a ranked list of change events; the top match is inspected through
+    paired before/after and after/heatmap reveal sliders, and the remaining
+    matches through a thumbnail grid with per-result inspect controls, each result
+    carrying a match score and a seasonal-vs-permanent note.}
     \label{fig:app}
 \end{figure}
 
@@ -1535,6 +1537,15 @@ variance are GPU non-determinism in the encoders and the random partitions of th
 cross-validation; the cross-validation means and standard deviations reported
 throughout quantify the latter, and seeds are fixed for the former.
 
+\paragraph{Code, data, and demonstration availability.}
+The full source, the preprocessed-data download recipe, the trained adapters, and
+the committed benchmark results are available in the public repository at
+\url{https://github.com/Panagiotis427/MSc_GBDA-OV_Temporal_Change_Retrieval}. The
+Gradio search engine is deployed and publicly usable, over a bundled synthetic
+corpus, at
+\url{https://huggingface.co/spaces/panagiotis427/Open_Vocabulary_Temporal_Change_Retrieval};
+short screen-recorded walkthroughs of the interface accompany the repository.
+
 
 \section{Limitations and future work}
 \label{sec:future}
@@ -1723,7 +1734,7 @@ degradation applied to each tile before encoding is varied. The native lossless
 raster is the upper bound; every other row is the identical corpus pushed through a
 lossy round-trip in memory. Relevance labels (from the lossless masks) and the
 text-query vectors are computed once and shared across all rows, so the only thing
-that changes between rows is the image. Two degradation families are swept: JPEG
+that changes between rows is the image. Two degradation families are swept: JPEG~\cite{jpeg}
 quality $q\in\{95,75,50,25,10\}$ (radiometric / compression loss at full
 resolution), and bicubic downsampling to $\{512,256,128,64\}$\,px followed by JPEG
 $q{=}75$ (the resolution loss the preprocessed subset's resize step would
