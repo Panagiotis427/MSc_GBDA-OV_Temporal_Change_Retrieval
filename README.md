@@ -11,7 +11,7 @@ pinned: false
 
 # Open Vocabulary Temporal Change Retrieval (GBDA Lab Project)
 
-> **Results → [Results at a glance](#results-at-a-glance) below; full report → [`report/main.tex`](report/main.tex)** (best: GeoRSCLIP+NRG `patch_top3`, CV mAP 0.193 ± 0.051, 4/9 FDR-significant).
+> **Results → [Results at a glance](#results-at-a-glance) below; full report → [`report/main.pdf`](report/main.pdf)** (best: GeoRSCLIP+NRG `patch_top3`, CV mAP 0.193 ± 0.051, 4/9 FDR-significant).
 
 A *Semantic Change Search Engine*: given a natural-language query
 (e.g. *"new buildings on former agricultural land"*, *"forest cleared to bare
@@ -118,7 +118,7 @@ Three scoring **approaches** (the supervisor-requested comparison):
 | `zero_shot` | cos(t, f_T2) − cos(t, f_T1)  (Δ-similarity) | none |
 | `peft`      | cos(t, g(Δf)), g = trained ProjectionHead   | ~0.5–0.7 M params (adapter only; backbones frozen) |
 
-*Per-encoder results for all three approaches — in-distribution and cross-split — are in the report ([`report/main.tex`](report/main.tex), §8.2).*
+*Per-encoder results for all three approaches — in-distribution and cross-split — are in the report ([`report/main.pdf`](report/main.pdf), §8.2).*
 
 **Key decoupling:** `f_T1, f_T2` are cached per `(dataset, encoder, split, color_mode)` so all
 three approaches and any number of queries reuse the same one-time encode
@@ -133,30 +133,17 @@ derived `PairLabel`s → Recall@K, mAP, plus a seasonal-vs-permanent
 
 ## Results at a glance
 
-Everything below is audited (random-ranking baselines, permutation tests, BH-FDR,
-leakage-free 5-fold leave-AOI-out cross-validation); the full tables, audit trail, and analysis are in the compiled report [`report/main.tex`](report/main.tex).
+Frozen vision-language change retrieval hits a **robust ≈0.20 cross-validated-mAP ceiling** on
+Dynamic EarthNet — best configuration **GeoRSCLIP + NRG with patch-level top-3 Δ-scoring: CV mAP
+0.193 ± 0.051** (4/9 queries FDR-significant), recovery scaling with the visual salience of the
+change. Open-vocabulary breadth holds on LEVIR-CC / SECOND-CC (salient building/urban change
+strong; subtle/sparse change weak); PEFT/LoRA adapters memorise training AOIs with no held-out
+gain over frozen zero-shot; heatmap localisation is a weak signal. All numbers are audited —
+random-ranking baselines, permutation tests, BH-FDR, and leakage-free 5-fold leave-AOI-out
+cross-validation.
 
-| Finding | Number |
-|---|---|
-| Best configuration: GeoRSCLIP + NRG, patch-level top-3 Δ-scoring | **CV mAP 0.193 ± 0.051**, 4/9 queries FDR-significant (buildings, urban, wetland transitions) |
-| Global zero-shot Δ-similarity (same encoder, fraction relevance) | CV mAP 0.139 ± 0.024 (2/9) |
-| The often-quoted single-split 0.426 | a lucky 110-pair fold — CV says 0.100 ± 0.139; never a headline |
-| PEFT / LoRA adapters | memorise training AOIs (train mAP 0.42–0.998); no held-out gain over zero-shot |
-| Seasonal false-positive gate | stable-pair FPR → 0 at threshold ≥ 0.05 |
-| LEVIR-CC (5 open-vocab queries, human captions) | salient construction strong (buildings AP ≈ 0.8, roads ≈ 0.6); subtle/sparse weak (demolition, vegetation, water ≈ 0.15–0.30); 5-query macro ≈ 0.40 |
-| SECOND-CC (7 change types, human captions + semantic masks) | open-vocab breadth: every type clears its prevalence floor but modestly — buildings ≈ 0.70, road/ground/trees ≈ 0.34–0.42, water 0.17; zero-shot macro ≈ 0.33 vs floor 0.30; localization weak (lifts ±0.04) |
-| Change localization (LEVIR-MCI + SECOND-CC masks) | heatmap is a weak localizer — pointing-game lift within ±0.04–0.10 of the random-patch floor; only road on RS-pretrained encoders is clearly positive |
-| Frozen-VLM ceiling on DEN | ≈ 0.20 CV mAP — robust across hybrids, prompt ensembles, attention variants, query-gated routing |
-
-![From the lucky single split to the audited recovery](report/figures/cv_progression.png)
-
-*The honest arc: single-split 0.426 collapses under cross-validation to ≈0.10; fixing the
-relevance rule and scoring locally (patch top-3) recovers 0.193 ± 0.051.*
-
-![Zero-shot vs PEFT, top-K retrievals side by side](report/figures/zeroshot_vs_peft__clip_vitl14__train.png)
-
-*Zero-shot vs PEFT visual comparison (CLIP ViT-L/14, train split): the adapter's
-in-distribution wins are memorisation; held-out, frozen zero-shot is the stronger ranking.*
+**Full results** — per-encoder tables, the honest single-split→CV arc, every ablation, and all
+figures — **are in the deliverable report: [`report/main.pdf`](report/main.pdf).**
 
 ## Module map
 
@@ -201,7 +188,6 @@ in-distribution wins are memorisation; held-out, frozen zero-shot is the stronge
 | `scripts/significance_audit.py` | random-ranking baseline + permutation p + BH-FDR over every result cell → `results/results_audit_summary.csv` (report §7 protocol, applied across §8) |
 | `scripts/cv_eval.py` | full-corpus + k-fold AOI cross-validation with bootstrap CIs; `--relevance fraction` swaps dominant-class-flip relevance for pixel-fraction (report §8.1); merges cached split embeddings, no re-encode |
 | `scripts/patch_eval.py` | patch-level (localised) Δ-similarity change retrieval vs the global baseline (report §8.1, "S3"); caches per-patch embeddings via `encoder.encode_image_patches`. `--approach hybrid` fuses global+patch, `patch_softattn`/`patch_spatial` are training-free change-attention variants, `--prompt-ensemble` averages query templates (all report §8.3) |
-| `.github/workflows/` | CI: `gitleaks.yml` secret-scanning on push/PR |
 
 ## Run / install / use
 
@@ -295,7 +281,7 @@ python -m scripts.run_pipeline --root data/DynamicEarthNet \
 ```
 
 Repeat with `--encoder georsclip` / `remoteclip` for the three-encoder comparison in the report
-([`report/main.tex`](report/main.tex), §8.2). `run_pipeline` is the canonical, cache-consistent flow; the
+([`report/main.pdf`](report/main.pdf), §8.2). `run_pipeline` is the canonical, cache-consistent flow; the
 individual stages (`src.embeddings`, `src.benchmark`, `src.train`, `src.lora_train`) are
 convenience entry points — pass the same `--split` / `--color-mode` to every stage so they
 share the split-tagged embedding cache.
@@ -413,4 +399,10 @@ Download links and citations for the datasets and encoders used.
 
 ## Report
 
-The complete technical account — methodology, the full statistical protocol, every ablation, the native-3m data-source-fidelity check, temporal pinpointing, and per-dataset results — is the compiled report, [`report/main.tex`](report/main.tex). Its headline is a robust ≈0.20 cross-validated-mAP ceiling for frozen vision-language change retrieval (best configuration GeoRSCLIP + NRG with patch-level scoring, 0.193 ± 0.051), with recovery scaling by the visual salience of the change; the [Results at a glance](#results-at-a-glance) table above is the audited in-repo summary.
+The complete technical account — methodology, the full statistical protocol, every ablation, the native-3m data-source-fidelity check, temporal pinpointing, and per-dataset results — is the **compiled deliverable report, [`report/main.pdf`](report/main.pdf)**, tracked in the repo so it reads directly on GitHub with no LaTeX build (LaTeX source: [`report/main.tex`](report/main.tex)). Its headline is a robust ≈0.20 cross-validated-mAP ceiling for frozen vision-language change retrieval (best configuration GeoRSCLIP + NRG with patch-level scoring, 0.193 ± 0.051), with recovery scaling by the visual salience of the change; the [Results at a glance](#results-at-a-glance) summary above is the audited in-repo digest.
+
+*Authors, the full acknowledgements, and the complete reference list are on the report's title page and bibliography.*
+
+## License
+
+The code in this repository is released under the [MIT License](LICENSE). The technical report in `report/` and its figures are the authors' academic work — please cite the report rather than redistribute it.

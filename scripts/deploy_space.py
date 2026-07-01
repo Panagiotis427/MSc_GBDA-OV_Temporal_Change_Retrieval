@@ -31,7 +31,6 @@ ALLOW = [
     "app.py",
     "requirements.txt",
     "README.md",
-    ".gitignore",
     "src/*",             # fnmatch '*' spans '/', so this is recursive
     "tests/fixtures/*",
     "report/figures/*",

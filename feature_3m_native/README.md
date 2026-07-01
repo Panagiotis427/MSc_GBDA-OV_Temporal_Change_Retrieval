@@ -104,11 +104,11 @@ for the paper: the lightweight ~7 GB JPEG subset was the right call — it cost 
 accuracy.
 
 ## Pointers
-- Shared report (LaTeX): `report/main.tex`, appendix `sec:nativeraster` — tables
+- Shared report: [`report/main.pdf`](../report/main.pdf) (source `report/main.tex`), appendix `sec:nativeraster` — tables
   `tab:nativeraster` (adapter, 5-seed stratified AOI hold-out — external one-off, not
   reproducible from the tree) and `tab:native3mcv` (this repository's own reproducible
   dominant-class `cv_eval` benchmark), plus the compression/resolution ablation
   (`tab:jpegablation`, `tab:jpegablationgeors`, `fig:jpegablation`).
-- Temporal pinpointing: `report/main.tex`, appendix `sec:temporalpinpoint`
+- Temporal pinpointing: [`report/main.pdf`](../report/main.pdf), appendix `sec:temporalpinpoint`
   (`tab:temporalpinpoint`, `fig:temporalpinpoint`).
 - Loader / integration: `src/datasets/dynamic_earthnet_planet.py`.
