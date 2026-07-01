@@ -1,0 +1,18 @@
+# Normalize text files to LF in the repository (stops CRLF<->LF churn between
+# Windows and Unix, and the "LF will be replaced by CRLF" warnings on commit).
+* text=auto eol=lf
+
+# Binary assets — never touch line endings.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.pdf  binary
+*.mp4  binary
+*.pt   binary
+*.pth  binary
+*.safetensors binary
+*.npy  binary
+*.npz  binary
+*.parquet binary
+*.zip  binary
