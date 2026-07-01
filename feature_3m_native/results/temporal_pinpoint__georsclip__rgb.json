@@ -1,0 +1,78 @@
+{
+  "dataset": "dynamic_earthnet_planet",
+  "encoder": "georsclip",
+  "color_mode": "rgb",
+  "axis": "temporal pinpointing (rank time-steps within each AOI timeline)",
+  "score": "zero-shot \u0394-similarity per monthly step",
+  "n_aois": 23,
+  "n_steps": 529,
+  "macro_temporal_mAP": 0.1464,
+  "macro_rand_mAP": 0.2078,
+  "macro_peak_hit_rate": 0.0286,
+  "macro_peak_hit_rate_pm1": 0.3771,
+  "n_queries_evaluable": 5,
+  "n_fdr_significant": 0,
+  "per_query": [
+    {
+      "query": "deforestation, forest cleared to bare soil",
+      "category": "permanent",
+      "n_aois": 5,
+      "temporal_mAP": 0.1426,
+      "rand_mAP": 0.1849,
+      "perm_p": 0.6087,
+      "peak_hit_rate": 0.0,
+      "peak_hit_rate_pm1": 0.4,
+      "mean_prevalence": 0.0696,
+      "bh_fdr": 0.992
+    },
+    {
+      "query": "forest loss",
+      "category": "permanent",
+      "n_aois": 5,
+      "temporal_mAP": 0.1422,
+      "rand_mAP": 0.1978,
+      "perm_p": 0.7076,
+      "peak_hit_rate": 0.0,
+      "peak_hit_rate_pm1": 0.2,
+      "mean_prevalence": 0.0783,
+      "bh_fdr": 0.992
+    },
+    {
+      "query": "new water body or flooding",
+      "category": "permanent",
+      "n_aois": 1,
+      "temporal_mAP": 0.0947,
+      "rand_mAP": 0.241,
+      "perm_p": 0.992,
+      "peak_hit_rate": 0.0,
+      "peak_hit_rate_pm1": 1.0,
+      "mean_prevalence": 0.1304,
+      "bh_fdr": 0.992
+    },
+    {
+      "query": "bare soil or land cleared",
+      "category": "permanent",
+      "n_aois": 7,
+      "temporal_mAP": 0.262,
+      "rand_mAP": 0.2138,
+      "perm_p": 0.2114,
+      "peak_hit_rate": 0.1429,
+      "peak_hit_rate_pm1": 0.2857,
+      "mean_prevalence": 0.0994,
+      "bh_fdr": 0.992
+    },
+    {
+      "query": "seasonal snow melting away",
+      "category": "seasonal",
+      "n_aois": 2,
+      "temporal_mAP": 0.0903,
+      "rand_mAP": 0.2013,
+      "perm_p": 0.932,
+      "peak_hit_rate": 0.0,
+      "peak_hit_rate_pm1": 0.0,
+      "mean_prevalence": 0.087,
+      "bh_fdr": 0.992
+    }
+  ],
+  "example_timeline": null
+}

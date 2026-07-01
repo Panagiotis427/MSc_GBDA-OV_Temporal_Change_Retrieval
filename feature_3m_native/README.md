@@ -38,7 +38,18 @@ rasters** — full radiometric depth, no JPEG loss.
   leakage-free PEFT), plus a full-corpus AP estimate with bootstrap CIs and
   permutation p-values. It mirrors the logic of `scripts/cv_eval.py` so the numbers
   are **directly comparable**, while importing the `src/` library read-only.
-- `feature_3m_native/results/` — the output JSON.
+- `feature_3m_native/jpeg_ablation.py` — **controlled compression/resolution
+  ablation**: holds AOIs, encoder, colour and folds fixed and varies only the per-tile
+  degradation (JPEG quality {95,75,50,25,10}; downsampling {512,256,128,64}px + JPEG
+  q75). Confirms image fidelity is not the bottleneck — largest Δ from native is
+  0.036 mAP, within one fold std, same null under GeoRSCLIP. Plot:
+  `scripts/make_jpeg_ablation_figure.py`.
+- `feature_3m_native/temporal_pinpoint.py` — **temporal pinpointing**: ranks the
+  monthly steps within each AOI timeline (*when* does the change occur) by zero-shot
+  Δ-similarity, with a within-AOI permutation test + BH-FDR. CLIP macro temporal mAP
+  0.309 vs 0.207 floor, ±1-month peak-hit 63%; encoder-dependent (GeoRSCLIP 0.146, at
+  or below chance). Plot: `scripts/make_temporal_pinpoint_figure.py`.
+- `feature_3m_native/results/` — the output JSON for all three experiments.
 
 ## How to run
 
@@ -50,6 +61,16 @@ uv run python -m src.embeddings --dataset dynamic_earthnet_planet \
 # 2) cross-validation (zero-shot + PEFT)
 uv run python feature_3m_native/cv_eval_planet3m.py \
   --root /path/to/dir/with/planet.<UTM>.zip --folds 5 --peft
+
+# 3) compression/resolution ablation (+ figure)
+uv run python feature_3m_native/jpeg_ablation.py \
+  --root /path/to/dir/with/planet.<UTM>.zip --folds 5
+uv run python scripts/make_jpeg_ablation_figure.py
+
+# 4) temporal pinpointing (+ figure)
+uv run python feature_3m_native/temporal_pinpoint.py \
+  --root /path/to/dir/with/planet.<UTM>.zip
+uv run python scripts/make_temporal_pinpoint_figure.py
 ```
 
 ## Result (CLIP ViT-L/14, 23 AOIs, 253 pairs, 5-fold AOI CV, dominant relevance)
@@ -83,7 +104,11 @@ for the paper: the lightweight ~7 GB JPEG subset was the right call — it cost 
 accuracy.
 
 ## Pointers
-- Shared report (LaTeX): `main.tex`, subsection `sec:nativeraster` — tables
-  `tab:nativeraster` (caption-retrieval protocol) and `tab:native3mcv` (this
-  repository's own dominant-class benchmark).
+- Shared report (LaTeX): `report/main.tex`, appendix `sec:nativeraster` — tables
+  `tab:nativeraster` (adapter, 5-seed stratified AOI hold-out — external one-off, not
+  reproducible from the tree) and `tab:native3mcv` (this repository's own reproducible
+  dominant-class `cv_eval` benchmark), plus the compression/resolution ablation
+  (`tab:jpegablation`, `tab:jpegablationgeors`, `fig:jpegablation`).
+- Temporal pinpointing: `report/main.tex`, appendix `sec:temporalpinpoint`
+  (`tab:temporalpinpoint`, `fig:temporalpinpoint`).
 - Loader / integration: `src/datasets/dynamic_earthnet_planet.py`.

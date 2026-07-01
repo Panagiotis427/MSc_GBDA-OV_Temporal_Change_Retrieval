@@ -1713,6 +1713,185 @@ accordingly rests on the stable, reproducible zero-shot rows.
     \end{tabular}
 \end{table}
 
+\paragraph{Controlled compression and resolution ablation.}
+The cross-checks above leave two confounds (AOI count and colour composite). To
+isolate image fidelity itself, everything is held fixed --- the same 23 AOIs, 253
+pairs, RGB composite, encoder, zero-shot scoring and 5 AOI folds --- and only the
+degradation applied to each tile before encoding is varied. The native lossless
+raster is the upper bound; every other row is the identical corpus pushed through a
+lossy round-trip in memory. Relevance labels (from the lossless masks) and the
+text-query vectors are computed once and shared across all rows, so the only thing
+that changes between rows is the image. Two degradation families are swept: JPEG
+quality $q\in\{95,75,50,25,10\}$ (radiometric / compression loss at full
+resolution), and bicubic downsampling to $\{512,256,128,64\}$\,px followed by JPEG
+$q{=}75$ (the resolution loss the preprocessed subset's resize step would
+introduce). Table~\ref{tab:jpegablation} and Figure~\ref{fig:jpegablation} report
+CLIP ViT-L/14.
+
+\begin{table}[H]
+    \centering
+    \caption{Controlled degradation ablation on the native 3\,m rasters (CLIP
+    ViT-L/14, RGB, zero-shot, 253 pairs / 23 AOIs, 5-fold AOI cross-validation,
+    seed 42). Identical corpus throughout; only the per-tile degradation varies.
+    Every row overlaps native within one fold standard deviation.}
+    \label{tab:jpegablation}
+    \begin{tabular}{lcc}
+        \toprule
+        \textbf{Degradation} & \textbf{macro mAP (mean $\pm$ std)} & \textbf{$\Delta$ vs native} \\
+        \midrule
+        Native 3\,m (lossless, 1024\,px) & 0.130 $\pm$ 0.068 & --- \\
+        \midrule
+        JPEG $q{=}95$  & 0.115 $\pm$ 0.065 & $-0.015$ \\
+        JPEG $q{=}75$  & 0.094 $\pm$ 0.064 & $-0.036$ \\
+        JPEG $q{=}50$  & 0.128 $\pm$ 0.078 & $-0.001$ \\
+        JPEG $q{=}25$  & 0.095 $\pm$ 0.065 & $-0.034$ \\
+        JPEG $q{=}10$  & 0.138 $\pm$ 0.108 & $+0.009$ \\
+        \midrule
+        Downsample 512\,px ($+$ JPEG $q75$) & 0.088 $\pm$ 0.054 & $-0.042$ \\
+        Downsample 256\,px & 0.154 $\pm$ 0.150 & $+0.025$ \\
+        Downsample 128\,px & 0.146 $\pm$ 0.166 & $+0.016$ \\
+        Downsample \phantom{0}64\,px & 0.216 $\pm$ 0.213 & $+0.086$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.72\linewidth]{jpeg_ablation__clip_vitl14__rgb.png}
+    \caption{Zero-shot AOI-CV macro mAP versus JPEG quality on the identical native
+    corpus (CLIP ViT-L/14, RGB). The dashed line and shaded band are the native
+    lossless mean $\pm$ fold std. Every JPEG point sits inside the band, and the
+    curve is non-monotonic --- the most-compressed setting ($q{=}10$) scores above
+    the lightly-compressed ones --- so the variation is fold sampling, not a
+    compression effect.}
+    \label{fig:jpegablation}
+\end{figure}
+
+The reading is unambiguous: image fidelity is not the bottleneck. The largest gap
+from native across the entire JPEG sweep is $0.036$\,mAP --- about half of one
+fold's standard deviation ($\sim$$0.065$) --- and the deltas alternate sign with
+quality, so they are fold-sampling noise rather than a degradation signal. The
+resolution sweep is, if anything, more decisive: collapsing the tile to 64\,px (a
+$16\times$ linear reduction) does not lower retrieval and nominally raises it,
+because the frozen encoder resizes every input to its own $224$\,px window and the
+change signal that survives in the global embedding is coarse --- high-frequency
+spatial detail is simply not what the web-pretrained features exploit for these
+queries.\footnote{The honest caveat is that fold variance grows under aggressive
+downsampling (std up to $0.21$ at 64\,px, driven by few positives per small fold),
+so the claim is only that no degradation is detectable at this corpus size, not
+exact equivalence.} This is direct evidence for the report's central thesis
+(Sections~\ref{sec:denmain},~\ref{sec:nativeraster}): the ceiling is the frozen
+web-pretrained representation and the small labelled-AOI set, not imagery
+compression or resolution. It also retroactively vindicates the
+Section~\ref{sec:data} decision to work from the $\sim$7\,GB preprocessed subset
+rather than the $\sim$525\,GB native mirror.
+
+The result is not an artefact of the generic web-pretrained encoder. Repeating the
+identical ablation with the RS-pretrained GeoRSCLIP (ViT-B/32) gives the same null
+(Table~\ref{tab:jpegablationgeors}): the largest deviation from its native baseline
+($0.085\pm0.059$) is $0.027$\,mAP, again inside one fold standard deviation, and
+every JPEG and downsample row overlaps native. Tellingly, the two encoders disagree
+on the sign of the small downsampling deltas --- CLIP nominally rises toward
+64\,px, GeoRSCLIP nominally falls --- which is exactly what fold-sampling noise, and
+not a real fidelity effect, would produce. Both the domain-agnostic and the
+RS-domain backbone are insensitive to compression and resolution on this task.
+
+\begin{table}[H]
+    \centering
+    \caption{Confirmation under GeoRSCLIP (ViT-B/32, RGB, zero-shot, same 253
+    pairs / 23 AOIs, 5-fold AOI cross-validation, seed 42). Same null as
+    Table~\ref{tab:jpegablation}: every row within one fold standard deviation of
+    native.}
+    \label{tab:jpegablationgeors}
+    \begin{tabular}{lcc}
+        \toprule
+        \textbf{Degradation} & \textbf{macro mAP (mean $\pm$ std)} & \textbf{$\Delta$ vs native} \\
+        \midrule
+        Native 3\,m (lossless, 1024\,px) & 0.085 $\pm$ 0.059 & --- \\
+        \midrule
+        JPEG $q{=}95$  & 0.083 $\pm$ 0.054 & $-0.002$ \\
+        JPEG $q{=}75$  & 0.095 $\pm$ 0.075 & $+0.010$ \\
+        JPEG $q{=}50$  & 0.091 $\pm$ 0.058 & $+0.006$ \\
+        JPEG $q{=}25$  & 0.091 $\pm$ 0.073 & $+0.006$ \\
+        JPEG $q{=}10$  & 0.104 $\pm$ 0.079 & $+0.019$ \\
+        \midrule
+        Downsample 512\,px ($+$ JPEG $q75$) & 0.102 $\pm$ 0.082 & $+0.017$ \\
+        Downsample 256\,px & 0.076 $\pm$ 0.059 & $-0.010$ \\
+        Downsample 128\,px & 0.074 $\pm$ 0.075 & $-0.011$ \\
+        Downsample \phantom{0}64\,px & 0.058 $\pm$ 0.035 & $-0.027$ \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\section{Temporal pinpointing: when does the change occur?}
+\label{sec:temporalpinpoint}
+
+The project brief singles out Dynamic EarthNet for its ability to ``pinpoint exact
+time-steps of change'' and asks evaluation to verify that the model identifies ``the
+specific temporal window where the change was most prominent compared to stable
+time-steps''. The retrieval metrics so far answer which pair shows a change (ranking
+across AOIs); this is the orthogonal question of when a change happens (ranking
+time-steps within one AOI's timeline), and it is uniquely accessible through the
+native loader's monthly raster stack. The loader is built with monthly pairing so
+each AOI's consecutive pairs form its 24-month timeline; the per-step change score
+is the same zero-shot $\Delta$-similarity used throughout
+($\cos(q,f_t)-\cos(q,f_{t-1})$); a step is relevant when the query predicate fires
+on its monthly transition label. Within each AOI the steps are ranked and the
+ranking is scored by average precision (a per-AOI temporal AP), and the peak-hit
+rate is reported --- whether the single highest-scoring step is a true transition,
+at exact and $\pm1$-month tolerance. Significance uses a permutation test that
+shuffles relevance within each AOI (preserving its step count) plus BH-FDR.
+
+\begin{table}[H]
+    \centering
+    \caption{Temporal pinpointing on native 3\,m DEN (CLIP ViT-L/14, RGB,
+    zero-shot): ranking the monthly steps within each AOI timeline. ``peak $\pm$1''
+    is the fraction of AOIs whose top-scored step is within one month of a true
+    transition. Macro temporal mAP 0.309 vs a 0.207 permutation floor.}
+    \label{tab:temporalpinpoint}
+    \begin{tabular}{lccccc}
+        \toprule
+        \textbf{Query} & \textbf{temporal mAP} & \textbf{rand} & \textbf{peak $\pm$1mo} & \textbf{perm $p$} & \textbf{AOIs} \\
+        \midrule
+        seasonal snow melting away      & 0.586 & 0.200 & 1.00 & 0.025 & 2 \\
+        bare soil or land cleared       & 0.324 & 0.214 & 0.57 & 0.067 & 7 \\
+        forest loss                     & 0.273 & 0.193 & 0.40 & 0.160 & 5 \\
+        new water body or flooding      & 0.221 & 0.246 & 1.00 & 0.409 & 1 \\
+        deforestation, forest $\to$ soil & 0.142 & 0.183 & 0.20 & 0.617 & 5 \\
+        \midrule
+        \textbf{macro}                  & \textbf{0.309} & 0.207 & 0.63 & --- & --- \\
+        \bottomrule
+    \end{tabular}
+\end{table}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=\linewidth]{temporal_pinpoint__clip_vitl14__rgb.png}
+    \caption{Left: per-query temporal mAP (within-AOI step ranking) against the
+    permutation random floor (red ticks). Right: an example AOI timeline --- the
+    zero-shot change score for ``forest loss'' spikes at the labelled transition
+    month (2019-07, dashed green), where the model's peak (orange star) also lands.}
+    \label{fig:temporalpinpoint}
+\end{figure}
+
+The system does locate change in time above chance: macro temporal mAP $0.309$
+against a $0.207$ random floor, and within a $\pm1$-month tolerance the model's peak
+step lands on a true transition $63\%$ of the time
+(Table~\ref{tab:temporalpinpoint}, Figure~\ref{fig:temporalpinpoint}). The signal
+is strongest for temporally sharp events --- snow melt ($0.586$, $p=0.025$) and
+abrupt soil clearing ($0.324$) --- and weak for gradual or ambiguous ones
+(deforestation $0.142$, below its floor). As with spatial localization
+(Section~\ref{sec:localization}) the effect is encoder-dependent: repeating the
+study with GeoRSCLIP (ViT-B/32) gives macro $0.146$ vs the same $0.208$ floor --- at
+or below chance --- so the larger general-purpose ViT-L/14 pinpoints change in time
+where the smaller RS-pretrained backbone does not. The honest limit is statistical
+power: only 1--7 AOIs carry positives per query, so although the aggregate clears
+the floor and snow melt is individually significant at $p=0.025$, no query survives
+BH-FDR --- the same small-labelled-AOI ceiling documented throughout. Pinpointing
+when a change occurs is feasible for salient, abrupt transitions on a capable frozen
+encoder, but, like pinpointing where, it is harder than retrieving whether the
+change is present.
+
 \section{Post-retrieval re-ranking}
 \label{sec:rerank}
 

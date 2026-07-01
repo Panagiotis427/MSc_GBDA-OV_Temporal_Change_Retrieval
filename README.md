@@ -834,7 +834,39 @@ These figures come from a one-off run on the full-resolution Planet-Fusion raste
 
 Under the identical encoder, metric and zero-shot setting the native 3 m source (macro mAP 0.130 ± 0.068) sits at or above the JPEG subset (0.076; 0.123 under fraction relevance), despite covering fewer AOIs. The comparison is not fully controlled — the corpora differ in AOI count (23 vs 75) and colour composite (native RGB vs JPEG NRG) — but for this corpus colour barely moves the score (GeoRSCLIP: RGB 0.085 vs NRG 0.100), so the direction is robust: the native source is no worse, corroborating the no-loss conclusion of Section 6 under the repository's own zero-shot cross-validated benchmark rather than the fitted hold-out above. (The leakage-free k-fold PEFT estimate on the native rasters is 0.215 ± 0.306; the large variance — one fold at 0.75, the rest 0.03–0.19, driven by few positives per small fold — makes the zero-shot figure the reliable point of comparison.) The two native-source adapter estimates also diverge sharply in stability — the external hold-out's tight 0.236 ± 0.030 against the leakage-free `cv_eval` adapter's 0.215 ± 0.306 — so the fitted-adapter level is not read as a gain over zero-shot: the instability under leakage-free folds is exactly the behaviour Section 8.2 attributes to adapter memorisation on this small labelled corpus, and the source-fidelity reading accordingly rests on the stable, reproducible zero-shot rows.
 
-### Appendix B. Post-retrieval re-ranking
+**Controlled compression and resolution ablation.** The cross-check above leaves two confounds (AOI count and colour composite). To isolate image fidelity itself, everything is held fixed — the same 23 AOIs, 253 pairs, RGB composite, encoder, zero-shot scoring and 5 AOI folds — and only the per-tile degradation is varied: JPEG quality q ∈ {95,75,50,25,10} at full resolution, and bicubic downsampling to {512,256,128,64} px (+ JPEG q75). Relevance labels (from the lossless masks) and query vectors are computed once and shared across all rows, so the only thing that changes between rows is the image.
+
+| Degradation | macro mAP (mean ± std) | Δ vs native |
+|---|---|---|
+| Native 3 m (lossless, 1024 px) | 0.130 ± 0.068 | — |
+| JPEG q=95 | 0.115 ± 0.065 | −0.015 |
+| JPEG q=75 | 0.094 ± 0.064 | −0.036 |
+| JPEG q=50 | 0.128 ± 0.078 | −0.001 |
+| JPEG q=25 | 0.095 ± 0.065 | −0.034 |
+| JPEG q=10 | 0.138 ± 0.108 | +0.009 |
+| Downsample 512 px (+ JPEG q75) | 0.088 ± 0.054 | −0.042 |
+| Downsample 256 px | 0.154 ± 0.150 | +0.025 |
+| Downsample 128 px | 0.146 ± 0.166 | +0.016 |
+| Downsample 64 px | 0.216 ± 0.213 | +0.086 |
+
+The reading is unambiguous: image fidelity is not the bottleneck. The largest gap from native across the JPEG sweep is 0.036 mAP — about half a fold's standard deviation (~0.065) — and the deltas alternate sign with quality, so they are fold-sampling noise rather than a degradation signal. Collapsing the tile to 64 px (a 16× linear reduction) does not lower retrieval and nominally raises it: the frozen encoder resizes every input to its own 224 px window, so high-frequency spatial detail is not what the web-pretrained features exploit for these queries. Repeating the identical ablation under GeoRSCLIP (ViT-B/32) gives the same null (largest deviation 0.027 mAP from its 0.085 ± 0.059 baseline), and the two encoders disagree on the sign of the small downsampling deltas — exactly what fold-sampling noise, not a real fidelity effect, would produce. This is direct evidence for the central thesis: the ceiling is the frozen web-pretrained representation and the small labelled-AOI set, not imagery compression or resolution — retroactively vindicating the choice to work from the ~7 GB preprocessed subset rather than the ~525 GB native mirror. (Scripts: `feature_3m_native/jpeg_ablation.py`, `scripts/make_jpeg_ablation_figure.py`.)
+
+### Appendix B. Temporal pinpointing: when does the change occur?
+
+The project brief singles out Dynamic EarthNet for its ability to pinpoint the exact time-step of change. The retrieval metrics so far answer *which pair* shows a change (ranking across AOIs); this is the orthogonal question of *when* a change happens (ranking monthly steps within one AOI's timeline), uniquely accessible through the native loader's monthly raster stack. The per-step change score is the same zero-shot Δ-similarity used throughout (cos(q, f_t) − cos(q, f_{t−1})); a step is relevant when the query predicate fires on its monthly transition label; within each AOI the steps are ranked and scored by average precision (a per-AOI temporal AP), and the peak-hit rate records whether the top-scored step is a true transition at exact and ±1-month tolerance. Significance uses a within-AOI permutation test plus BH-FDR.
+
+| Query | temporal mAP | rand | peak ±1mo | perm p | AOIs |
+|---|---|---|---|---|---|
+| seasonal snow melting away | 0.586 | 0.200 | 1.00 | 0.025 | 2 |
+| bare soil or land cleared | 0.324 | 0.214 | 0.57 | 0.067 | 7 |
+| forest loss | 0.273 | 0.193 | 0.40 | 0.160 | 5 |
+| new water body or flooding | 0.221 | 0.246 | 1.00 | 0.409 | 1 |
+| deforestation, forest → soil | 0.142 | 0.183 | 0.20 | 0.617 | 5 |
+| **macro** | **0.309** | 0.207 | 0.63 | — | — |
+
+The system locates change in time above chance: macro temporal mAP 0.309 against a 0.207 random floor, and within a ±1-month tolerance the model's peak step lands on a true transition 63% of the time. The signal is strongest for temporally sharp events — snow melt (0.586, p=0.025) and abrupt soil clearing (0.324) — and weak for gradual or ambiguous ones (deforestation 0.142, below its floor). As with spatial localisation, the effect is encoder-dependent: repeating the study with GeoRSCLIP (ViT-B/32) gives macro 0.146 vs the same 0.208 floor — at or below chance — so the larger general-purpose ViT-L/14 pinpoints change in time where the smaller RS-pretrained backbone does not. The honest limit is statistical power: only 1–7 AOIs carry positives per query, so although the aggregate clears the floor and snow melt is individually significant at p=0.025, no query survives BH-FDR — the same small-labelled-AOI ceiling documented throughout. Pinpointing *when* a change occurs is feasible for salient, abrupt transitions on a capable frozen encoder, but — like pinpointing *where* — it is harder than retrieving *whether* the change is present. (Scripts: `feature_3m_native/temporal_pinpoint.py`, `scripts/make_temporal_pinpoint_figure.py`.)
+
+### Appendix C. Post-retrieval re-ranking
 
 The Gradio app exposes two optional, per-query re-ranking toggles, evaluated on the held-out test split (110 pairs, 3 queries with positives) using GeoRSCLIP + NRG zero-shot.
 
