@@ -250,6 +250,9 @@ class SemanticChangeSearch:
         .dl-heat,   .dl-heat button   {background:#e0822e !important; border-color:#b5641a !important; color:#fff !important;}
         /* All-matches grid: each "View" button spans its tile's width. */
         .view-btn, .view-btn button {width:100% !important; font-weight:600 !important;}
+        /* Tiles are display-only — the View button below is the click target, so
+           don't imply the image itself is clickable. */
+        .match-tile, .match-tile * {cursor: default !important;}
         """
 
     def __init__(self, cfg: RunConfig):
@@ -817,7 +820,7 @@ class SemanticChangeSearch:
             # clipped tiles behind an internal scrollbar and whose click was bound
             # to a hard-to-exit enlarge preview. MAX_RESULTS components are built up
             # front (== Top-K slider max) and shown/hidden per query.
-            gr.Markdown("## All matches — click a tile's **View** button to inspect it above")
+            gr.Markdown("## All matches")
             MAX_RESULTS = 10  # == Top-K slider maximum
             tiles, view_btns = [], []
             with gr.Column(elem_classes="matches-grid"):
@@ -827,7 +830,8 @@ class SemanticChangeSearch:
                             with gr.Column(min_width=140):
                                 tiles.append(gr.Image(
                                     visible=False, interactive=False, height=220,
-                                    show_label=False, format="png", buttons=[]))
+                                    show_label=False, format="png", buttons=[],
+                                    elem_classes="match-tile"))
                                 view_btns.append(gr.Button(
                                     "View", visible=False, size="sm",
                                     elem_classes="view-btn"))
