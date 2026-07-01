@@ -1,0 +1,123 @@
+{
+  "approach": "peft",
+  "color_mode": "rgb",
+  "dataset": "dynamic_earthnet_planet",
+  "encoder": "clip_vitl14",
+  "k_values": [
+    1,
+    3,
+    5,
+    10
+  ],
+  "lora": false,
+  "macro": {
+    "mAP": 0.5705815811172954,
+    "recall_at_k": {
+      "1": 0.12857142857142856,
+      "10": 0.9428571428571428,
+      "3": 0.36190476190476184,
+      "5": 0.5071428571428571
+    },
+    "seasonal_drift_at_k": {
+      "1": 0.25,
+      "10": 0.25,
+      "3": 0.16666666666666666,
+      "5": 0.2708333333333333
+    }
+  },
+  "n_pairs": 143,
+  "per_query": [
+    {
+      "ap": 0.6388888888888888,
+      "category": "permanent",
+      "n_relevant": 3,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 1.0,
+        "3": 0.6666666666666666,
+        "5": 1.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "deforestation, forest cleared to bare soil"
+    },
+    {
+      "ap": 0.33819444444444446,
+      "category": "permanent",
+      "n_relevant": 4,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 1.0,
+        "3": 0.0,
+        "5": 0.25
+      },
+      "seasonal_drift_at_k": {
+        "1": 1.0,
+        "10": 0.5,
+        "3": 0.6666666666666666,
+        "5": 0.75
+      },
+      "text": "forest loss"
+    },
+    {
+      "ap": 1.0,
+      "category": "permanent",
+      "n_relevant": 2,
+      "recall_at_k": {
+        "1": 0.5,
+        "10": 1.0,
+        "3": 1.0,
+        "5": 1.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.5,
+        "3": 0.0,
+        "5": 0.3333333333333333
+      },
+      "text": "new water body or flooding"
+    },
+    {
+      "ap": 0.6000309214594929,
+      "category": "permanent",
+      "n_relevant": 7,
+      "recall_at_k": {
+        "1": 0.14285714285714285,
+        "10": 0.7142857142857143,
+        "3": 0.14285714285714285,
+        "5": 0.2857142857142857
+      },
+      "seasonal_drift_at_k": {
+        "1": 0.0,
+        "10": 0.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "text": "bare soil or land cleared"
+    },
+    {
+      "ap": 0.27579365079365076,
+      "category": "seasonal",
+      "n_relevant": 3,
+      "recall_at_k": {
+        "1": 0.0,
+        "10": 1.0,
+        "3": 0.0,
+        "5": 0.0
+      },
+      "seasonal_drift_at_k": {
+        "1": 1.0,
+        "10": 0.42857142857142855,
+        "3": 1.0,
+        "5": 0.6
+      },
+      "text": "seasonal snow melting away"
+    }
+  ],
+  "schema_version": 1,
+  "split": "train"
+}

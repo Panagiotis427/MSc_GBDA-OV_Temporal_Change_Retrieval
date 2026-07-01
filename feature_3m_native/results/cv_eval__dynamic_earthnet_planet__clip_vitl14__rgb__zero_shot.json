@@ -1,0 +1,154 @@
+{
+  "dataset": "dynamic_earthnet_planet",
+  "encoder": "clip_vitl14",
+  "color_mode": "rgb",
+  "approach": "zero_shot",
+  "relevance": "dominant",
+  "frac_thresh": 0.05,
+  "prompt_ensemble": false,
+  "n_evaluable_queries": 5,
+  "n_pairs": 253,
+  "n_aois": 23,
+  "folds": 5,
+  "full_corpus": {
+    "macro_mAP": 0.0412,
+    "per_query": [
+      {
+        "query": "deforestation, forest cleared to bare soil",
+        "n_relevant": 5,
+        "ap": 0.0186,
+        "ci95": [
+          0.0056,
+          0.0383
+        ],
+        "rand_ap": 0.0407,
+        "perm_p": 0.8553,
+        "bh_fdr": 0.946
+      },
+      {
+        "query": "forest loss",
+        "n_relevant": 6,
+        "ap": 0.0194,
+        "ci95": [
+          0.0076,
+          0.0351
+        ],
+        "rand_ap": 0.0438,
+        "perm_p": 0.946,
+        "bh_fdr": 0.946
+      },
+      {
+        "query": "new water body or flooding",
+        "n_relevant": 2,
+        "ap": 0.0745,
+        "ci95": [
+          0.0,
+          0.2758
+        ],
+        "rand_ap": 0.0265,
+        "perm_p": 0.0552,
+        "bh_fdr": 0.276
+      },
+      {
+        "query": "bare soil or land cleared",
+        "n_relevant": 10,
+        "ap": 0.0633,
+        "ci95": [
+          0.0217,
+          0.1758
+        ],
+        "rand_ap": 0.0584,
+        "perm_p": 0.2629,
+        "bh_fdr": 0.547
+      },
+      {
+        "query": "seasonal snow melting away",
+        "n_relevant": 4,
+        "ap": 0.0303,
+        "ci95": [
+          0.0055,
+          0.0901
+        ],
+        "rand_ap": 0.0361,
+        "perm_p": 0.3282,
+        "bh_fdr": 0.547
+      }
+    ]
+  },
+  "kfold_zero_shot": {
+    "macro_mAP_mean": 0.1296,
+    "macro_mAP_std": 0.0684,
+    "fold_macro": [
+      0.1592,
+      0.2,
+      0.0462,
+      0.175,
+      0.0675
+    ],
+    "per_query": {
+      "deforestation, forest cleared to bare soil": {
+        "mean": 0.0515,
+        "std": 0.0125,
+        "n_folds": 3
+      },
+      "forest loss": {
+        "mean": 0.0459,
+        "std": 0.009,
+        "n_folds": 3
+      },
+      "new water body or flooding": {
+        "mean": 0.125,
+        "std": 0.1061,
+        "n_folds": 2
+      },
+      "bare soil or land cleared": {
+        "mean": 0.2086,
+        "std": 0.241,
+        "n_folds": 4
+      },
+      "seasonal snow melting away": {
+        "mean": 0.1552,
+        "std": 0.1341,
+        "n_folds": 2
+      }
+    }
+  },
+  "kfold_peft": {
+    "macro_mAP_mean": 0.2147,
+    "macro_mAP_std": 0.3062,
+    "fold_macro": [
+      0.0625,
+      0.0286,
+      0.0411,
+      0.75,
+      0.1913
+    ],
+    "per_query": {
+      "deforestation, forest cleared to bare soil": {
+        "mean": 0.0578,
+        "std": 0.0247,
+        "n_folds": 3
+      },
+      "forest loss": {
+        "mean": 0.0732,
+        "std": 0.0432,
+        "n_folds": 3
+      },
+      "new water body or flooding": {
+        "mean": 0.056,
+        "std": 0.0387,
+        "n_folds": 2
+      },
+      "bare soil or land cleared": {
+        "mean": 0.3664,
+        "std": 0.4478,
+        "n_folds": 4
+      },
+      "seasonal snow melting away": {
+        "mean": 0.2838,
+        "std": 0.3058,
+        "n_folds": 2
+      }
+    }
+  }
+}

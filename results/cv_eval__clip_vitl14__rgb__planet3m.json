@@ -1,0 +1,58 @@
+{
+  "dataset": "dynamic_earthnet",
+  "source": "native_tum_pf_sr_3m",
+  "source_note": "Full-resolution Planet-Fusion surface-reflectance rasters (1024x1024x4 int16, B/G/R/NIR, 3 m) read in-memory from per-zone planet.<UTM>.zip; the ~525 GB raw TUM mirror excluded in sec:data, cherry-picked via rsync include/exclude.",
+  "encoder": "clip_vitl14",
+  "approach": "adapter",
+  "feature_mode": "difference",
+  "relevance": "dominant",
+  "n_pairs": 552,
+  "n_aois": 23,
+  "n_classes_present": 7,
+  "folds": 5,
+  "seeds": [0, 1, 2, 3, 4],
+  "cv_protocol": "5-seed stratified AOI-level hold-out (split on real cube id to prevent leakage, stratified by dominant change class)",
+  "provenance": "src/cross_validate.py over src/train_v2.py + src/evaluate_v2.py (GBDA26_project_11). fold_macro holds the per-seed test mAP from a fresh re-run; mean/std/min/max are computed from those values.",
+  "headline": {
+    "config": "adapter_rgb",
+    "color_mode": "rgb",
+    "macro_mAP_mean": 0.2364,
+    "macro_mAP_std": 0.0301,
+    "macro_mAP_min": 0.2022,
+    "macro_mAP_max": 0.2789,
+    "fold_macro": [0.2337, 0.2789, 0.2061, 0.2022, 0.2612]
+  },
+  "variants": [
+    {
+      "config": "adapter_nir",
+      "color_mode": "nrg",
+      "color_note": "Planet bands (3,2,1) = NIR-Red-Green false colour, equivalent to nrg elsewhere",
+      "macro_mAP_mean": 0.2533,
+      "macro_mAP_std": 0.0399,
+      "macro_mAP_min": 0.2071,
+      "macro_mAP_max": 0.3268,
+      "fold_macro": [0.2443, 0.3268, 0.2353, 0.2071, 0.2531]
+    },
+    {
+      "config": "adapter_rgb_class_weighted",
+      "color_mode": "rgb",
+      "class_weighted": true,
+      "class_weight_note": "agri x3.3 / wetland x6.25 / snow x3.6",
+      "macro_mAP_mean": 0.2649,
+      "macro_mAP_std": 0.0287,
+      "macro_mAP_min": 0.2229,
+      "macro_mAP_max": 0.3095,
+      "fold_macro": [0.2790, 0.3095, 0.2229, 0.2595, 0.2535]
+    },
+    {
+      "config": "adapter_rgb_patch2x2",
+      "color_mode": "rgb",
+      "patch_grid": 2,
+      "macro_mAP_mean": 0.2019,
+      "macro_mAP_std": 0.0223,
+      "macro_mAP_min": 0.1735,
+      "macro_mAP_max": 0.2353,
+      "fold_macro": [0.2194, 0.2353, 0.1880, 0.1735, 0.1932]
+    }
+  ]
+}

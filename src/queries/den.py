@@ -48,6 +48,9 @@ QUERIES = [
 
 
 register_queries("dynamic_earthnet", QUERIES)
+# Native 3 m Planet-Fusion DEN uses the same 7 LULC classes and PairLabel schema,
+# so it shares this query set (resolved by dataset.name in run_benchmark).
+register_queries("dynamic_earthnet_planet", QUERIES)
 
 
 # ---------------------------------------------------------------------------
