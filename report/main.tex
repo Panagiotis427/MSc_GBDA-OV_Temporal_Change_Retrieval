@@ -85,7 +85,7 @@ expansion, with new water borderline - retrievable above chance. On LEVIR-CC
 the same frozen engine retrieves salient building and road change strongly
 (per-query AP $\approx$0.6--0.8) but subtle vegetation and sparse water change
 only near their prevalence floors, so the open-vocabulary signal scales sharply
-with change salience. SECOND-CC extends this to a seven-class open vocabulary -
+with change salience. SECOND-CC extends this to a seven-query open vocabulary -
 every change type clears its prevalence floor but only modestly (zero-shot macro
 $\approx$0.33 vs a $\approx$0.30 floor). Using the LEVIR-MCI and SECOND-CC pixel masks we
 also score the change heatmap quantitatively: it is a weak localiser
@@ -567,8 +567,9 @@ set; a query is reported as significant only after FDR correction.
 \label{sec:results}
 
 All headline experiments use real Dynamic EarthNet. The fast test suite (mock
-encoders, synthetic fixture, no network) passes 234 tests (full suite 250: 249
-passed, 1 skipped) and covers the embeddings cache and round-trip, retrieval
+encoders, synthetic fixture, no network) passes 240 tests; the full suite is 256
+(255 passed, 1 skipped: the real-CLIP text-encoder test needs weights) and covers
+the embeddings cache and round-trip, retrieval
 (naive/zero\_shot/peft), benchmark metrics, PEFT training (loss decreases,
 save/load), the encoder protocol/registry, and the app's \texttt{query()} path
 (real fixture tiles + heatmap + seasonal note). We report the cross-validated DEN
@@ -1470,7 +1471,7 @@ summarise hardware, model sizes, disk footprint and timings.
         End-to-end query - CLIP text forward + scoring, 605 pairs & 10.5\,ms \\
         Embedding precompute - CLIP L/14, $1024^2 \rightarrow 224$, GPU & 68\,ms/tile ($\approx$82\,s, one-time) \\
         PEFT training - 605 samples, 40 epochs, adapter only, GPU & $\approx$29\,s \\
-        Fast test suite - 234 tests, mock encoders, CPU & $\approx$65\,s \\
+        Fast test suite - 240 tests, mock encoders, CPU & $\approx$65\,s \\
         \bottomrule
     \end{tabular}
 \end{table}
@@ -1590,7 +1591,7 @@ generalisation. Across all four datasets the recovered signal tracks change
 salience (Figure~\ref{fig:saliencelaw}): weak on DEN's subtle spectral
 transitions, dataset-dependent on QFabric, strong on LEVIR-CC's salient
 building/road change (per-query AP $\approx$0.6--0.8) yet near-random on its
-subtle vegetation and sparse water, and - on SECOND-CC's seven-class open
+subtle vegetation and sparse water, and - on SECOND-CC's seven-query open
 vocabulary - above every prevalence floor but only modestly (zero-shot macro
 $\approx$0.33). Localising the change (LEVIR-MCI/SECOND-CC masks) is weaker still:
 the heatmap clears its random-patch floor by at most $\approx$0.04--0.10.
