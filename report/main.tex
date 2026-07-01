@@ -117,7 +117,8 @@ error analysis of seasonal-vs-permanent confusion (``semantic drift''), and a
 Gradio~\cite{gradio} Semantic Change Search Engine as the product deliverable.
 The primary dataset is Dynamic EarthNet (DEN)~\cite{dynamicearthnet}, which
 provides daily multi-spectral Planet Fusion~\cite{planetfusion} data ideal for
-pinpointing the exact time-step of change; the dataset-agnostic design is
+pinpointing the exact time-step of change (evaluated in
+Appendix~\ref{sec:temporalpinpoint}); the dataset-agnostic design is
 exercised on QFabric~\cite{qfabric}, LEVIR-CC/MCI~\cite{levircc,levirmci}, and
 SECOND-CC~\cite{secondcc}.
 
@@ -1563,9 +1564,10 @@ head on this data memorises rather than generalises.
 
 The system fulfils the GBDA Lab Project's brief: an open-vocabulary, frozen-backbone change
 search engine with a Gradio interface, a label-grounded Recall@$K$/mAP benchmark,
-seasonal-vs-permanent error analysis, and a clear zero-shot vs PEFT comparison
-across three CLIP-variant encoders on Dynamic EarthNet, reported under a strict
-statistical protocol. Four findings emerge. First, a learned adapter shows no
+seasonal-vs-permanent error analysis, temporal pinpointing of the change within each
+AOI timeline (Appendix~\ref{sec:temporalpinpoint}), and a clear zero-shot vs PEFT
+comparison across three CLIP-variant encoders on Dynamic EarthNet, reported under a
+strict statistical protocol. Four findings emerge. First, a learned adapter shows no
 out-of-distribution gain: the large in-distribution PEFT lift
 ($0.043 \rightarrow 0.420$, up to 0.998 on QFabric) is the adapter scored on its
 own training pairs (memorisation), and under the headline GeoRSCLIP+NRG
