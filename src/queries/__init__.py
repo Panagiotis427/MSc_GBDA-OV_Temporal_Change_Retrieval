@@ -27,6 +27,16 @@ def list_query_sets() -> List[str]:
     return sorted(_QUERIES)
 
 
+def has_tag(tag: str):
+    """Relevance predicate: the label's pipe-joined ``change_type`` contains *tag*.
+
+    Shared by the caption-derived query sets (``levir_cc``, ``second_cc``) whose
+    labels store change tags as a ``|``-joined string. ``None`` labels are treated
+    as non-relevant.
+    """
+    return lambda lb: lb is not None and tag in (lb.change_type or "").split("|")
+
+
 # Auto-register the built-in dataset query sets on first import.
 from . import den  # noqa: F401,E402
 from . import qfabric  # noqa: F401,E402

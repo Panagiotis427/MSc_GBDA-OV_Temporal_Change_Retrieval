@@ -29,6 +29,7 @@ matplotlib.use("Agg")  # headless: no display, safe in CI / Windows service
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
+from scripts._figutil import save_fig as _save  # noqa: E402
 from src.results_io import load_all  # noqa: E402
 
 _SPLIT_ORDER = {"train": 0, "val": 1, "test": 2}
@@ -61,16 +62,6 @@ def _approach_label(rec: Dict) -> str:
 
 def _ks(rec: Dict) -> List[int]:
     return [int(k) for k in rec.get("k_values", [])]
-
-
-def _save(fig, out_dir: Path, name: str, svg: bool) -> Path:
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"{name}.png"
-    fig.savefig(path, dpi=150, bbox_inches="tight")
-    if svg:
-        fig.savefig(out_dir / f"{name}.svg", bbox_inches="tight")
-    plt.close(fig)
-    return path
 
 
 def _skip(name: str) -> None:

@@ -18,21 +18,17 @@ Self-registers on import (``src.queries`` imports this at package load).
 from __future__ import annotations
 
 from src.benchmark import Query
-from . import register_queries
-
-
-def _has(tag: str):
-    return lambda lb: lb is not None and tag in (lb.change_type or "").split("|")
+from . import has_tag, register_queries
 
 
 QUERIES = [
-    Query("new buildings or structures appeared", "permanent", _has("building")),
-    Query("a new road or street", "permanent", _has("road")),
-    Query("trees appeared or were cleared", "permanent", _has("tree")),
-    Query("low vegetation or grassland changed", "permanent", _has("low_vegetation")),
-    Query("a water body appeared or changed", "permanent", _has("water")),
-    Query("bare ground or land cleared", "permanent", _has("ground")),
-    Query("a playground or sports field", "permanent", _has("playground")),
+    Query("new buildings or structures appeared", "permanent", has_tag("building")),
+    Query("a new road or street", "permanent", has_tag("road")),
+    Query("trees appeared or were cleared", "permanent", has_tag("tree")),
+    Query("low vegetation or grassland changed", "permanent", has_tag("low_vegetation")),
+    Query("a water body appeared or changed", "permanent", has_tag("water")),
+    Query("bare ground or land cleared", "permanent", has_tag("ground")),
+    Query("a playground or sports field", "permanent", has_tag("playground")),
 ]
 
 register_queries("second_cc", QUERIES)

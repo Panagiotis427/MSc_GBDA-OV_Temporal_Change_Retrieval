@@ -11,11 +11,7 @@ Self-registers on import (``src.queries`` imports this at package load).
 from __future__ import annotations
 
 from src.benchmark import Query
-from . import register_queries
-
-
-def _has(tag: str):
-    return lambda lb: lb is not None and tag in (lb.change_type or "").split("|")
+from . import has_tag, register_queries
 
 
 # The loader (src/datasets/levir_cc.py) parses five change tags from the human
@@ -25,11 +21,11 @@ def _has(tag: str):
 # (sparse, prevalence ~0.01 — a deliberately weak open-vocab probe, reported as
 # such, never a headline).
 QUERIES = [
-    Query("new buildings or houses constructed", "permanent", _has("building")),
-    Query("a new road or street built", "permanent", _has("road")),
-    Query("buildings demolished or removed", "permanent", _has("demolition")),
-    Query("trees or vegetation cleared or grown", "permanent", _has("vegetation")),
-    Query("a lake, pond, or body of water", "permanent", _has("water")),
+    Query("new buildings or houses constructed", "permanent", has_tag("building")),
+    Query("a new road or street built", "permanent", has_tag("road")),
+    Query("buildings demolished or removed", "permanent", has_tag("demolition")),
+    Query("trees or vegetation cleared or grown", "permanent", has_tag("vegetation")),
+    Query("a lake, pond, or body of water", "permanent", has_tag("water")),
 ]
 
 register_queries("levir_cc", QUERIES)

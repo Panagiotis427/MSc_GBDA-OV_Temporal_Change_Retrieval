@@ -29,6 +29,8 @@ matplotlib.use("Agg")  # headless
 import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
+from scripts._figutil import save_fig as _save  # noqa: E402
+
 _ENCODERS = ["georsclip", "clip_vitl14", "remoteclip"]
 _ENC_LABEL = {"georsclip": "GeoRSCLIP", "clip_vitl14": "CLIP ViT-L/14",
               "remoteclip": "RemoteCLIP"}
@@ -39,16 +41,6 @@ def _load(path: Path) -> Optional[Dict]:
         return None
     with open(path, encoding="utf-8") as f:
         return json.load(f)
-
-
-def _save(fig, out_dir: Path, name: str, svg: bool) -> Path:
-    out_dir.mkdir(parents=True, exist_ok=True)
-    path = out_dir / f"{name}.png"
-    fig.savefig(path, dpi=150, bbox_inches="tight")
-    if svg:
-        fig.savefig(out_dir / f"{name}.svg", bbox_inches="tight")
-    plt.close(fig)
-    return path
 
 
 def _short(text: str, n: int = 22) -> str:
