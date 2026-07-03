@@ -44,9 +44,19 @@ from src.results_io import append_macro_csv, load_all, result_path, write_report
 from src.retrieval import ChangeRetriever
 
 
-def adapter_path(dataset: str, encoder: str, color: str) -> Path:
-    """Where ``run_pipeline`` saves the ProjectionHead adapter for this combo."""
-    return Path("models") / f"{dataset}__{encoder}{color_tag(color)}__adapter.pt"
+def adapter_path(dataset: str, encoder: str, color: str,
+                 train_split: str = "train", mode: str = "difference") -> Path:
+    """Where ``run_pipeline`` saves the ProjectionHead adapter for this combo.
+
+    Mirrors the producer naming in ``scripts.run_pipeline``: a non-default
+    ``--train-split`` appends ``_<split>`` and a non-default ``--mode`` appends
+    ``_<mode>`` (the default ``train`` / ``difference`` add no suffix, so the
+    committed ``<ds>__<enc>[_<color>]__adapter.pt`` names still resolve).
+    """
+    split_tag = "" if train_split == "train" else f"_{train_split}"
+    mode_tag = "" if mode == "difference" else f"_{mode}"
+    return (Path("models")
+            / f"{dataset}__{encoder}{color_tag(color)}{split_tag}{mode_tag}__adapter.pt")
 
 
 def export_one(
@@ -62,6 +72,8 @@ def export_one(
     results_dir: str,
     lora: bool = False,
     confusion: bool = False,
+    train_split: str = "train",
+    mode: str = "difference",
 ) -> Optional[dict]:
     """Benchmark one combo from cache and write its JSON. Returns the record
     dict (for the macro CSV) or ``None`` if skipped."""
@@ -79,7 +91,8 @@ def export_one(
     retr = ChangeRetriever(store, enc)
 
     if approach == "peft":
-        apath = adapter_path(dataset, encoder_name, color)
+        apath = adapter_path(dataset, encoder_name, color,
+                             train_split=train_split, mode=mode)
         if not apath.exists():
             print(f"  skip {label}: no adapter ({apath.name})")
             return None
@@ -121,6 +134,13 @@ def main() -> None:
     ap.add_argument("--color-modes", nargs="+", default=["rgb"])
     ap.add_argument("--approaches", nargs="+",
                     default=["naive", "zero_shot", "peft"])
+    ap.add_argument("--train-split", default="train",
+                    help="Adapter training split to locate for peft export "
+                         "(matches run_pipeline --train-split; default: train).")
+    ap.add_argument("--mode", default="difference",
+                    choices=["difference", "concatenate"],
+                    help="Adapter feature mode to locate for peft export "
+                         "(matches run_pipeline --mode; default: difference).")
     ap.add_argument("--lora", action="store_true",
                     help="Also export zero_shot on LoRA-merged embeddings where cached.")
     ap.add_argument("--confusion", action="store_true",
@@ -143,6 +163,7 @@ def main() -> None:
                         args.dataset, enc_name, split, color, approach,
                         enc=enc, ds=ds, cache_dir=args.cache_dir,
                         results_dir=args.results_dir, confusion=args.confusion,
+                        train_split=args.train_split, mode=args.mode,
                     )
                     if rec:
                         written.append(rec)

@@ -37,7 +37,7 @@ import numpy as np
 import torch
 
 from src.datasets.registry import build_dataset
-from src.embeddings import cache_tag_for, load_or_compute
+from src.embeddings import cache_tag_for, color_tag, load_or_compute
 from src.encoders import get_encoder
 from src.retrieval import ChangeRetriever
 from src.benchmark import run_benchmark
@@ -115,7 +115,7 @@ def main() -> None:
         return
 
     enc = get_encoder(args.encoder)
-    color_tag = f"_{args.color_mode}" if args.color_mode != "rgb" else ""
+    color_suffix = color_tag(args.color_mode)
     # Tag artefacts trained on a non-default split so a `--train-split val` run never
     # overwrites the committed train-split adapter/LoRA (default 'train' -> no suffix,
     # back-compat with the committed `<ds>__<enc>[_<color>]__adapter.pt` names).
@@ -165,7 +165,7 @@ def main() -> None:
         # committed difference adapters (difference -> no suffix, back-compat).
         mode_tag = "" if args.mode == "difference" else f"_{args.mode}"
         adapter_path = (
-            f"models/{ds_train.name}__{enc.name}{color_tag}{split_tag}{mode_tag}__adapter.pt"
+            f"models/{ds_train.name}__{enc.name}{color_suffix}{split_tag}{mode_tag}__adapter.pt"
         )
         save_adapter(adapter_path, adapter, {
             "input_dim": adapter.input_dim,
@@ -197,7 +197,7 @@ def main() -> None:
             seed=args.seed,
         )
         visual_lora, lora_history = train_lora(ds_train, enc, lora_cfg, verbose=True)
-        lora_dir = f"models/{ds_train.name}__{enc.name}{color_tag}{split_tag}__lora"
+        lora_dir = f"models/{ds_train.name}__{enc.name}{color_suffix}{split_tag}__lora"
         save_lora(visual_lora, lora_dir)
         print(f"Saved LoRA weights -> {lora_dir}/")
 
