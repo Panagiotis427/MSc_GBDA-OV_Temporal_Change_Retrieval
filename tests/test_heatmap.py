@@ -9,6 +9,7 @@ import torch
 import numpy as np
 from src.heatmap import (
     generate_heatmap,
+    generate_change_heatmap,
     extract_attention_weights,
     extract_patch_attention,
     resize_heatmap,
@@ -314,4 +315,88 @@ class TestIntegration:
         # Test that the mock provides required attributes
         assert hasattr(model, 'vision_encoder')
         assert hasattr(model, 'text_encoder')
+
+
+class _StubPatchEncoder:
+    """Minimal encoder exposing the patch + text hooks the production heatmap
+    entry points rely on (no CLIP, no network). ``embed_dim`` is small; 16 patches
+    give a 4x4 grid."""
+
+    name = "stub"
+    embed_dim = 4
+    image_input_size = 8
+    device = torch.device("cpu")
+
+    def encode_text(self, texts, batch_size: int = 32) -> np.ndarray:
+        n = 1 if isinstance(texts, str) else len(texts)
+        v = np.zeros((n, self.embed_dim), dtype=np.float32)
+        v[:, 0] = 1.0  # unit vector along axis 0
+        return v
+
+    def encode_image_patches(self, image, batch_size: int = 32) -> np.ndarray:
+        # 16 L2-normalised patch embeddings, deterministic from the tile's mean
+        # pixel so T1 and T2 differ.
+        base = int(float(np.asarray(image).mean()) * 1000) + 7
+        p = np.random.default_rng(base).standard_normal(
+            (16, self.embed_dim)).astype(np.float32)
+        p /= np.linalg.norm(p, axis=-1, keepdims=True) + 1e-8
+        return p
+
+    def compute_patch_text_similarity(self, image, text) -> np.ndarray:
+        return np.linspace(0, 1, 16, dtype=np.float32).reshape(4, 4)
+
+
+class _NoPatchEncoder:
+    """Encoder without ``encode_image_patches`` — change heatmap must degrade to
+    (None, None) so the caller can fall back to ``generate_heatmap``."""
+
+    def compute_patch_text_similarity(self, image, text) -> np.ndarray:
+        return np.zeros((4, 4), dtype=np.float32)
+
+
+class TestGenerateChangeHeatmap:
+    """Covers generate_change_heatmap — the production change localiser (used by
+    src/app.py and thesis figures) that had no direct test."""
+
+    @staticmethod
+    def _imgs():
+        t1 = np.zeros((32, 32, 3), dtype=np.uint8)
+        t2 = np.full((32, 32, 3), 200, dtype=np.uint8)
+        return t1, t2
+
+    def test_returns_normalised_square_grid(self):
+        t1, t2 = self._imgs()
+        grid, blended = generate_change_heatmap(t1, t2, "new buildings", _StubPatchEncoder())
+        assert grid is not None and blended is not None
+        assert grid.shape == (4, 4)                       # 16 patches -> 4x4
+        assert grid.min() >= 0.0 and grid.max() <= 1.0    # min-max normalised
+        assert isinstance(blended, Image.Image)
+        assert blended.width == 32 and blended.height == 32
+
+    def test_precomputed_patches_bypass_encoder(self):
+        t1, t2 = self._imgs()
+        P = np.zeros((16, 4), dtype=np.float32)
+        P[:, 0] = 1.0
+        grid, _ = generate_change_heatmap(t1, t2, "x", _StubPatchEncoder(),
+                                          precomputed_p1=P, precomputed_p2=P.copy())
+        # Identical P1/P2 -> zero Δ everywhere -> flat (all-zero) normalised grid.
+        assert grid is not None
+        assert np.allclose(grid, 0.0)
+
+    def test_none_when_encoder_lacks_patches(self):
+        t1, t2 = self._imgs()
+        grid, blended = generate_change_heatmap(t1, t2, "x", _NoPatchEncoder())
+        assert grid is None and blended is None
+
+
+class TestGenerateHeatmap:
+    """Covers generate_heatmap — the After-image similarity overlay."""
+
+    def test_returns_grid_and_blend(self):
+        t1 = np.zeros((24, 24, 3), dtype=np.uint8)
+        t2 = np.full((24, 24, 3), 128, dtype=np.uint8)
+        grid, blended = generate_heatmap(t1, t2, "a water body", _StubPatchEncoder())
+        assert grid.shape == (4, 4)                       # stub returns a 4x4 sim grid
+        assert isinstance(blended, Image.Image)
+        assert blended.width == 24 and blended.height == 24
 

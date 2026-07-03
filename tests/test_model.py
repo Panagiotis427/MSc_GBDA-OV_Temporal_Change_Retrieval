@@ -50,23 +50,24 @@ class TestProjectionHead:
 
     def test_dropout_behavior(self, sample_input):
         """
-        Test dropout is active during training mode.
-        Running in eval mode should produce deterministic output.
-        Note: PyTorch 2.x dropout seeding behavior differs from earlier versions;
-        we verify dropout works by checking it produces stochastic outputs in train mode
-        while being fully reproducible in eval mode.
+        Dropout is active in train mode (stochastic output) and disabled in eval
+        mode (deterministic output), and gradients still flow through it.
         """
         model = ProjectionHead(input_dim=768, dropout_rate=0.5)
 
-        # Training mode: run multiple forward passes with same input and seed
-        torch.manual_seed(42)
+        # Train mode: dropout must make the output stochastic — two different RNG
+        # states over the same input give different masks and thus different
+        # outputs. This is the claim the test name makes, so assert it directly
+        # (rather than computing the outputs and never checking them).
+        model.train()
+        torch.manual_seed(1)
         out_train1 = model(sample_input.clone())
-
-        torch.manual_seed(42)
+        torch.manual_seed(2)
         out_train2 = model(sample_input.clone())
+        assert not torch.allclose(out_train1, out_train2), \
+            "Train-mode dropout should produce stochastic outputs across RNG states"
 
-        # Due to dropout randomness (even with same seed in some PyTorch versions),
-        # we check that eval mode is strictly deterministic instead
+        # Eval mode: strictly deterministic (dropout disabled)
         model.eval()
         with torch.no_grad():
             out_eval1 = model(sample_input.clone())

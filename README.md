@@ -316,7 +316,8 @@ dataset-specific choices live in their own modules and self-register.
 | Generic-options mapping | same opts adapter | Maps `(root, pairing, split, **extra)` → loader kwargs; `color_mode` travels via `**extra` to `DENNpyDataset` |
 | Encoder | `src/encoders/<name>.py` | Implement `ImageTextEncoder`; `register_encoder(...)` in `src/encoders/__init__.py` |
 | Benchmark query set | `src/queries/<name>.py` | List of `Query(text, category, predicate)`; `register_queries(name, queries)`; auto-imported by `src/queries/__init__.py` |
-| App / CLI | nothing — dropdown and `--dataset` / `--encoder` choices derive from the registries |
+| CLI (`--dataset` / `--encoder`) | nothing | Choices derive from the dataset/encoder registries — a registry-only dataset is immediately usable from `scripts/run_pipeline.py`, `scripts/export_results.py`, and `python -m src.app --dataset <name>` |
+| App dropdown | `src/app.py` (`DATASET_PROFILES`) | The **one** shared-file touch a dataset needs: the Gradio demo needs a launch profile (label, root, split, colour, rank) per dataset, so a registry-only dataset is CLI-usable but does **not** appear in the dropdown until it has a `DATASET_PROFILES` entry. Deliberate exception to the files-only rule, scoped to the demo UI |
 
 ### What a new dataset adds (and only adds)
 
@@ -336,8 +337,10 @@ already covers it.
 - **Embeddings:** `data/cache/<dataset>__<encoder>[__<tag>]__pair_embeddings.npz`, where `<tag>` =
   `{split}[_{color_mode}][_lora]` — built by `cache_tag_for()`. Pass `cache_tag` to
   `load_or_compute()` to isolate caches per split / colour / LoRA.
-- **Adapters:** `models/<dataset>__<encoder>[__<color>][__<split>][__<mode>]__adapter.pt` — the
-  committed `train` split + `difference` mode take no suffix; others append `_<split>` / `_<mode>`.
+- **Adapters:** `models/<dataset>__<encoder>[_<color>][_<split>][_<mode>]__adapter.pt` — the
+  committed `train` split + `difference` mode take no suffix; others append `_<color>` / `_<split>` /
+  `_<mode>` (single underscore each). `scripts/export_results.py --train-split/--mode` locate the
+  matching adapter for a non-default run.
 - Keyed by `(dataset, encoder, split, color_mode)` — no cross-split/colour collision; a stale
   pair-set on load triggers automatic recompute and overwrites the cache at the same path.
 
@@ -346,8 +349,9 @@ already covers it.
 - `src/stats.py::rand_ap(...)` — the shuffle-based random-AP baseline used by the significance
   scripts. `scripts/cv_eval.py` keeps its own `rng.permutation` variant on purpose, to preserve its
   committed RNG-dependent results.
-- `src/embeddings.py::cache_tag_for(split, color_mode, lora)` — single source of truth for
-  split/colour/LoRA cache tags; import it rather than re-deriving.
+- `src/embeddings.py::cache_tag_for(split, color_mode, lora)` and its sibling `color_tag(color_mode)`
+  — the single source of truth for split/colour/LoRA cache tags and the `_<color>` artefact suffix;
+  import them rather than re-deriving the strings (every pipeline/benchmark/export script does).
 
 ## Datasets & model resources
 

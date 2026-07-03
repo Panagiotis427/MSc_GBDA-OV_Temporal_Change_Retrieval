@@ -4,9 +4,10 @@ Encoder-agnostic core.
 Defines the `ImageTextEncoder` Protocol that decouples the rest of the pipeline
 (retrieval, heatmaps, error analysis) from any specific vision-language model.
 
-Two concrete implementations:
+Concrete implementations (registered in `src.encoders.__init__`):
   - `src.encoders.clip_vitl14.CLIPViTL14Encoder` — OpenAI CLIP ViT-L/14 (768-d)
-  - `src.encoders.georsclip.GeoRSCLIPEncoder` — RS-specific GeoRSCLIP (512-d) [session 2]
+  - `src.encoders.georsclip.GeoRSCLIPEncoder` — RS-specific GeoRSCLIP (512-d)
+  - `src.encoders.remoteclip.RemoteCLIPEncoder` — RS-specific RemoteCLIP (768-d)
 """
 from __future__ import annotations
 
