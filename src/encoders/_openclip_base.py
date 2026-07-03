@@ -10,6 +10,7 @@ architecture, then load a domain-specific state dict downloaded with
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import logging
 from typing import Iterator, List, Optional, Union
 
@@ -41,17 +42,46 @@ def _silence_open_clip_random_init() -> Iterator[None]:
         root.removeFilter(flt)
 
 
-def _load_state_dict_flexible(model, ckpt_path: str) -> None:
+def _sha256(path: str) -> str:
+    """Streaming SHA-256 of a file (checkpoints are large, so hash in chunks)."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(1 << 20), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _load_state_dict_flexible(
+    model, ckpt_path: str, expected_sha256: Optional[str] = None
+) -> None:
     """Tolerant load: handles ``{'state_dict': ...}`` wrappers, ``module.``
-    prefixes, and partial matches (strict=False)."""
+    prefixes, and partial matches (strict=False).
+
+    Supply-chain guard: when *expected_sha256* is set (see
+    ``OpenClipHFEncoder._hf_sha256``), the downloaded checkpoint's digest is
+    verified *before* it is ever handed to ``torch.load``, and a mismatch refuses
+    the load — closing the "compromised upstream repo -> arbitrary unpickle ->
+    code execution" path for the ``weights_only=False`` fallback below.
+    """
+    if expected_sha256:
+        actual = _sha256(ckpt_path)
+        if actual != expected_sha256:
+            raise RuntimeError(
+                f"{ckpt_path}: checksum mismatch (expected {expected_sha256}, got "
+                f"{actual}); refusing to load an unverified checkpoint."
+            )
     try:
         ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=True)
     except Exception as exc:  # noqa: BLE001 — fall back loudly, never silently
-        # The domain checkpoint is pulled from a pinned HF repo and is normally a
-        # pure state dict; if one bundles non-tensor objects the safe loader fails,
-        # so we warn (rather than defaulting to the unsafe path unconditionally).
+        # These domain checkpoints (GeoRSCLIP/RemoteCLIP) bundle non-tensor objects,
+        # so the safe loader legitimately fails and the unsafe path is the normal
+        # one. Guard it: with a checksum configured the bytes are already verified;
+        # without one, warn that pinning ``_hf_sha256`` (+ ``_hf_revision``) would
+        # harden this (never fall back silently).
+        verified = "checksum verified" if expected_sha256 else (
+            "no checksum configured — pin _hf_sha256 + _hf_revision to harden")
         print(f"  [security] {ckpt_path}: weights_only load failed ({exc}); "
-              "retrying with weights_only=False.")
+              f"retrying with weights_only=False ({verified}).")
         ckpt = torch.load(ckpt_path, map_location="cpu", weights_only=False)
     sd = ckpt.get("state_dict", ckpt) if isinstance(ckpt, dict) else ckpt
     sd = {(k[7:] if k.startswith("module.") else k): v for k, v in sd.items()}
@@ -76,6 +106,13 @@ class OpenClipHFEncoder:
     _arch: str = "ViT-B-32"
     _hf_repo: str = ""
     _hf_file: str = ""
+    # Supply-chain pinning (recommended for the public deployment): set
+    # ``_hf_revision`` to a commit SHA so the download can't silently change under
+    # us, and ``_hf_sha256`` to the checkpoint's digest so a swapped file is
+    # rejected before the ``weights_only=False`` load. Both default to None
+    # (fetch latest / no integrity check) to preserve current behaviour.
+    _hf_revision: Optional[str] = None
+    _hf_sha256: Optional[str] = None
 
     def __init__(
         self,
@@ -99,9 +136,10 @@ class OpenClipHFEncoder:
         with _silence_open_clip_random_init():
             model, _, preprocess = open_clip.create_model_and_transforms(self._arch)
         ckpt_path = hf_hub_download(
-            repo_id=self._hf_repo, filename=self._hf_file, cache_dir=cache_dir
+            repo_id=self._hf_repo, filename=self._hf_file,
+            revision=self._hf_revision, cache_dir=cache_dir,
         )
-        _load_state_dict_flexible(model, ckpt_path)
+        _load_state_dict_flexible(model, ckpt_path, expected_sha256=self._hf_sha256)
 
         self._model = model.to(self.device).eval()
         for p in self._model.parameters():
