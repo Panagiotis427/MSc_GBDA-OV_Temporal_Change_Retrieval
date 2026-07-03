@@ -73,12 +73,25 @@ def _patch_embeddings(ds, enc, enc_name, split, cache_dir, dataset):
             print(f"loaded patch cache {cache} (N={int(d['n'])})")
             return d["p1"], d["p2"], pairs
     print(f"encoding {len(pairs)} pairs to patch embeddings ({enc_name}, {split})...")
+    # Batch the encode: collect a chunk of tiles and encode each side in one pass
+    # rather than one single-image forward per tile. Per-image patch tokens are
+    # independent so the result is numerically identical; chunking bounds host
+    # memory (mirrors src.embeddings.compute_patch_embeddings). Cold-cache only.
     p1, p2 = [], []
-    for pk in tqdm(pairs, desc=f"{enc_name} patches", unit="pair"):
-        im1, im2 = ds.load_pair_images(pk)
-        p1.append(enc.encode_image_patches(im1))
-        p2.append(enc.encode_image_patches(im2))
-    p1, p2 = np.stack(p1), np.stack(p2)
+    batch = 32
+    for s in tqdm(range(0, len(pairs), batch), desc=f"{enc_name} patches", unit="batch"):
+        imgs1, imgs2 = [], []
+        for pk in pairs[s:s + batch]:
+            im1, im2 = ds.load_pair_images(pk)
+            imgs1.append(im1)
+            imgs2.append(im2)
+        a = enc.encode_image_patches(imgs1, batch_size=batch)
+        b = enc.encode_image_patches(imgs2, batch_size=batch)
+        if a is None or b is None:
+            raise RuntimeError(f"{enc_name} does not expose patch tokens")
+        p1.append(np.asarray(a))
+        p2.append(np.asarray(b))
+    p1, p2 = np.concatenate(p1, axis=0), np.concatenate(p2, axis=0)
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
     np.savez_compressed(cache, p1=p1, p2=p2, n=len(pairs))
     print(f"  cached {cache}")

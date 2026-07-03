@@ -60,19 +60,28 @@ def _encode_patches(ds, enc, cache_dir, enc_name, color, pairing="bimonthly"):
             print(f"loaded patch cache {cache} (N={int(d['n'])})")
             return d["p1"], d["p2"], pairs
     print(f"encoding {len(pairs)} pairs to patch embeddings ({enc_name}, {color})...")
+    # Encode a chunk of images per GPU pass instead of one image at a time — the
+    # encoder's per-image patch tokens are independent, so batching is numerically
+    # identical while collapsing ~2N single-image forward passes into ~2N/B batched
+    # ones (B=32). Chunked so host memory stays bounded (mirrors
+    # src.embeddings.compute_patch_embeddings). Cold-cache path only.
     p1, p2 = [], []
-    for i, pk in enumerate(pairs):
-        im1, im2 = ds.load_pair_images(pk)
-        a = enc.encode_image_patches(im1)
-        b = enc.encode_image_patches(im2)
+    batch = 32
+    for s in range(0, len(pairs), batch):
+        imgs1, imgs2 = [], []
+        for pk in pairs[s:s + batch]:
+            im1, im2 = ds.load_pair_images(pk)
+            imgs1.append(im1)
+            imgs2.append(im2)
+        a = enc.encode_image_patches(imgs1, batch_size=batch)
+        b = enc.encode_image_patches(imgs2, batch_size=batch)
         if a is None or b is None:
             raise RuntimeError(f"{enc_name} does not expose patch tokens")
-        p1.append(a)
-        p2.append(b)
-        if (i + 1) % 100 == 0:
-            print(f"  {i + 1}/{len(pairs)}")
-    p1 = np.stack(p1).astype(np.float32)
-    p2 = np.stack(p2).astype(np.float32)
+        p1.append(np.asarray(a))
+        p2.append(np.asarray(b))
+        print(f"  {min(s + batch, len(pairs))}/{len(pairs)}")
+    p1 = np.concatenate(p1, axis=0).astype(np.float32)
+    p2 = np.concatenate(p2, axis=0).astype(np.float32)
     Path(cache_dir).mkdir(parents=True, exist_ok=True)
     np.savez_compressed(cache, p1=p1, p2=p2, n=len(pairs))
     print(f"cached patch embeddings -> {cache}  shape {p1.shape}")

@@ -85,13 +85,23 @@ class ImageLevelChangeGate:
         L2-normalised), so cosines are plain dot products.
         """
         q = np.atleast_2d(np.asarray(query_vecs, dtype=np.float32))  # (Q, D)
-        scores = np.empty(len(pairs), dtype=np.float32)
-        for i, pair in enumerate(pairs):
+        pairs = list(pairs)
+        if not pairs:
+            return np.empty(0, dtype=np.float32)
+        # Collect all T1/T2 tiles first and encode each side in one batched pass
+        # (the encoder batches internally), instead of a batch-of-2 GPU call per
+        # pair. Per-image embeddings are unchanged (the ViT towers encode each
+        # image independently), so this is numerically identical to the per-pair
+        # loop, just far fewer kernel launches over a stable subset in the hundreds.
+        imgs_t1, imgs_t2 = [], []
+        for pair in pairs:
             im1, im2 = dataset.load_pair_images(pair)
-            f = np.asarray(self.encoder.encode_image([im1, im2]), dtype=np.float32)  # (2, D)
-            delta = f[1] @ q.T - f[0] @ q.T  # (Q,)
-            scores[i] = float(delta.max())
-        return scores
+            imgs_t1.append(im1)
+            imgs_t2.append(im2)
+        f1 = np.asarray(self.encoder.encode_image(imgs_t1), dtype=np.float32)  # (N, D)
+        f2 = np.asarray(self.encoder.encode_image(imgs_t2), dtype=np.float32)  # (N, D)
+        delta = f2 @ q.T - f1 @ q.T          # (N, Q)
+        return delta.max(axis=1).astype(np.float32)
 
 
 def evaluate_seasonal_fpr(
