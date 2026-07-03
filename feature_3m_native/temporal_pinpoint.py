@@ -80,7 +80,6 @@ def main() -> None:
 
     enc = get_encoder(args.encoder)
     color = args.color_mode
-    csuf = "" if color == "rgb" else f"_{color}"
 
     ds = build_dataset(DATASET, root=args.root, split=None, color_mode=color,
                        pairing="monthly")

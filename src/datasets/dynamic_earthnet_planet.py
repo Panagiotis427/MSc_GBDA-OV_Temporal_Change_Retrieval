@@ -35,7 +35,6 @@ data section) instead of mirroring the full ~525 GB release.
 """
 from __future__ import annotations
 
-import io
 import os
 import re
 import zipfile

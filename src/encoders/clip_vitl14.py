@@ -36,7 +36,6 @@ class CLIPViTL14Encoder:
     ) -> None:
         self.model_name = model_name
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        from src import _cache
         self.cache_dir = cache_dir or _cache.CLIP_CACHE_DIR
 
         self._text = FrozenTextEncoder(
