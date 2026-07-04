@@ -158,7 +158,7 @@ figures — **are in the deliverable report: [`report/main.pdf`](report/main.pdf
 | `scripts/download_den.py` | fetch + extract DEN subset, build label index |
 | `scripts/build_qfabric_labels.py` | TEOChatlas RQA2 → `qfabric_teo_labels.json` (27,879 real crop→change-type labels) |
 | `scripts/build_qfabric_status_labels.py` | TEOChatlas RQA5 → `qfabric_status_labels.json` (per-timepoint construction-status labels) |
-| `scripts/eval_rerank.py` | re-ranking benchmark (diversity / coherence) on the DEN test split (report Appendix B) |
+| `scripts/eval_rerank.py` | re-ranking benchmark (diversity / coherence) on the DEN test split (report Appendix C) |
 | `scripts/make_cv_figure.py` | CV-progression figure (single-split → full-corpus → 5-fold) from `results/` (report §8.1) |
 | `scripts/run_seasonal_gate.py` | seasonal false-positive gate / stable-pair FPR robustness check |
 | `scripts/benchmark_qfabric.py` | extract QFabric crops + encode + label-grounded change-type mAP (`qfabric_teo`) |
@@ -226,7 +226,9 @@ python -m src.app --dataset dynamic_earthnet --root data/DynamicEarthNet --encod
 Type a free-text change query (or click a curated example) and press **Search**. The top match opens
 in a detail panel with two swipe sliders — before against after, and after against the
 query-conditioned change heatmap — beside its match score and a seasonal-vs-permanent note, with
-buttons to download the before, after, and heatmap images. The remaining matches fill a thumbnail
+buttons to download the before, after, and heatmap images. The match score is the raw retrieval
+score (a difference of cosine similarities) min–max normalised across the returned results: a
+relative ranking within the query, not a calibrated probability. The remaining matches fill a thumbnail
 grid whose per-tile **View** button promotes any result into the detail panel, and a ranked table
 (exportable to CSV) lists them all. A collapsible **Settings** panel chooses the dataset, encoder,
 colour mode, PEFT/LoRA, and the optional geographic filter and re-ranking, applied on **Apply**; a
@@ -278,8 +280,8 @@ convenience entry points — pass the same `--split` / `--color-mode` to every s
 share the split-tagged embedding cache.
 
 ```bash
-pytest -q                              # full suite: 256 tests, 1 skipped (real-CLIP test_text_encoder needs weights)
-pytest -q --ignore=tests/test_text_encoder.py   # fast CPU loop: 240 tests, ~65 s (mock encoders, synthetic fixture)
+pytest -q                              # full suite (real-CLIP test_text_encoder skipped unless weights present)
+pytest -q --ignore=tests/test_text_encoder.py   # fast CPU loop, ~65 s (mock encoders, synthetic fixture)
 ```
 
 ## Dependencies — `pyproject.toml` vs `requirements.txt`
