@@ -353,8 +353,8 @@ class SemanticChangeSearch:
         # colour-tagged: models/<dataset>__<encoder>[_<color>]__adapter.pt.
         # Without the colour tag the app would silently apply the RGB-trained
         # adapter to NRG/NDVI embeddings (a dim-compatible but wrong head).
-        color_tag = f"_{cfg.color_mode}" if cfg.color_mode != "rgb" else ""
-        fname = f"{cfg.dataset}__{cfg.encoder}{color_tag}__adapter.pt"
+        from src.model import adapter_path
+        fname = adapter_path(cfg.dataset, cfg.encoder, cfg.color_mode).name
         path = Path(cfg.cache_dir).parent / "models" / fname
         if not path.exists():
             path = _PROJECT_ROOT / "models" / fname

@@ -43,7 +43,7 @@ from src.retrieval import ChangeRetriever
 from src.benchmark import run_benchmark
 from src.results_io import append_macro_csv, load_all, result_path, write_report
 from src.train import TrainConfig, train_adapter
-from src.model import save_adapter
+from src.model import adapter_path, save_adapter
 from src.lora_train import LoRAConfig, train_lora, save_lora, merge_lora_into_encoder
 
 
@@ -161,13 +161,9 @@ def main() -> None:
         print(f"\nTraining PEFT adapter ({args.mode}, {args.epochs} epochs)...")
         cfg = TrainConfig(mode=args.mode, epochs=args.epochs, seed=args.seed)
         adapter, _ = train_adapter(ds_train, store_train, enc, cfg)
-        # Tag non-default feature modes so a concatenate run never clobbers the
-        # committed difference adapters (difference -> no suffix, back-compat).
-        mode_tag = "" if args.mode == "difference" else f"_{args.mode}"
-        adapter_path = (
-            f"models/{ds_train.name}__{enc.name}{color_suffix}{split_tag}{mode_tag}__adapter.pt"
-        )
-        save_adapter(adapter_path, adapter, {
+        apath = adapter_path(ds_train.name, enc.name, args.color_mode,
+                             train_split=args.train_split, mode=args.mode)
+        save_adapter(str(apath), adapter, {
             "input_dim": adapter.input_dim,
             "output_dim": adapter.output_dim,
             "hidden_dims": list(cfg.hidden_dims),
@@ -178,7 +174,7 @@ def main() -> None:
             "train_split": args.train_split,
             "color_mode": args.color_mode,
         })
-        print(f"Saved adapter -> {adapter_path}")
+        print(f"Saved adapter -> {apath}")
         retr_train.set_adapter(adapter, feature_mode=args.mode)
         rep = run_benchmark(ds_train, retr_train, approach="peft")
         train_summary["peft"] = _emit(rep, esplit=args.train_split)

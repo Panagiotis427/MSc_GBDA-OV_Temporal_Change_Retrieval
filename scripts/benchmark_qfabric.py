@@ -29,7 +29,7 @@ from src.benchmark import run_benchmark
 from src.datasets.registry import build_dataset
 from src.embeddings import load_or_compute
 from src.encoders import get_encoder
-from src.model import save_adapter
+from src.model import adapter_path, save_adapter
 from src.results_io import append_macro_csv, load_all, result_path, write_report
 from src.retrieval import ChangeRetriever
 from src.train import TrainConfig, train_adapter
@@ -92,7 +92,7 @@ def _run_peft(args) -> list:
         print(f"  training adapter on {len(store_tr)} train pairs ({args.epochs} ep)...")
         cfg = TrainConfig(mode="difference", epochs=args.epochs, seed=args.seed)
         adapter, _ = train_adapter(ds_tr, store_tr, enc, cfg, verbose=False)
-        apath = f"models/{args.dataset}__{enc_name}__adapter.pt"
+        apath = str(adapter_path(args.dataset, enc_name))
         save_adapter(apath, adapter, {
             "input_dim": adapter.input_dim, "output_dim": adapter.output_dim,
             "hidden_dims": list(cfg.hidden_dims), "dropout_rate": cfg.dropout,

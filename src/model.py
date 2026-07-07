@@ -8,9 +8,11 @@ learned. The contrastive loss that trains it lives with each trainer
 (``train._masked_infonce`` for the PEFT ProjectionHead; ``lora_train._infonce_loss``
 for LoRA).
 """
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple
+
 import torch
 import torch.nn as nn
-from typing import Any, Dict, Optional, Tuple
 
 
 class ProjectionHead(nn.Module):
@@ -206,3 +208,27 @@ def load_adapter(path: str, map_location="cpu") -> Tuple["ProjectionHead", Dict[
     adapter.load_state_dict(ckpt["state_dict"])
     adapter.eval()
     return adapter, meta
+
+
+def adapter_path(
+    dataset: str,
+    encoder: str,
+    color_mode: str = "rgb",
+    train_split: str = "train",
+    mode: str = "difference",
+    models_dir: str = "models",
+) -> Path:
+    """Canonical on-disk path for a trained ``ProjectionHead`` adapter.
+
+    Single source of truth for the tagged filename, shared by the producer
+    (``scripts.run_pipeline``) and the consumer (``scripts.export_results``) so the
+    two can never drift: a non-default ``color_mode`` / ``train_split`` / ``mode``
+    appends ``_<color>`` / ``_<split>`` / ``_<mode>`` respectively (``rgb`` / ``train``
+    / ``difference`` add no suffix, keeping the committed
+    ``<ds>__<enc>[_<color>]__adapter.pt`` names valid).
+    """
+    from src.embeddings import color_tag  # local import: keep model import-cycle-free
+    split_tag = "" if train_split == "train" else f"_{train_split}"
+    mode_tag = "" if mode == "difference" else f"_{mode}"
+    return (Path(models_dir)
+            / f"{dataset}__{encoder}{color_tag(color_mode)}{split_tag}{mode_tag}__adapter.pt")

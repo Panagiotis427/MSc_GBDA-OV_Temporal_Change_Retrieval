@@ -35,7 +35,7 @@ from src.datasets.base import TemporalDataset
 from src.datasets.registry import build_dataset
 from src.embeddings import PairEmbeddingStore, cache_tag_for, load_or_compute
 from src.encoders import get_encoder
-from src.model import ProjectionHead, create_projection_head, save_adapter
+from src.model import ProjectionHead, adapter_path, create_projection_head, save_adapter
 from src.retrieval import ChangeRetriever
 from src.benchmark import run_benchmark
 
@@ -192,11 +192,9 @@ def main() -> None:
     print(f"\nTraining adapter ({args.mode}, {args.epochs} epochs)...")
     adapter, hist = train_adapter(ds, store, enc, cfg)
 
-    # Tag non-default feature modes so a `concatenate` run never clobbers the
-    # committed `difference` adapters (difference -> no suffix, back-compat;
-    # mirrors scripts.run_pipeline's adapter-path convention).
-    mode_tag = "" if args.mode == "difference" else f"_{args.mode}"
-    out = args.out or f"models/{ds.name}__{enc.name}{mode_tag}__adapter.pt"
+    # Adapter filename via the canonical helper (single source of truth shared
+    # with run_pipeline / export_results); a non-default --mode adds its suffix.
+    out = args.out or str(adapter_path(ds.name, enc.name, mode=args.mode))
     save_adapter(out, adapter, {
         "input_dim": adapter.input_dim, "output_dim": adapter.output_dim,
         "hidden_dims": list(cfg.hidden_dims), "dropout_rate": cfg.dropout,

@@ -36,27 +36,12 @@ import json
 
 from src.benchmark import run_benchmark
 from src.datasets.registry import build_dataset
-from src.embeddings import PairEmbeddingStore, cache_path, cache_tag_for, color_tag
+from src.embeddings import PairEmbeddingStore, cache_path, cache_tag_for
 from src.encoders import get_encoder
 from src.error_analysis import build_confusion
-from src.model import load_adapter
+from src.model import adapter_path, load_adapter
 from src.results_io import append_macro_csv, load_all, result_path, write_report
 from src.retrieval import ChangeRetriever
-
-
-def adapter_path(dataset: str, encoder: str, color: str,
-                 train_split: str = "train", mode: str = "difference") -> Path:
-    """Where ``run_pipeline`` saves the ProjectionHead adapter for this combo.
-
-    Mirrors the producer naming in ``scripts.run_pipeline``: a non-default
-    ``--train-split`` appends ``_<split>`` and a non-default ``--mode`` appends
-    ``_<mode>`` (the default ``train`` / ``difference`` add no suffix, so the
-    committed ``<ds>__<enc>[_<color>]__adapter.pt`` names still resolve).
-    """
-    split_tag = "" if train_split == "train" else f"_{train_split}"
-    mode_tag = "" if mode == "difference" else f"_{mode}"
-    return (Path("models")
-            / f"{dataset}__{encoder}{color_tag(color)}{split_tag}{mode_tag}__adapter.pt")
 
 
 def export_one(
