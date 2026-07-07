@@ -29,7 +29,7 @@
 \AtBeginEnvironment{thebibliography}{\sloppy} % standard: loosen line-breaking in the bibliography
 \hypersetup{                       % explicit PDF metadata so hyperref never derives strings from the rich \title
     pdftitle={Open-Vocabulary Temporal Change Retrieval},
-    pdfauthor={Panagiotis Giannikos and Markos Siroukis}
+    pdfauthor={Panagiotis Giannikos and Markos Syroukis}
 }
 
 % Figures live under figures/; the NTUA logo (when added) under images/.
@@ -513,7 +513,7 @@ deliverable quantitatively measurable (Section~\ref{sec:localization}).
 
 \paragraph{SECOND-CC (open-vocabulary breadth + semantic masks).}
 SECOND-CC~\cite{secondcc} pairs 6{,}041 bi-temporal scenes with 30{,}205 human
-change captions \emph{and} six-class SECOND~\cite{second} semantic maps for both
+change captions and six-class SECOND~\cite{second} semantic maps for both
 phases (ground, tree, low-vegetation, water, building, playground). It is the
 breadth counterpart to LEVIR-CC, whose change is almost entirely building/road:
 SECOND-CC's captions span a far wider land-cover vocabulary, and its per-phase
@@ -1340,7 +1340,7 @@ finds in every dataset.
     \includegraphics[width=\linewidth]{qualitative_examples__georsclip.png}
     \caption{The salience law in a single view (LEVIR-CC, GeoRSCLIP, zero-shot).
     For a salient query (new buildings) and a subtle one (vegetation), the panels
-    show the engine's \emph{actual} top-1 retrieved pair --- Before, After, and the
+    show the engine's actual top-1 retrieved pair --- Before, After, and the
     query-conditioned change heatmap --- with a green border when that top-1
     satisfies the query's label predicate and red otherwise. The salient query
     retrieves a genuine construction event at rank~1, whereas the subtle query's
@@ -1759,7 +1759,7 @@ queries.\footnote{The honest caveat is that fold variance grows under aggressive
 downsampling (std up to $0.21$ at 64\,px, driven by few positives per small fold),
 so the claim is only that no degradation is detectable at this corpus size, not
 exact equivalence.} This is direct evidence for the report's central thesis
-(Sections~\ref{sec:denmain},~\ref{sec:nativeraster}): the ceiling is the frozen
+(Section~\ref{sec:denmain} and Appendix~\ref{sec:nativeraster}): the ceiling is the frozen
 web-pretrained representation and the small labelled-AOI set, not imagery
 compression or resolution. It also retroactively vindicates the
 Section~\ref{sec:data} decision to work from the $\sim$7\,GB preprocessed subset
@@ -1862,7 +1862,7 @@ is strongest for temporally sharp events --- snow melt ($0.586$, $p=0.025$) and
 abrupt soil clearing ($0.324$) --- and weak for gradual or ambiguous ones
 (deforestation $0.142$, below its floor). As with spatial localization
 (Section~\ref{sec:localization}) the effect is encoder-dependent: repeating the
-study with GeoRSCLIP (ViT-B/32) gives macro $0.146$ vs the same $0.208$ floor --- at
+study with GeoRSCLIP (ViT-B/32) gives macro $0.146$ vs the same $0.207$ floor --- at
 or below chance --- so the larger general-purpose ViT-L/14 pinpoints change in time
 where the smaller RS-pretrained backbone does not. The honest limit is statistical
 power: only 1--7 AOIs carry positives per query, so although the aggregate clears

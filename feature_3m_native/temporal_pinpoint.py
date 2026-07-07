@@ -26,7 +26,7 @@ Honesty machinery matches the rest of the repo: per-query permutation p-value
 Run::
 
     uv run python feature_3m_native/temporal_pinpoint.py \
-        --root /media/markos/<drive>/dynamic_earthnet --encoder clip_vitl14
+        --root /path/to/dynamic_earthnet --encoder clip_vitl14
 """
 from __future__ import annotations
 

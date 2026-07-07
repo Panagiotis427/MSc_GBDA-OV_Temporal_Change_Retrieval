@@ -31,7 +31,7 @@ depend only on the AOI set + seed, so the partition is identical too.
 Run::
 
     uv run python feature_3m_native/jpeg_ablation.py \
-        --root /media/markos/<drive>/dynamic_earthnet --folds 5 \
+        --root /path/to/dynamic_earthnet --folds 5 \
         --qualities 95 75 50 25 10
 """
 from __future__ import annotations
