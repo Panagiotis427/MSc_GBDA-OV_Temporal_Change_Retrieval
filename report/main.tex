@@ -32,7 +32,7 @@
     pdfauthor={Panagiotis Giannikos and Markos Syroukis}
 }
 
-% Figures live under figures/; the NTUA logo (when added) under images/.
+% Figures live under figures/ (including the NTUA logo).
 \graphicspath{{figures/}{images/}}
 
 
@@ -79,7 +79,7 @@ open-vocabulary breadth and pixel-level change localisation. All findings are
 reported under a strict statistical protocol (random-ranking baselines, FDR
 correction, and leave-one-AOI-out cross-validation). Out of distribution, the
 frozen zero-shot score beats the learned PEFT and LoRA adapters: the adapters'
-high in-distribution scores (0.420--0.998 mAP) measure the adapter evaluated on
+high in-distribution scores (0.420--0.999 mAP) measure the adapter evaluated on
 its own training pairs (memorisation) and collapse to or below chance on
 held-out areas. Single-split test mAP on the 110-pair split is high-variance -
 the GeoRSCLIP+NRG configuration reaches 0.426 on one split, while its 5-fold AOI
@@ -1534,7 +1534,7 @@ AOI timeline (Appendix~\ref{sec:temporalpinpoint}), and a clear zero-shot vs PEF
 comparison across three CLIP-variant encoders on Dynamic EarthNet, reported under a
 strict statistical protocol. Four findings emerge. First, a learned adapter shows no
 out-of-distribution gain: the large in-distribution PEFT lift
-($0.043 \rightarrow 0.420$, up to 0.998 on QFabric) is the adapter scored on its
+($0.043 \rightarrow 0.420$, up to 0.999 on QFabric) is the adapter scored on its
 own training pairs (memorisation), and under the headline GeoRSCLIP+NRG
 configuration leakage-free cross-validated PEFT ($0.196 \pm 0.049$) merely
 overlaps frozen zero-shot ($0.139 \pm 0.024$) within fold variance, so low-compute
@@ -1588,7 +1588,7 @@ at full radiometric depth - the adapter was also run directly on the native
 Planet-Fusion~\cite{planetfusion} surface-reflectance rasters
 ($1024\times1024\times4$ \texttt{int16}, Blue/Green/Red/NIR, 3\,m), read in-memory
 from the per-zone \texttt{planet.<UTM>.zip} archives with no lossy re-encoding,
-yielding 23 labelled AOIs (552 bimonthly change pairs) spanning all seven DEN
+yielding 23 labelled AOIs (552 change pairs, under that earlier pipeline's denser pairing) spanning all seven DEN
 land-cover classes. The adapter (frozen CLIP ViT-L/14, \texttt{difference} change
 feature) was scored under the same held-out protocol as
 Section~\ref{sec:denmain}: a 5-seed stratified AOI-level hold-out (split on real
