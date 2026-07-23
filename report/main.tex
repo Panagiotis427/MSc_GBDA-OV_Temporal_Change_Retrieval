@@ -654,7 +654,7 @@ buildings, urban expansion, water) near chance. Scoring from per-patch embedding
 with \texttt{patch\_top3} (Section~\ref{sec:methods}) lifts cross-validated mAP to
 $0.193 \pm 0.051$ - the best DEN configuration - and makes new buildings
 ($q{=}0.003$) and urban expansion ($q{=}0.006$) beat random under FDR correction
-for the first time, with new water borderline ($q{=}0.053$)
+for the first time --- four of the nine change-types are FDR-significant in this configuration --- with new water borderline ($q{=}0.053$)
 (Figure~\ref{fig:cvprogression}). Diffuse large-area wetland change still prefers
 the global score, so the two are complementary. GeoRSCLIP's coarse 49-patch grid
 beats CLIP-L/14's finer 256-patch grid (0.193 vs 0.149), so domain pre-training
@@ -758,12 +758,7 @@ train-fit ranking reverses on held-out data, where GeoRSCLIP leads
 
 \begin{figure}[H]
     \centering
-    \includegraphics[width=\linewidth]{zeroshot_vs_peft__clip_vitl14__train_part1.png}
-    \label{fig:zsvspeft_part1}
-\end{figure}
-
-\begin{figure}[H]
-    \centering
+    \includegraphics[width=\linewidth]{zeroshot_vs_peft__clip_vitl14__train_part1.png}\\[4pt]
     \includegraphics[width=\linewidth]{zeroshot_vs_peft__clip_vitl14__train_part2.png}
     \caption{Qualitative zero-shot vs PEFT (CLIP, train): top-3 retrievals per
     query, $[T_1 \mid T_2]$, green = relevant. The adapter sharpens scores, but

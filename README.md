@@ -28,9 +28,9 @@ quantitative change localisation.
 
 **Screen recordings** (`demos/`, click to play on GitHub) —
 [1](demos/demo_1.mp4) · [2](demos/demo_2.mp4) · [3](demos/demo_3.mp4) the app in default settings
-(LEVIR-CC, GeoRSCLIP, zero-shot) running the built-in example searches;
+(LEVIR-MCI — the documented default, sharing LEVIR-CC's pairs — GeoRSCLIP, zero-shot) running the built-in example searches;
 [4](demos/demo_4.mp4) a custom free-text query (open-vocabulary);
-[5](demos/demo_5.mp4) switching dataset (LEVIR-CC → Dynamic EarthNet) and scoring approach
+[5](demos/demo_5.mp4) switching dataset (LEVIR-MCI → Dynamic EarthNet) and scoring approach
 (zero-shot → patch / localised).
 
 *Enter a free-text change query, pick a dataset / encoder / scoring approach, and get
@@ -165,7 +165,7 @@ figures — **are in the deliverable report: [`report/main.pdf`](report/main.pdf
 | `scripts/benchmark_levir_cc.py` | LEVIR-CC 5-query open-vocab retrieval, per-query AP (reads the shared LEVIR-MCI dir) |
 | `scripts/benchmark_second_cc.py` | SECOND-CC 7-query open-vocab breadth retrieval, per-query AP |
 | `scripts/eval_localization.py` | quantitative change localisation (pointing-game + patch-AP vs mask) — `--dataset levir_mci\|second_cc` |
-| `scripts/peft_augment_eval.py` | Track-4 anti-memorization check: frozen / PEFT / PEFT+feature-noise on the same leakage-free folds |
+| `scripts/peft_augment_eval.py` | anti-memorization check: frozen / PEFT / PEFT+feature-noise on the same leakage-free folds (exploratory; not surfaced in the report) |
 | `scripts/make_den_fixture.py` | tiny synthetic DEN tree for fast tests |
 | `scripts/run_pipeline.py` | one-command run with `--train-split` / `--eval-splits` / `--color-mode` / `--mode` / `--lora` / `--results-dir`; cross-split mAP table |
 | `scripts/precompute_patch_embeddings.py` | warm the on-disk per-patch embedding cache (`PatchEmbeddingStore` in `src/embeddings.py`) so the first `approach="patch"` query in the app is instant instead of a full GPU pass |
@@ -178,7 +178,7 @@ figures — **are in the deliverable report: [`report/main.pdf`](report/main.pdf
 | `scripts/cv_eval.py` | full-corpus + k-fold AOI cross-validation with bootstrap CIs; `--relevance fraction` swaps dominant-class-flip relevance for pixel-fraction (report §8.1); merges cached split embeddings, no re-encode |
 | `scripts/patch_eval.py` | patch-level (localised) Δ-similarity change retrieval vs the global baseline (report §8.1, "S3"); caches per-patch embeddings via `encoder.encode_image_patches`. `--approach hybrid` fuses global+patch, `patch_softattn`/`patch_spatial` are training-free change-attention variants, `--prompt-ensemble` averages query templates (all report §8.3) |
 
-*Report-figure and native-3m experiment scripts — `download_den_planet`, `make_dataset_figures`, `make_jpeg_ablation_figure`, `make_pipeline_figure`, `make_temporal_pinpoint_figure` — are documented in [`feature_3m_native/README.md`](feature_3m_native/README.md); `scripts/deploy_space.py` publishes the HuggingFace Space.*
+*Native-3m experiment scripts — `download_den_planet`, `make_jpeg_ablation_figure`, `make_temporal_pinpoint_figure` — are documented in [`feature_3m_native/README.md`](feature_3m_native/README.md); `make_dataset_figures` and `make_pipeline_figure` generate report figures from `results/`; `scripts/deploy_space.py` publishes the HuggingFace Space.*
 
 ## Run / install / use
 

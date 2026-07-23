@@ -41,8 +41,10 @@ rasters** — full radiometric depth, no JPEG loss.
 - `feature_3m_native/jpeg_ablation.py` — **controlled compression/resolution
   ablation**: holds AOIs, encoder, colour and folds fixed and varies only the per-tile
   degradation (JPEG quality {95,75,50,25,10}; downsampling {512,256,128,64}px + JPEG
-  q75). Confirms image fidelity is not the bottleneck — largest Δ from native is
-  0.036 mAP, within one fold std, same null under GeoRSCLIP. Plot:
+  q75). Confirms image fidelity is not the bottleneck — the largest Δ from native across the
+  JPEG-quality sweep is 0.036 mAP (within one fold std); the resolution sweep reaches $+0.086$ mAP at
+  64px, but within that setting's inflated fold variance (std up to 0.21, few positives per small
+  fold), so no degradation is detectable at this corpus size — same null under GeoRSCLIP. Plot:
   `scripts/make_jpeg_ablation_figure.py`.
 - `feature_3m_native/temporal_pinpoint.py` — **temporal pinpointing**: ranks the
   monthly steps within each AOI timeline (*when* does the change occur) by zero-shot
